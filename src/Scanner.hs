@@ -246,7 +246,7 @@ data Token = INT | IF | ELSE | NEQUAL
            | TIMES | DIVIDE | EQUAL | CHAR
            | WRITE | READ | GREATER | LESS
            | NOT | LENGTH | WHILE
-           | NAME String | NUMBER Int | QCHAR String
+           | NAME String | NUMBER Int | QCHAR Char
            deriving (Eq, Show)
 
 alex_action_2 =  \s -> INT 
@@ -276,7 +276,7 @@ alex_action_25 =  \s -> LENGTH
 alex_action_26 =  \s -> WHILE 
 alex_action_27 =  \s -> NUMBER (read s) 
 alex_action_28 =  \s -> NAME s 
-alex_action_29 =  \s -> QCHAR s 
+alex_action_29 =  \s -> QCHAR (s !! 1) 
 {-# LINE 1 "templates/GenericTemplate.hs" #-}
 {-# LINE 1 "templates/GenericTemplate.hs" #-}
 {-# LINE 1 "<built-in>" #-}

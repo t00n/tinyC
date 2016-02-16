@@ -37,7 +37,7 @@ tokens :-
     while           { \s -> WHILE }
     $digit+         { \s -> NUMBER (read s) }
     $alpha[$word]*    { \s -> NAME s }
-    \'.\'             { \s -> QCHAR s }
+    \'.\'             { \s -> QCHAR (s !! 1) }
 
 {
 data Token = INT | IF | ELSE | NEQUAL
@@ -47,6 +47,6 @@ data Token = INT | IF | ELSE | NEQUAL
            | TIMES | DIVIDE | EQUAL | CHAR
            | WRITE | READ | GREATER | LESS
            | NOT | LENGTH | WHILE
-           | NAME String | NUMBER Int | QCHAR String
+           | NAME String | NUMBER Int | QCHAR Char
            deriving (Eq, Show)
 }
