@@ -11,7 +11,7 @@ main :: IO ()
 --        it "does someting" $ do
 --            5 `shouldBe` (5 :: Int)
 main = do
-    s <- readFile "fixtures/trivial.c"
-    tokens <- alexScanTokens s
-    putStrLn tokens
+    s <- readFile "test/fixtures/trivial.c"
+    let tokens = alexScanTokens s
+    putStrLn $ show tokens
 

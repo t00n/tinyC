@@ -4,22 +4,49 @@
 
 %wrapper "basic"
 $digit = 0-9
--- digits
 $alpha = [a-zA-Z]
--- alphabetic characters
+$word = [$alpha$digit\_]
 
 tokens :- 
-    $white+     ;
-    $digit+     { \s -> INT (read s) }
+    $white+         ; -- spaces etc
+    \/\/.*          ; -- comments
+    int             { \s -> INT }
+    if              { \s -> IF }
+    else            { \s -> ELSE }
+    !=              { \s -> NEQUAL }
+    return          { \s -> RETURN }
+    \(               { \s -> LPAR }
+    \)               { \s -> RPAR }
+    \{               { \s -> LBRACE }
+    \}               { \s -> RBRACE }
+    =               { \s -> ASSIGN }
+    \;               { \s -> SEMICOLON }
+    \,               { \s -> COMMA }
+    \+               { \s -> PLUS }
+    \-               { \s -> MINUS }
+    \*               { \s -> TIMES }
+    \/               { \s -> DIVIDE }
+    ==              { \s -> EQUAL }
+    char            { \s -> CHAR }
+    write           { \s -> WRITE }
+    read            { \s -> READ }
+    >               { \s -> GREATER }
+    \<               { \s -> LESS }
+    !               { \s -> NOT }
+    length          { \s -> LENGTH }
+    while           { \s -> WHILE }
+    $digit+         { \s -> NUMBER (read s) }
+    $alpha[$word]*    { \s -> NAME s }
+    \'.\'             { \s -> QCHAR s }
 
 {
-data Token = INT Int | IF | ELSE | NEQUAL
+data Token = INT | IF | ELSE | NEQUAL
            | RETURN | LPAR | RPAR | LBRACE
            | RBRACE | LBRACK | RBRACK | ASSIGN
            | SEMICOLON | COMMA | PLUS | MINUS
            | TIMES | DIVIDE | EQUAL | CHAR
            | WRITE | READ | GREATER | LESS
            | NOT | LENGTH | WHILE
-           | NAME | NUMBER | QCHAR
+           | NAME String | NUMBER Int | QCHAR String
            deriving (Eq, Show)
 }
