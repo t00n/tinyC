@@ -1,6 +1,6 @@
 import Test.Hspec
 import Test.QuickCheck
-import Control.Exception (evaluate)
+import Control.Exception (evaluate, ErrorCall)
 import System.IO
 
 import Scanner
@@ -16,4 +16,9 @@ main = hspec $ do
             s <- readFile "test/fixtures/fibonacci.c"
             let tokens = alexScanTokens s
             tokens `shouldBe` [INT,NAME "fibonacci",LPAR,INT,NAME "n",RPAR,LBRACE,IF,LPAR,NAME "n",LESS,NUMBER 0,RPAR,LBRACE,RETURN,MINUS,NUMBER 1,SEMICOLON,RBRACE,ELSE,IF,LPAR,NAME "n",LESS,NUMBER 1,RPAR,LBRACE,RETURN,NUMBER 0,SEMICOLON,RBRACE,ELSE,IF,LPAR,NAME "n",LESS,NUMBER 2,RPAR,LBRACE,RETURN,NUMBER 1,SEMICOLON,RBRACE,ELSE,LBRACE,RETURN,NAME "fibonacci",LPAR,NAME "n",MINUS,NUMBER 1,RPAR,PLUS,NAME "fibonacci",LPAR,NAME "n",MINUS,NUMBER 2,RPAR,SEMICOLON,RBRACE,RBRACE,INT,NAME "main",LPAR,INT,NAME "argc",COMMA,CHAR,TIMES,TIMES,NAME "argv",RPAR,LBRACE,INT,NAME "i",ASSIGN,NUMBER 0,SEMICOLON,WHILE,LPAR,NAME "i",LESS,NUMBER 10,RPAR,LBRACE,WRITE,LPAR,NAME "fibonacci",LPAR,NAME "i",RPAR,RPAR,SEMICOLON,NAME "i",ASSIGN,NAME "i",PLUS,NUMBER 1,SEMICOLON,RBRACE,RBRACE]
+        it "Tokenizes wrong.c" $ do
+            s <- readFile "test/fixtures/wrong.c"
+            let tokens = alexScanTokens s
+            --putStrLn $ show tokens
+            evaluate tokens `shouldThrow` anyErrorCall
 
