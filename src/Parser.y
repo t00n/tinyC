@@ -40,8 +40,13 @@ import Scanner (Token(..))
     qchar           { QCHAR $$ }
     qstring         { QString $$ }
 
+%left ','
+%right '='
+%left '==' '!='
 %left '+' '-'
 %left '*' '/'
+%right '!'
+%left '[' ']' '(' ')'
 %%
 
 Statements : Statement                { $1 }
