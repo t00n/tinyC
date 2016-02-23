@@ -27,6 +27,9 @@ main = hspec $ do
             let s = "int a = 2;;; int b = 3;; int c = 4;"
             let tokens = alexScanTokens s
             let ast = parse tokens
-            putStrLn $ show ast
-            ast `shouldBe` [Declaration INT "a" 2, Declaration INT "b" 3, Declaration INT "c" 4]            
+            ast `shouldBe` [Declaration INT "a" 2, Declaration INT "b" 3, Declaration INT "c" 4]
+        it "Parses declarations without semicolons and throws an exception" $ do
+            let s = "int a = 2 int b = 3;"
+            let tokens = alexScanTokens s
+            evaluate (parse tokens) `shouldThrow` anyErrorCall
 

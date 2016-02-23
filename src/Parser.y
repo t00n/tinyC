@@ -44,7 +44,6 @@ import Scanner (Token(..))
 
 Statements : Statement                { $1 }
            | Statements Statement     { $1 ++ $2 }
-           | {- empty -}              { [] }
 
 Statement : Statement1 ';'            { [$1] }
           | {- empty -} ';'           { [] }
