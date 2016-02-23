@@ -1,5 +1,5 @@
 {
-module Parser (parse) where
+module Parser (parse, Statement(..)) where
 import Scanner (Token(..))
 }
 
@@ -42,18 +42,21 @@ import Scanner (Token(..))
 
 %%
 
-Instruction : int var '=' number ';'  { Declaration $1 $2 $4 }
+Statements : Statement                { $1 }
+           | Statements Statement     { $1 ++ $2 }
+           | {- empty -}              { [] }
+
+Statement : Statement1 ';'            { [$1] }
+          | {- empty -} ';'           { [] }
+
+Statement1 : int var '=' number       { Declaration $1 $2 $4 }
 
 {
 parseError :: [Token] -> a
 parseError _ = error "Parse error"
 
-type Program = [Statement]
+type Statements = [Statement]
 
-data Statement = Instruction
-               | Block
-    deriving Show
-
-data Instruction = Declaration Token String Int
-    deriving Show
+data Statement = Declaration Token String Int
+    deriving (Eq, Show)
 }
