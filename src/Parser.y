@@ -50,7 +50,8 @@ Statements : Statement                { $1 }
 Statement : Statement1 ';'            { [$1] }
           | {- empty -} ';'           { [] }
 
-Statement1 : int var '=' IntExpr       { Declaration $1 $2 $4 }
+Statement1 : int var '=' IntExpr      { Declaration $1 $2 (Just $4) }
+           | int var                  { Declaration $1 $2 Nothing }
 
 IntExpr : number                      { $1 }
         | IntExpr '+' IntExpr         { $1 + $3 }
@@ -63,7 +64,7 @@ parseError _ = error "Parse error"
 
 type Statements = [Statement]
 
-data Statement = Declaration Token String Int
+data Statement = Declaration Token String (Maybe Int)
     deriving (Eq, Show)
 
 data IntExpr = Int

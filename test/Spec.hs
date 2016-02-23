@@ -23,11 +23,16 @@ main = hspec $ do
         testTokens "fibonacci.c" [INT,NAME "fibonacci",LPAR,INT,NAME "n",RPAR,LBRACE,IF,LPAR,NAME "n",LESS,NUMBER 0,RPAR,LBRACE,RETURN,MINUS,NUMBER 1,SEMICOLON,RBRACE,ELSE,IF,LPAR,NAME "n",LESS,NUMBER 1,RPAR,LBRACE,RETURN,NUMBER 0,SEMICOLON,RBRACE,ELSE,IF,LPAR,NAME "n",LESS,NUMBER 2,RPAR,LBRACE,RETURN,NUMBER 1,SEMICOLON,RBRACE,ELSE,LBRACE,RETURN,NAME "fibonacci",LPAR,NAME "n",MINUS,NUMBER 1,RPAR,PLUS,NAME "fibonacci",LPAR,NAME "n",MINUS,NUMBER 2,RPAR,SEMICOLON,RBRACE,RBRACE,INT,NAME "main",LPAR,INT,NAME "argc",COMMA,CHAR,TIMES,TIMES,NAME "argv",RPAR,LBRACE,INT,NAME "i",ASSIGN,NUMBER 0,SEMICOLON,WHILE,LPAR,NAME "i",LESS,NUMBER 10,RPAR,LBRACE,WRITE,LPAR,NAME "fibonacci",LPAR,NAME "i",RPAR,RPAR,SEMICOLON,NAME "i",ASSIGN,NAME "i",PLUS,NUMBER 1,SEMICOLON,RBRACE,RBRACE]
         testTokensThrow "wrong.c" anyErrorCall
     describe "Parser" $ do
+        it "Parses int declarations" $ do
+            let s = "int a = 2; int b;"
+            let tokens = alexScanTokens s
+            let ast = parse tokens
+            ast `shouldBe` [Declaration INT "a" (Just 2), Declaration INT "b" Nothing]
         it "Parses several declarations with too much semicolons" $ do
             let s = "int a = 2;;; int b = 3;; int c = 4;"
             let tokens = alexScanTokens s
             let ast = parse tokens
-            ast `shouldBe` [Declaration INT "a" 2, Declaration INT "b" 3, Declaration INT "c" 4]
+            ast `shouldBe` [Declaration INT "a" (Just 2), Declaration INT "b" (Just 3), Declaration INT "c" (Just 4)]
         it "Parses declarations without semicolons and throws an exception" $ do
             let s = "int a = 2 int b = 3;"
             let tokens = alexScanTokens s
@@ -36,5 +41,5 @@ main = hspec $ do
             let s = "int a = 2 + 3; int b = 2 + 3 * 4; int c = 2 / 4 + 3 * 2; int d = 8/2 + 1;"
             let tokens = alexScanTokens s
             let ast = parse tokens
-            ast `shouldBe` [Declaration INT "a" 5, Declaration INT "b" 14, Declaration INT "c" 6, Declaration INT "d" 5]
+            ast `shouldBe` [Declaration INT "a" (Just 5), Declaration INT "b" (Just 14), Declaration INT "c" (Just 6), Declaration INT "d" (Just 5)]
 
