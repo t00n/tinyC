@@ -32,4 +32,9 @@ main = hspec $ do
             let s = "int a = 2 int b = 3;"
             let tokens = alexScanTokens s
             evaluate (parse tokens) `shouldThrow` anyErrorCall
+        it "Parses integer expressions" $ do
+            let s = "int a = 2 + 3; int b = 2 + 3 * 4; int c = 2 / 4 + 3 * 2; int d = 8/2 + 1;"
+            let tokens = alexScanTokens s
+            let ast = parse tokens
+            ast `shouldBe` [Declaration INT "a" 5, Declaration INT "b" 14, Declaration INT "c" 6, Declaration INT "d" 5]
 

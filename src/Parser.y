@@ -40,6 +40,8 @@ import Scanner (Token(..))
     qchar           { QCHAR $$ }
     qstring         { QString $$ }
 
+%left '+' '-'
+%left '*' '/'
 %%
 
 Statements : Statement                { $1 }
@@ -48,8 +50,13 @@ Statements : Statement                { $1 }
 Statement : Statement1 ';'            { [$1] }
           | {- empty -} ';'           { [] }
 
-Statement1 : int var '=' number       { Declaration $1 $2 $4 }
+Statement1 : int var '=' IntExpr       { Declaration $1 $2 $4 }
 
+IntExpr : number                      { $1 }
+        | IntExpr '+' IntExpr         { $1 + $3 }
+        | IntExpr '-' IntExpr         { $1 - $3 }
+        | IntExpr '*' IntExpr         { $1 * $3 }
+        | IntExpr '/' IntExpr         { $1 `div` $3 }
 {
 parseError :: [Token] -> a
 parseError _ = error "Parse error"
@@ -58,4 +65,7 @@ type Statements = [Statement]
 
 data Statement = Declaration Token String Int
     deriving (Eq, Show)
+
+data IntExpr = Int
+             | IntExpr Token IntExpr
 }
