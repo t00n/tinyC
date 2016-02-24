@@ -27,12 +27,12 @@ main = hspec $ do
             let s = "int a = 2; int b;"
             let tokens = alexScanTokens s
             let ast = parse tokens
-            ast `shouldBe` [Declaration INT "a" (Just 2), Declaration INT "b" Nothing]
+            ast `shouldBe` [Declaration INT "a" (Just $ Lit 2), Declaration INT "b" Nothing]
         it "Parses several declarations with too much semicolons" $ do
             let s = "int a = 2;;; int b = 3;; int c = 4;"
             let tokens = alexScanTokens s
             let ast = parse tokens
-            ast `shouldBe` [Declaration INT "a" (Just 2), Declaration INT "b" (Just 3), Declaration INT "c" (Just 4)]
+            ast `shouldBe` [Declaration INT "a" (Just $ Lit 2), Declaration INT "b" (Just $ Lit 3), Declaration INT "c" (Just $ Lit 4)]
         it "Parses declarations without semicolons and throws an exception" $ do
             let s = "int a = 2 int b = 3;"
             let tokens = alexScanTokens s
@@ -41,5 +41,5 @@ main = hspec $ do
             let s = "int a = 2 + 3; int b = 2 + 3 * 4; int c = 2 / 4 + 3 * 2; int d = 8/2 + 1;"
             let tokens = alexScanTokens s
             let ast = parse tokens
-            ast `shouldBe` [Declaration INT "a" (Just 5), Declaration INT "b" (Just 14), Declaration INT "c" (Just 6), Declaration INT "d" (Just 5)]
+            ast `shouldBe` [Declaration INT "a" (Just $ Operator (Lit 2) PLUS (Lit 3)), Declaration INT "b" (Just $ Operator (Lit 2) PLUS $ Operator (Lit 3) TIMES (Lit 4)), Declaration INT "c" (Just $ Operator (Operator (Lit 2) DIVIDE (Lit 4)) PLUS (Operator (Lit 3) TIMES (Lit 2))), Declaration INT "d" (Just $ Operator (Operator (Lit 8) DIVIDE (Lit 2)) PLUS (Lit 1))]
 
