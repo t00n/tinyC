@@ -41,10 +41,10 @@ main = hspec $ do
             let s = "int a = 2 + 3; int b = 2 + 3 * 4; int c = 2 / 4 + 3 * 2; int d = 8/2 + 1;"
             let tokens = alexScanTokens s
             let ast = parse tokens
-            ast `shouldBe` [Declaration Int "a" (Just $ Operator (Lit 2) PLUS (Lit 3)), Declaration Int "b" (Just $ Operator (Lit 2) PLUS $ Operator (Lit 3) TIMES (Lit 4)), Declaration Int "c" (Just $ Operator (Operator (Lit 2) DIVIDE (Lit 4)) PLUS (Operator (Lit 3) TIMES (Lit 2))), Declaration Int "d" (Just $ Operator (Operator (Lit 8) DIVIDE (Lit 2)) PLUS (Lit 1))]
+            ast `shouldBe` [Declaration Int "a" (Just $ Operator (Lit 2) Plus (Lit 3)), Declaration Int "b" (Just $ Operator (Lit 2) Plus $ Operator (Lit 3) Times (Lit 4)), Declaration Int "c" (Just $ Operator (Operator (Lit 2) Divide (Lit 4)) Plus (Operator (Lit 3) Times (Lit 2))), Declaration Int "d" (Just $ Operator (Operator (Lit 8) Divide (Lit 2)) Plus (Lit 1))]
         --it "Parses integer and char expressions" $ do
         --    let s = "int c = 'c' + 'b'; int a = 2 + 'c';"
         --    let tokens = alexScanTokens s
         --    let ast = parse tokens
-        --    ast `shouldBe` [Declaration Int "c" (Just $ Operator (Lit 'c') PLUS (Lit 'b')), Declaration Int "a" (Just $ Operator (Lit 2) PLUS (Lit 'c'))]
+        --    ast `shouldBe` [Declaration Int "c" (Just $ Operator (Lit 'c') Plus (Lit 'b')), Declaration Int "a" (Just $ Operator (Lit 2) Plus (Lit 'c'))]
 

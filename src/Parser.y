@@ -1,5 +1,5 @@
 {
-module Parser (parse, Statement(..), Expr(..), Declaration1(..), Type(..)) where
+module Parser (parse, Statement(..), Expr(..), Declaration1(..), Type(..), BinaryOperator(..)) where
 import Scanner (Token(..))
 }
 
@@ -59,10 +59,10 @@ Statement1 : int var '=' Expr         { Declaration Int $2 (Just $4) }
            | int var                  { Declaration Int $2 Nothing }
 
 Expr : number                         { Lit $1 }
-     | Expr '+' Expr                  { Operator $1 $2 $3 }
-     | Expr '-' Expr                  { Operator $1 $2 $3 }
-     | Expr '*' Expr                  { Operator $1 $2 $3 }
-     | Expr '/' Expr                  { Operator $1 $2 $3 }
+     | Expr '+' Expr                  { Operator $1 Plus $3 }
+     | Expr '-' Expr                  { Operator $1 Minus $3 }
+     | Expr '*' Expr                  { Operator $1 Times $3 }
+     | Expr '/' Expr                  { Operator $1 Divide $3 }
 {
 parseError :: [Token] -> a
 parseError _ = error "Parse error"
@@ -78,7 +78,10 @@ data Declaration1 a = Declaration Type String (Maybe (Expr a))
 data Type = Int | Char
     deriving (Eq, Show)
 
+data BinaryOperator = Plus | Minus | Times | Divide
+    deriving (Eq, Show)
+
 data Expr a = Lit a
-            | Operator (Expr a) Token (Expr a)
+            | Operator (Expr a) BinaryOperator (Expr a)
     deriving (Eq, Show)
 }
