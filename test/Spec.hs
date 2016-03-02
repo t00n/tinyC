@@ -27,12 +27,12 @@ main = hspec $ do
             let s = "int a = 2; int b;"
             let tokens = alexScanTokens s
             let ast = parse tokens
-            ast `shouldBe` [Declaration Int "a" (Just $ Lit 2), Declaration Int "b" Nothing]
+            ast `shouldBe` [Declaration IntType "a" (Just $ Int 2), Declaration IntType "b" Nothing]
         it "Parses several declarations with too much semicolons" $ do
             let s = "int a = 2;;; int b = 3;; int c = 4;"
             let tokens = alexScanTokens s
             let ast = parse tokens
-            ast `shouldBe` [Declaration Int "a" (Just $ Lit 2), Declaration Int "b" (Just $ Lit 3), Declaration Int "c" (Just $ Lit 4)]
+            ast `shouldBe` [Declaration IntType "a" (Just $ Int 2), Declaration IntType "b" (Just $ Int 3), Declaration IntType "c" (Just $ Int 4)]
         it "Parses declarations without semicolons and throws an exception" $ do
             let s = "int a = 2 int b = 3;"
             let tokens = alexScanTokens s
@@ -41,15 +41,15 @@ main = hspec $ do
             let s = "int a = 2 + 3; int b = 2 + 3 * 4; int c = 2 / 4 + 3 * 2; int d = 8/2 + 1;"
             let tokens = alexScanTokens s
             let ast = parse tokens
-            ast `shouldBe` [Declaration Int "a" (Just $ Operator (Lit 2) Plus (Lit 3)), Declaration Int "b" (Just $ Operator (Lit 2) Plus $ Operator (Lit 3) Times (Lit 4)), Declaration Int "c" (Just $ Operator (Operator (Lit 2) Divide (Lit 4)) Plus (Operator (Lit 3) Times (Lit 2))), Declaration Int "d" (Just $ Operator (Operator (Lit 8) Divide (Lit 2)) Plus (Lit 1))]
-        --it "Parses declaration of int with char expressions" $ do
-        --    let s = "int a = 'c'; char c = 5;"
-        --    let tokens = alexScanTokens s
-        --    let ast = parse tokens
-        --    ast `shouldBe` [Declaration Int "a" (Just $ Lit 'c'), Declaration Char "c" (Just $ Lit 5)]
+            ast `shouldBe` [Declaration IntType "a" (Just $ Operator (Int 2) Plus (Int 3)), Declaration IntType "b" (Just $ Operator (Int 2) Plus $ Operator (Int 3) Times (Int 4)), Declaration IntType "c" (Just $ Operator (Operator (Int 2) Divide (Int 4)) Plus (Operator (Int 3) Times (Int 2))), Declaration IntType "d" (Just $ Operator (Operator (Int 8) Divide (Int 2)) Plus (Int 1))]
+        it "Parses declaration of int with char expressions" $ do
+            let s = "int a = 'c'; char c = 5;"
+            let tokens = alexScanTokens s
+            let ast = parse tokens
+            ast `shouldBe` [Declaration IntType "a" (Just $ Char 'c'), Declaration CharType "c" (Just $ Int 5)]
         --it "Parses integer and char expressions" $ do
         --    let s = "int c = 'c' + 'b'; int a = 2 + 'c';"
         --    let tokens = alexScanTokens s
         --    let ast = parse tokens
-        --    ast `shouldBe` [Declaration Int "c" (Just $ Operator (Lit 'c') Plus (Lit 'b')), Declaration Int "a" (Just $ Operator (Lit 2) Plus (Lit 'c'))]
+        --    ast `shouldBe` [Declaration IntType "c" (Just $ Operator (Lit 'c') Plus (Lit 'b')), Declaration IntType "a" (Just $ Operator (Lit 2) Plus (Lit 'c'))]
 

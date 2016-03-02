@@ -55,10 +55,13 @@ Statements : Statement                { $1 }
 Statement : Statement1 ';'            { [$1] }
           | {- empty -} ';'           { [] }
 
-Statement1 : int var '=' Expr         { Declaration Int $2 (Just $4) }
-           | int var                  { Declaration Int $2 Nothing }
+Statement1 : int var '=' Expr         { Declaration IntType $2 (Just $4) }
+           | int var                  { Declaration IntType $2 Nothing }
+           | char var '=' Expr        { Declaration CharType $2 (Just $4) }
+           | char var                 { Declaration CharType $2 Nothing}
 
-Expr : number                         { Lit $1 }
+Expr : number                         { Int $1 }
+     | qchar                          { Char $1 }
      | Expr '+' Expr                  { Operator $1 Plus $3 }
      | Expr '-' Expr                  { Operator $1 Minus $3 }
      | Expr '*' Expr                  { Operator $1 Times $3 }
@@ -72,16 +75,17 @@ type Statements = [Statement]
 data Statement = Declaration1
     deriving (Eq, Show)
 
-data Declaration1 a = Declaration Type String (Maybe (Expr a))
+data Declaration1 = Declaration Type String (Maybe Expr)
     deriving (Eq, Show)
 
-data Type = Int | Char
+data Type = IntType | CharType
     deriving (Eq, Show)
 
 data BinaryOperator = Plus | Minus | Times | Divide
     deriving (Eq, Show)
 
-data Expr a = Lit a
-            | Operator (Expr a) BinaryOperator (Expr a)
+data Expr = Int Int
+            | Char Char
+            | Operator Expr BinaryOperator Expr
     deriving (Eq, Show)
 }
