@@ -47,9 +47,9 @@ main = hspec $ do
             let tokens = alexScanTokens s
             let ast = parse tokens
             ast `shouldBe` [Declaration IntType "a" (Just $ Char 'c'), Declaration CharType "c" (Just $ Int 5)]
-        --it "Parses integer and char expressions" $ do
-        --    let s = "int c = 'c' + 'b'; int a = 2 + 'c';"
-        --    let tokens = alexScanTokens s
-        --    let ast = parse tokens
-        --    ast `shouldBe` [Declaration IntType "c" (Just $ Operator (Lit 'c') Plus (Lit 'b')), Declaration IntType "a" (Just $ Operator (Lit 2) Plus (Lit 'c'))]
+        it "Parses integer and char expressions" $ do
+            let s = "int c = 'c' + 'b'; int a = 2 + 'c'; char c = 'c' + 2; char c = 2 + 3;"
+            let tokens = alexScanTokens s
+            let ast = parse tokens
+            ast `shouldBe` [Declaration IntType "c" (Just $ Operator (Char 'c') Plus (Char 'b')), Declaration IntType "a" (Just $ Operator (Int 2) Plus (Char 'c')), Declaration CharType "c" (Just $ Operator (Char 'c') Plus (Int 2)), Declaration CharType "c" (Just $ Operator (Int 2) Plus (Int 3))]
 
