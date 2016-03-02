@@ -42,6 +42,11 @@ main = hspec $ do
             let tokens = alexScanTokens s
             let ast = parse tokens
             ast `shouldBe` [Declaration Int "a" (Just $ Operator (Lit 2) Plus (Lit 3)), Declaration Int "b" (Just $ Operator (Lit 2) Plus $ Operator (Lit 3) Times (Lit 4)), Declaration Int "c" (Just $ Operator (Operator (Lit 2) Divide (Lit 4)) Plus (Operator (Lit 3) Times (Lit 2))), Declaration Int "d" (Just $ Operator (Operator (Lit 8) Divide (Lit 2)) Plus (Lit 1))]
+        --it "Parses declaration of int with char expressions" $ do
+        --    let s = "int a = 'c'; char c = 5;"
+        --    let tokens = alexScanTokens s
+        --    let ast = parse tokens
+        --    ast `shouldBe` [Declaration Int "a" (Just $ Lit 'c'), Declaration Char "c" (Just $ Lit 5)]
         --it "Parses integer and char expressions" $ do
         --    let s = "int c = 'c' + 'b'; int a = 2 + 'c';"
         --    let tokens = alexScanTokens s
