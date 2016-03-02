@@ -57,4 +57,7 @@ main = hspec $ do
             let tokens = alexScanTokens s
             let ast = parse tokens
             ast `shouldBe`[Assignment "a" (Int 5), Assignment "b" (Char 'c')]
+        it "Uses variables in declarations and assignments" $ do
+            let ast = (parse . alexScanTokens) "int a = b; char c = a + 5; a = 'c' + c; b = a + b;"
+            ast `shouldBe` [Declaration IntType "a" (Just $ Var "b"), Declaration CharType "c" (Just $ Operator (Var "a") Plus (Int 5)), Assignment "a" (Operator (Char 'c') Plus (Var "c")), Assignment "b" (Operator (Var "a") Plus (Var "b"))]
 

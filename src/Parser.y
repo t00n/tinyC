@@ -63,6 +63,7 @@ Instruction : int var '=' Expr        { Declaration IntType $2 (Just $4) }
 
 Expr : number                         { Int $1 }
      | qchar                          { Char $1 }
+     | var                            { Var $1 }
      | Expr '+' Expr                  { Operator $1 Plus $3 }
      | Expr '-' Expr                  { Operator $1 Minus $3 }
      | Expr '*' Expr                  { Operator $1 Times $3 }
@@ -85,6 +86,7 @@ data BinaryOperator = Plus | Minus | Times | Divide
 
 data Expr = Int Int
             | Char Char
+            | Var String
             | Operator Expr BinaryOperator Expr
     deriving (Eq, Show)
 }
