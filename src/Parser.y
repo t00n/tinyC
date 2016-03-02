@@ -1,5 +1,5 @@
 {
-module Parser (parse, Statement(..), Expr(..), Declaration1(..), Type(..), BinaryOperator(..)) where
+module Parser (parse, Statement(..), Expr(..), Type(..), BinaryOperator(..)) where
 import Scanner (Token(..))
 }
 
@@ -52,13 +52,14 @@ import Scanner (Token(..))
 Statements : Statement                { $1 }
            | Statements Statement     { $1 ++ $2 }
 
-Statement : Statement1 ';'            { [$1] }
+Statement : Instruction ';'           { [$1] }
           | {- empty -} ';'           { [] }
 
-Statement1 : int var '=' Expr         { Declaration IntType $2 (Just $4) }
+Instruction : int var '=' Expr        { Declaration IntType $2 (Just $4) }
            | int var                  { Declaration IntType $2 Nothing }
            | char var '=' Expr        { Declaration CharType $2 (Just $4) }
            | char var                 { Declaration CharType $2 Nothing}
+           | var '=' Expr             { Assignment $1 $3}
 
 Expr : number                         { Int $1 }
      | qchar                          { Char $1 }
@@ -72,10 +73,8 @@ parseError _ = error "Parse error"
 
 type Statements = [Statement]
 
-data Statement = Declaration1
-    deriving (Eq, Show)
-
-data Declaration1 = Declaration Type String (Maybe Expr)
+data Statement = Declaration Type String (Maybe Expr)
+               | Assignment String Expr
     deriving (Eq, Show)
 
 data Type = IntType | CharType
