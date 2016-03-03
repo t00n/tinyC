@@ -66,6 +66,7 @@ Statement : int var '=' Expr                      { Declaration IntType $2 (Just
 
 Block :: { Statement }
 Block : if '(' Expr ')' '{' Statements '}'        { IfBlock $3 $6 }
+      | while '(' Expr ')' '{' Statements '}'     { WhileBlock $3 $6 }
 
 
 Expr :: { Expr }
@@ -89,6 +90,7 @@ data Statement = Declaration Type String (Maybe Expr)
                | Assignment String Expr
                | If Expr Statement
                | IfBlock Expr Statements
+               | WhileBlock Expr Statements
     deriving (Eq, Show)
 
 data Type = IntType | CharType
