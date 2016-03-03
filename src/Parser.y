@@ -46,32 +46,35 @@ import Scanner (Token(..))
 %left '+' '-'
 %left '*' '/'
 %right '!'
-%left '[' ']' '(' ')'
+{-%left '[' ']' '(' ')' '{' '}'-}
 %%
 
-Statements : Statement                { $1 }
-           | Statements Statement     { $1 ++ $2 }
+Statements :: { Statements }
+Statements : Statement                              { $1 }
+           | Statements Statement                   { $1 ++ $2 }
 
-Statement : Instruction ';'           { [$1] }
-          | {- empty -} ';'           { [] }
+Statement :: { Statements }
+Statement : Instruction ';'                         { [$1] }
+          | {- empty -} ';'                         { [] }
 
-Instruction : int var '=' Expr        { Declaration IntType $2 (Just $4) }
-           | int var                  { Declaration IntType $2 Nothing }
-           | char var '=' Expr        { Declaration CharType $2 (Just $4) }
-           | char var                 { Declaration CharType $2 Nothing}
-           | var '=' Expr             { Assignment $1 $3}
-           | if '(' Expr ')' Instruction{ If $3 $5 }
-           {-| if '(' Expr ')'
-                '{' Statements '}'    { IfBlock $3 $6 }-}
+Instruction :: { Statement }
+Instruction : int var '=' Expr                      { Declaration IntType $2 (Just $4) }
+            | int var                               { Declaration IntType $2 Nothing }
+            | char var '=' Expr                     { Declaration CharType $2 (Just $4) }
+            | char var                              { Declaration CharType $2 Nothing}
+            | var '=' Expr                          { Assignment $1 $3}
+            {-| if '(' Expr ')' '{' Instruction '}'   { IfBlock $3 [$6] }
+            | if '(' Expr ')' Instruction           { If $3 $5 }-}
 
-Expr : number                         { Int $1 }
-     | qchar                          { Char $1 }
-     | var                            { Var $1 }
-     | Expr '+' Expr                  { Operator $1 Plus $3 }
-     | Expr '-' Expr                  { Operator $1 Minus $3 }
-     | Expr '*' Expr                  { Operator $1 Times $3 }
-     | Expr '/' Expr                  { Operator $1 Divide $3 }
-     | Expr '==' Expr                 { Operator $1 Equal $3 }
+Expr :: { Expr }
+Expr : number                                       { Int $1 }
+     | qchar                                        { Char $1 }
+     | var                                          { Var $1 }
+     | Expr '+' Expr                                { Operator $1 Plus $3 }
+     | Expr '-' Expr                                { Operator $1 Minus $3 }
+     | Expr '*' Expr                                { Operator $1 Times $3 }
+     | Expr '/' Expr                                { Operator $1 Divide $3 }
+     | Expr '==' Expr                               { Operator $1 Equal $3 }
 
 {
 parseError :: [Token] -> a
@@ -81,7 +84,7 @@ type Statements = [Statement]
 
 data Statement = Declaration Type String (Maybe Expr)
                | Assignment String Expr
-               | If Expr Statement
+               -- | If Expr Statement
                -- | IfBlock Expr Statements
     deriving (Eq, Show)
 
