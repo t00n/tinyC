@@ -43,9 +43,10 @@ import Scanner (Token(..))
 %left ','
 %right '='
 %left '==' '!='
+%left '<' '>'
 %left '+' '-'
 %left '*' '/'
-%right '!'
+%right '!' NEG
 %left '[' ']' '(' ')' '{' '}'
 %%
 
@@ -79,6 +80,9 @@ Expr : number                                     { Int $1 }
      | Expr '*' Expr                              { Operator $1 Times $3 }
      | Expr '/' Expr                              { Operator $1 Divide $3 }
      | Expr '==' Expr                             { Operator $1 Equal $3 }
+     | Expr '>' Expr                              { Operator $1 Greater $3 }
+     | Expr '<' Expr                              { Operator $1 Less $3 }
+     | Expr '!=' Expr                             { Operator $1 NotEqual $3 }
 
 {
 
@@ -98,7 +102,7 @@ data Statement = Declaration Type String (Maybe Expr)
 data Type = IntType | CharType
     deriving (Eq, Show)
 
-data BinaryOperator = Plus | Minus | Times | Divide | Equal
+data BinaryOperator = Plus | Minus | Times | Divide | Equal | Greater | Less | NotEqual
     deriving (Eq, Show)
 
 data Expr = Int Int
