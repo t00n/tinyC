@@ -54,6 +54,7 @@ Statements : Statement ';'                        { [$1] }
            | Statements Statement ';'             { $2 : $1 }
            | {- empty -} ';'                      { [] }
            | Statements ';'                       { $1 }
+           | Block                                { [$1] }
 
 Statement :: { Statement }
 Statement : int var '=' Expr                      { Declaration IntType $2 (Just $4) }
@@ -61,8 +62,11 @@ Statement : int var '=' Expr                      { Declaration IntType $2 (Just
           | char var '=' Expr                     { Declaration CharType $2 (Just $4) }
           | char var                              { Declaration CharType $2 Nothing}
           | var '=' Expr                          { Assignment $1 $3}
-          | if '(' Expr ')' '{' Statement '}'     { IfBlock $3 [$6] }
           | if '(' Expr ')' Statement             { If $3 $5 }
+
+Block :: { Statement }
+Block : if '(' Expr ')' '{' Statements '}'        { IfBlock $3 $6 }
+
 
 Expr :: { Expr }
 Expr : number                                     { Int $1 }
