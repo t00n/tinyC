@@ -3,7 +3,7 @@ module Parser (parse, Statement(..), Expr(..), Type(..), BinaryOperator(..)) whe
 import Scanner (Token(..))
 }
 
-%name parse1
+%name parse
 %tokentype { Token }
 %error { parseError }
 
@@ -51,7 +51,7 @@ import Scanner (Token(..))
 
 Statements :: { Statements }
 Statements : Statement ';'                        { [$1] }
-           | Statements Statement ';'             { $2 : $1 }
+           | Statements Statement ';'             { $1 ++ [$2] }
            | {- empty -} ';'                      { [] }
            | Statements ';'                       { $1 }
            | Block                                { [$1] }
@@ -79,9 +79,6 @@ Expr : number                                     { Int $1 }
      | Expr '==' Expr                             { Operator $1 Equal $3 }
 
 {
-
-parse :: [Token] -> Statements
-parse = reverse . parse1
 
 parseError :: [Token] -> a
 parseError _ = error "Parse error"

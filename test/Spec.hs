@@ -66,6 +66,6 @@ main = hspec $ do
             let ast = scan_and_parse "if (a == 5) a = 3;"
             ast `shouldBe` [If (Operator (Var "a") Equal (Int 5)) (Assignment "a" (Int 3))]
         it "Parses an if block" $ do
-            let ast2 = scan_and_parse "if (a == 5) { a = 3; }"
-            ast2 `shouldBe` [IfBlock (Operator (Var "a") Equal (Int 5)) [Assignment "a" (Int 3)]]
+            let ast2 = scan_and_parse "if (a == 5) { a = 3; b = 'c';}"
+            ast2 `shouldBe` [IfBlock (Operator (Var "a") Equal (Int 5)) [Assignment "a" (Int 3), Assignment "b" (Char 'c')]]
 
