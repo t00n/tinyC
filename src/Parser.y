@@ -3,7 +3,7 @@ module Parser (parse, Statement(..), Expr(..), Type(..), BinaryOperator(..)) whe
 import Scanner (Token(..))
 }
 
-%name parse
+%name parse1
 %tokentype { Token }
 %error { parseError }
 
@@ -46,37 +46,39 @@ import Scanner (Token(..))
 %left '+' '-'
 %left '*' '/'
 %right '!'
-{-%left '[' ']' '(' ')' '{' '}'-}
+%left '[' ']' '(' ')' '{' '}'
 %%
 
 Statements :: { Statements }
-Statements : Statement                              { $1 }
-           | Statements Statement                   { $1 ++ $2 }
+Statements : Statement ';'                        { [$1] }
+           | Statements Statement ';'             { $2 : $1 }
+           | {- empty -} ';'                      { [] }
+           | Statements ';'                       { $1 }
 
-Statement :: { Statements }
-Statement : Instruction ';'                         { [$1] }
-          | {- empty -} ';'                         { [] }
-
-Instruction :: { Statement }
-Instruction : int var '=' Expr                      { Declaration IntType $2 (Just $4) }
-            | int var                               { Declaration IntType $2 Nothing }
-            | char var '=' Expr                     { Declaration CharType $2 (Just $4) }
-            | char var                              { Declaration CharType $2 Nothing}
-            | var '=' Expr                          { Assignment $1 $3}
-            {-| if '(' Expr ')' '{' Instruction '}'   { IfBlock $3 [$6] }
-            | if '(' Expr ')' Instruction           { If $3 $5 }-}
+Statement :: { Statement }
+Statement : int var '=' Expr                      { Declaration IntType $2 (Just $4) }
+          | int var                               { Declaration IntType $2 Nothing }
+          | char var '=' Expr                     { Declaration CharType $2 (Just $4) }
+          | char var                              { Declaration CharType $2 Nothing}
+          | var '=' Expr                          { Assignment $1 $3}
+          | if '(' Expr ')' '{' Statement '}'     { IfBlock $3 [$6] }
+          | if '(' Expr ')' Statement             { If $3 $5 }
 
 Expr :: { Expr }
-Expr : number                                       { Int $1 }
-     | qchar                                        { Char $1 }
-     | var                                          { Var $1 }
-     | Expr '+' Expr                                { Operator $1 Plus $3 }
-     | Expr '-' Expr                                { Operator $1 Minus $3 }
-     | Expr '*' Expr                                { Operator $1 Times $3 }
-     | Expr '/' Expr                                { Operator $1 Divide $3 }
-     | Expr '==' Expr                               { Operator $1 Equal $3 }
+Expr : number                                     { Int $1 }
+     | qchar                                      { Char $1 }
+     | var                                        { Var $1 }
+     | Expr '+' Expr                              { Operator $1 Plus $3 }
+     | Expr '-' Expr                              { Operator $1 Minus $3 }
+     | Expr '*' Expr                              { Operator $1 Times $3 }
+     | Expr '/' Expr                              { Operator $1 Divide $3 }
+     | Expr '==' Expr                             { Operator $1 Equal $3 }
 
 {
+
+parse :: [Token] -> Statements
+parse = reverse . parse1
+
 parseError :: [Token] -> a
 parseError _ = error "Parse error"
 
@@ -84,8 +86,8 @@ type Statements = [Statement]
 
 data Statement = Declaration Type String (Maybe Expr)
                | Assignment String Expr
-               -- | If Expr Statement
-               -- | IfBlock Expr Statements
+               | If Expr Statement
+               | IfBlock Expr Statements
     deriving (Eq, Show)
 
 data Type = IntType | CharType
