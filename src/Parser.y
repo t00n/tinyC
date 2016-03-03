@@ -60,6 +60,9 @@ Instruction : int var '=' Expr        { Declaration IntType $2 (Just $4) }
            | char var '=' Expr        { Declaration CharType $2 (Just $4) }
            | char var                 { Declaration CharType $2 Nothing}
            | var '=' Expr             { Assignment $1 $3}
+           | if '(' Expr ')' Instruction{ If $3 $5 }
+           {-| if '(' Expr ')'
+                '{' Statements '}'    { IfBlock $3 $6 }-}
 
 Expr : number                         { Int $1 }
      | qchar                          { Char $1 }
@@ -68,6 +71,8 @@ Expr : number                         { Int $1 }
      | Expr '-' Expr                  { Operator $1 Minus $3 }
      | Expr '*' Expr                  { Operator $1 Times $3 }
      | Expr '/' Expr                  { Operator $1 Divide $3 }
+     | Expr '==' Expr                 { Operator $1 Equal $3 }
+
 {
 parseError :: [Token] -> a
 parseError _ = error "Parse error"
@@ -76,12 +81,14 @@ type Statements = [Statement]
 
 data Statement = Declaration Type String (Maybe Expr)
                | Assignment String Expr
+               | If Expr Statement
+               -- | IfBlock Expr Statements
     deriving (Eq, Show)
 
 data Type = IntType | CharType
     deriving (Eq, Show)
 
-data BinaryOperator = Plus | Minus | Times | Divide
+data BinaryOperator = Plus | Minus | Times | Divide | Equal
     deriving (Eq, Show)
 
 data Expr = Int Int

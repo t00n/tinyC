@@ -60,4 +60,7 @@ main = hspec $ do
         it "Uses variables in declarations and assignments" $ do
             let ast = (parse . alexScanTokens) "int a = b; char c = a + 5; a = 'c' + c; b = a + b;"
             ast `shouldBe` [Declaration IntType "a" (Just $ Var "b"), Declaration CharType "c" (Just $ Operator (Var "a") Plus (Int 5)), Assignment "a" (Operator (Char 'c') Plus (Var "c")), Assignment "b" (Operator (Var "a") Plus (Var "b"))]
+        it "Parses an if condition" $ do
+            let ast = (parse . alexScanTokens) $ "if (a == 5) a = 3;"
+            ast `shouldBe` [If (Operator (Var "a") Equal (Int 5)) (Assignment "a" (Int 3))]
 
