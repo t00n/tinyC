@@ -1,5 +1,5 @@
 {
-module Parser (parse, Statement(..), Expr(..), Type(..), BinaryOperator(..)) where
+module Parser (parse, Statement(..), Expr(..), Type(..), BinaryOperator(..), UnaryOperator(..)) where
 import Scanner (Token(..))
 }
 
@@ -75,14 +75,16 @@ Expr :: { Expr }
 Expr : number                                     { Int $1 }
      | qchar                                      { Char $1 }
      | var                                        { Var $1 }
-     | Expr '+' Expr                              { Operator $1 Plus $3 }
-     | Expr '-' Expr                              { Operator $1 Minus $3 }
-     | Expr '*' Expr                              { Operator $1 Times $3 }
-     | Expr '/' Expr                              { Operator $1 Divide $3 }
-     | Expr '==' Expr                             { Operator $1 Equal $3 }
-     | Expr '>' Expr                              { Operator $1 Greater $3 }
-     | Expr '<' Expr                              { Operator $1 Less $3 }
-     | Expr '!=' Expr                             { Operator $1 NotEqual $3 }
+     | Expr '+' Expr                              { BinOp $1 Plus $3 }
+     | Expr '-' Expr                              { BinOp $1 Minus $3 }
+     | Expr '*' Expr                              { BinOp $1 Times $3 }
+     | Expr '/' Expr                              { BinOp $1 Divide $3 }
+     | Expr '==' Expr                             { BinOp $1 Equal $3 }
+     | Expr '>' Expr                              { BinOp $1 Greater $3 }
+     | Expr '<' Expr                              { BinOp $1 Less $3 }
+     | Expr '!=' Expr                             { BinOp $1 NotEqual $3 }
+     | '-' Expr %prec NEG                         { UnOp Neg $2 }
+     | '!' Expr                                   { UnOp Not $2 }
 
 {
 
@@ -105,9 +107,13 @@ data Type = IntType | CharType
 data BinaryOperator = Plus | Minus | Times | Divide | Equal | Greater | Less | NotEqual
     deriving (Eq, Show)
 
+data UnaryOperator = Neg | Not
+    deriving (Eq, Show)
+
 data Expr = Int Int
-            | Char Char
-            | Var String
-            | Operator Expr BinaryOperator Expr
+          | Char Char
+          | Var String
+          | BinOp Expr BinaryOperator Expr
+          | UnOp UnaryOperator Expr
     deriving (Eq, Show)
 }

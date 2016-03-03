@@ -43,7 +43,10 @@ main = hspec $ do
             let s = "int a = 2 + 3; int b = 2 + 3 * 4; int c = 2 / 4 + 3 * 2; int d = 8/2 + 1;"
             let tokens = alexScanTokens s
             let ast = parse tokens
-            ast `shouldBe` [Declaration IntType "a" (Just $ Operator (Int 2) Plus (Int 3)), Declaration IntType "b" (Just $ Operator (Int 2) Plus $ Operator (Int 3) Times (Int 4)), Declaration IntType "c" (Just $ Operator (Operator (Int 2) Divide (Int 4)) Plus (Operator (Int 3) Times (Int 2))), Declaration IntType "d" (Just $ Operator (Operator (Int 8) Divide (Int 2)) Plus (Int 1))]
+            ast `shouldBe` [Declaration IntType "a" (Just $ BinOp (Int 2) Plus (Int 3)), Declaration IntType "b" (Just $ BinOp (Int 2) Plus $ BinOp (Int 3) Times (Int 4)), Declaration IntType "c" (Just $ BinOp (BinOp (Int 2) Divide (Int 4)) Plus (BinOp (Int 3) Times (Int 2))), Declaration IntType "d" (Just $ BinOp (BinOp (Int 8) Divide (Int 2)) Plus (Int 1))]
+        it "Parses unary operators" $ do
+            let ast = scan_and_parse "int a = -5; int b = -7 + -5; int c = !5;"
+            ast `shouldBe` [Declaration IntType "a" (Just $ UnOp Neg (Int 5)), Declaration IntType "b" (Just $ BinOp (UnOp Neg (Int 7)) Plus (UnOp Neg (Int 5))), Declaration IntType "c" (Just $ UnOp Not (Int 5))]
         it "Parses declaration of int with char expressions" $ do
             let s = "int a = 'c'; char c = 5;"
             let tokens = alexScanTokens s
@@ -53,7 +56,7 @@ main = hspec $ do
             let s = "int c = 'c' + 'b'; int a = 2 + 'c'; char c = 'c' + 2; char c = 2 + 3;"
             let tokens = alexScanTokens s
             let ast = parse tokens
-            ast `shouldBe` [Declaration IntType "c" (Just $ Operator (Char 'c') Plus (Char 'b')), Declaration IntType "a" (Just $ Operator (Int 2) Plus (Char 'c')), Declaration CharType "c" (Just $ Operator (Char 'c') Plus (Int 2)), Declaration CharType "c" (Just $ Operator (Int 2) Plus (Int 3))]
+            ast `shouldBe` [Declaration IntType "c" (Just $ BinOp (Char 'c') Plus (Char 'b')), Declaration IntType "a" (Just $ BinOp (Int 2) Plus (Char 'c')), Declaration CharType "c" (Just $ BinOp (Char 'c') Plus (Int 2)), Declaration CharType "c" (Just $ BinOp (Int 2) Plus (Int 3))]
         it "Parses assignments of int and chars" $ do
             let s = "a = 5; b = 'c';"
             let tokens = alexScanTokens s
@@ -61,17 +64,17 @@ main = hspec $ do
             ast `shouldBe`[Assignment "a" (Int 5), Assignment "b" (Char 'c')]
         it "Uses variables in declarations and assignments" $ do
             let ast = (parse . alexScanTokens) "int a = b; char c = a + 5; a = 'c' + c; b = a + b;"
-            ast `shouldBe` [Declaration IntType "a" (Just $ Var "b"), Declaration CharType "c" (Just $ Operator (Var "a") Plus (Int 5)), Assignment "a" (Operator (Char 'c') Plus (Var "c")), Assignment "b" (Operator (Var "a") Plus (Var "b"))]
+            ast `shouldBe` [Declaration IntType "a" (Just $ Var "b"), Declaration CharType "c" (Just $ BinOp (Var "a") Plus (Int 5)), Assignment "a" (BinOp (Char 'c') Plus (Var "c")), Assignment "b" (BinOp (Var "a") Plus (Var "b"))]
         it "Parses an if with one instruction " $ do
             let ast = scan_and_parse "if (a == 5) a = 3;"
-            ast `shouldBe` [If (Operator (Var "a") Equal (Int 5)) (Assignment "a" (Int 3))]
+            ast `shouldBe` [If (BinOp (Var "a") Equal (Int 5)) (Assignment "a" (Int 3))]
         it "Parses an if block" $ do
             let ast = scan_and_parse "if (a == 5) { a = 3; b = 'c';}"
-            ast `shouldBe` [IfBlock (Operator (Var "a") Equal (Int 5)) [Assignment "a" (Int 3), Assignment "b" (Char 'c')]]
+            ast `shouldBe` [IfBlock (BinOp (Var "a") Equal (Int 5)) [Assignment "a" (Int 3), Assignment "b" (Char 'c')]]
         it "Parses a while with one instruction" $ do
             let ast = scan_and_parse "while (a == 5) a = 3; b = 2;"
-            ast `shouldBe` [While (Operator (Var "a") Equal (Int 5)) (Assignment "a" (Int 3)), Assignment "b" (Int 2)]
+            ast `shouldBe` [While (BinOp (Var "a") Equal (Int 5)) (Assignment "a" (Int 3)), Assignment "b" (Int 2)]
         it "Parses a while block" $ do
             let ast = scan_and_parse "while (a == 5) { a = 4; int b = 'c'; }"
-            ast `shouldBe` [WhileBlock (Operator (Var "a") Equal (Int 5)) [Assignment "a" (Int 4), Declaration IntType "b" (Just $ Char 'c')]]
+            ast `shouldBe` [WhileBlock (BinOp (Var "a") Equal (Int 5)) [Assignment "a" (Int 4), Declaration IntType "b" (Just $ Char 'c')]]
 
