@@ -61,10 +61,8 @@ declaration : var_declaration ';'                 { Just $1 }
 
 
 var_declaration :: { Declaration }
-var_declaration : int var '=' Expr                { VarDeclaration IntType $2 (Just $4) }
-                | int var                         { VarDeclaration IntType $2 Nothing }
-                | char var '=' Expr               { VarDeclaration CharType $2 (Just $4) }
-                | char var                        { VarDeclaration CharType $2 Nothing}
+var_declaration : type var '=' expr                { VarDeclaration $1 $2 (Just $4) }
+                | type var                         { VarDeclaration $1 $2 Nothing }
           {-| var '=' Expr                          { Assignment $1 $3}
           | if '(' Expr ')' Statement             { If $3 $5 }
           | while '(' Expr ')' Statement          { While $3 $5 }-}
@@ -74,20 +72,24 @@ Block : if '(' Expr ')' '{' Statements '}'        { IfBlock $3 $6 }
       | while '(' Expr ')' '{' Statements '}'     { WhileBlock $3 $6 }-}
 
 
-Expr :: { Expr }
-Expr : number                                     { Int $1 }
+expr :: { Expr }
+expr : number                                     { Int $1 }
      | qchar                                      { Char $1 }
      | var                                        { Var $1 }
-     | Expr '+' Expr                              { BinOp $1 Plus $3 }
-     | Expr '-' Expr                              { BinOp $1 Minus $3 }
-     | Expr '*' Expr                              { BinOp $1 Times $3 }
-     | Expr '/' Expr                              { BinOp $1 Divide $3 }
-     | Expr '==' Expr                             { BinOp $1 Equal $3 }
-     | Expr '>' Expr                              { BinOp $1 Greater $3 }
-     | Expr '<' Expr                              { BinOp $1 Less $3 }
-     | Expr '!=' Expr                             { BinOp $1 NotEqual $3 }
-     | '-' Expr %prec NEG                         { UnOp Neg $2 }
-     | '!' Expr                                   { UnOp Not $2 }
+     | expr '+' expr                              { BinOp $1 Plus $3 }
+     | expr '-' expr                              { BinOp $1 Minus $3 }
+     | expr '*' expr                              { BinOp $1 Times $3 }
+     | expr '/' expr                              { BinOp $1 Divide $3 }
+     | expr '==' expr                             { BinOp $1 Equal $3 }
+     | expr '>' expr                              { BinOp $1 Greater $3 }
+     | expr '<' expr                              { BinOp $1 Less $3 }
+     | expr '!=' expr                             { BinOp $1 NotEqual $3 }
+     | '-' expr %prec NEG                         { UnOp Neg $2 }
+     | '!' expr                                   { UnOp Not $2 }
+
+type :: { Type }
+type : int                                        { IntType }
+     | char                                       { CharType }
 
 {
 
