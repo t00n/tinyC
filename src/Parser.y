@@ -1,6 +1,7 @@
 {
-module Parser (parse, Statement(..), Expr(..), Type(..), BinaryOperator(..), UnaryOperator(..)) where
+module Parser (parse, Declaration(..), Statement(..), Expr(..), Type(..), BinaryOperator(..), UnaryOperator(..)) where
 import Scanner (Token(..))
+import Data.Maybe
 }
 
 %name parse
@@ -50,25 +51,27 @@ import Scanner (Token(..))
 %left '[' ']' '(' ')' '{' '}'
 %%
 
-Statements :: { Statements }
-Statements : Statement ';'                        { [$1] }
-           | Statements Statement ';'             { $1 ++ [$2] }
-           | {- empty -} ';'                      { [] }
-           | Statements ';'                       { $1 }
-           | Block                                { [$1] }
+program :: { Program }
+program : declaration                             { if isJust $1 then [fromJust $1] else [] }
+        | program declaration                     { $1 ++ if isJust $2 then [fromJust $2] else [] }
 
-Statement :: { Statement }
-Statement : int var '=' Expr                      { Declaration IntType $2 (Just $4) }
-          | int var                               { Declaration IntType $2 Nothing }
-          | char var '=' Expr                     { Declaration CharType $2 (Just $4) }
-          | char var                              { Declaration CharType $2 Nothing}
-          | var '=' Expr                          { Assignment $1 $3}
+declaration :: { Maybe Declaration }
+declaration : var_declaration ';'                 { Just $1 }
+            | {-empty -} ';'                      { Nothing }
+
+
+var_declaration :: { Declaration }
+var_declaration : int var '=' Expr                { VarDeclaration IntType $2 (Just $4) }
+                | int var                         { VarDeclaration IntType $2 Nothing }
+                | char var '=' Expr               { VarDeclaration CharType $2 (Just $4) }
+                | char var                        { VarDeclaration CharType $2 Nothing}
+          {-| var '=' Expr                          { Assignment $1 $3}
           | if '(' Expr ')' Statement             { If $3 $5 }
-          | while '(' Expr ')' Statement          { While $3 $5 }
+          | while '(' Expr ')' Statement          { While $3 $5 }-}
 
-Block :: { Statement }
+{-Block :: { Statement }
 Block : if '(' Expr ')' '{' Statements '}'        { IfBlock $3 $6 }
-      | while '(' Expr ')' '{' Statements '}'     { WhileBlock $3 $6 }
+      | while '(' Expr ')' '{' Statements '}'     { WhileBlock $3 $6 }-}
 
 
 Expr :: { Expr }
@@ -91,14 +94,16 @@ Expr : number                                     { Int $1 }
 parseError :: [Token] -> a
 parseError _ = error "Parse error"
 
-type Statements = [Statement]
+type Program = [Declaration]
 
-data Statement = Declaration Type String (Maybe Expr)
-               | Assignment String Expr
+data Declaration = VarDeclaration Type String (Maybe Expr)
+    deriving (Eq, Show)
+
+data Statement = Assignment String Expr
                | If Expr Statement
-               | IfBlock Expr Statements
+               | IfBlock Expr Statement
                | While Expr Statement
-               | WhileBlock Expr Statements
+               | WhileBlock Expr Statement
     deriving (Eq, Show)
 
 data Type = IntType | CharType
