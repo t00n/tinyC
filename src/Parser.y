@@ -58,11 +58,28 @@ program : declaration                             { if isJust $1 then [fromJust 
 declaration :: { Maybe Declaration }
 declaration : var_declaration ';'                 { Just $1 }
             | {-empty -} ';'                      { Nothing }
+            | func_declaration                    { Just $1 }
 
 
 var_declaration :: { Declaration }
 var_declaration : type var '=' expr                { VarDeclaration $1 $2 (Just $4) }
                 | type var                         { VarDeclaration $1 $2 Nothing }
+
+func_declaration :: { Declaration }
+func_declaration : type var '(' params_declaration ')' block { FuncDeclaration $1 $2 $4 $6 }
+
+
+params_declaration :: { ParametersDeclaration }
+params_declaration : param_declaration            { [$1] }
+                   | params_declaration ',' param_declaration { $1 ++ [$3] }
+                   | {- empty -}                  { [] }
+
+param_declaration :: { ParameterDeclaration }
+param_declaration : type var                      { ParameterDeclaration $1 $2 }
+
+block :: { Statement }
+block : '{' '}'                                   { Block [] [] }
+
           {-| var '=' Expr                          { Assignment $1 $3}
           | if '(' Expr ')' Statement             { If $3 $5 }
           | while '(' Expr ')' Statement          { While $3 $5 }-}
@@ -99,13 +116,20 @@ parseError _ = error "Parse error"
 type Program = [Declaration]
 
 data Declaration = VarDeclaration Type String (Maybe Expr)
+                 | FuncDeclaration Type String ParametersDeclaration Statement
     deriving (Eq, Show)
+
+type ParametersDeclaration = [ParameterDeclaration]
+
+data ParameterDeclaration = ParameterDeclaration Type String
+    deriving (Eq, Show)
+
+type Statements = [Statement]
 
 data Statement = Assignment String Expr
                | If Expr Statement
-               | IfBlock Expr Statement
                | While Expr Statement
-               | WhileBlock Expr Statement
+               | Block [Declaration] Statements
     deriving (Eq, Show)
 
 data Type = IntType | CharType

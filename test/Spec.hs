@@ -46,6 +46,9 @@ main = hspec $ do
         it "Parses integer and char expressions" $ do
             let ast = scan_and_parse "int c = 'c' + 'b'; int a = 2 + 'c'; char c = 'c' + 2; char c = 2 + 3;"
             ast `shouldBe` [VarDeclaration IntType "c" (Just $ BinOp (Char 'c') Plus (Char 'b')), VarDeclaration IntType "a" (Just $ BinOp (Int 2) Plus (Char 'c')), VarDeclaration CharType "c" (Just $ BinOp (Char 'c') Plus (Int 2)), VarDeclaration CharType "c" (Just $ BinOp (Int 2) Plus (Int 3))]
+        it "Parses function declarations" $ do
+            let ast = scan_and_parse "int tiny() { }"
+            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [])]
         --it "Parses assignments of int and chars" $ do
         --    let ast = scan_and_parse "a = 5; b = 'c';"
         --    ast `shouldBe`[Assignment "a" (Int 5), Assignment "b" (Char 'c')]
