@@ -51,6 +51,8 @@ main = hspec $ do
             ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [])]
             let ast2 = scan_and_parse "int tiny(int a) { }"
             ast2 `shouldBe` [FuncDeclaration IntType "tiny" [ParameterDeclaration IntType "a"] (Block [] [])]
+            let ast3 = scan_and_parse "int tiny(int a, char b) { }"
+            ast3 `shouldBe` [FuncDeclaration IntType "tiny" [ParameterDeclaration IntType "a", ParameterDeclaration CharType "b"] (Block [] [])]
         --it "Parses assignments of int and chars" $ do
         --    let ast = scan_and_parse "a = 5; b = 'c';"
         --    ast `shouldBe`[Assignment "a" (Int 5), Assignment "b" (Char 'c')]
