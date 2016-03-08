@@ -1,5 +1,5 @@
 {
-module Parser (parse, Declaration(..), ParameterDeclaration(..), Statement(..), Expr(..), Type(..), BinaryOperator(..), UnaryOperator(..)) where
+module Parser (parse, Declaration(..), Parameter(..), Statement(..), Expr(..), Type(..), BinaryOperator(..), UnaryOperator(..)) where
 import Scanner (Token(..))
 import Data.Maybe
 }
@@ -66,16 +66,16 @@ var_declaration : type var '=' expr                { VarDeclaration $1 $2 (Just 
                 | type var                         { VarDeclaration $1 $2 Nothing }
 
 func_declaration :: { Declaration }
-func_declaration : type var '(' params_declaration ')' block { FuncDeclaration $1 $2 $4 $6 }
+func_declaration : type var '(' params ')' block { FuncDeclaration $1 $2 $4 $6 }
 
 
-params_declaration :: { ParametersDeclaration }
-params_declaration : param_declaration            { [$1] }
-                   | params_declaration ',' param_declaration { $1 ++ [$3] }
+params :: { Parameters }
+params : param            { [$1] }
+                   | params ',' param { $1 ++ [$3] }
                    | {- empty -}                  { [] }
 
-param_declaration :: { ParameterDeclaration }
-param_declaration : type var                      { ParameterDeclaration $1 $2 }
+param :: { Parameter }
+param : type var                      { Parameter $1 $2 }
 
 block :: { Statement }
 block : '{' '}'                                   { Block [] [] }
@@ -116,12 +116,12 @@ parseError _ = error "Parse error"
 type Program = [Declaration]
 
 data Declaration = VarDeclaration Type String (Maybe Expr)
-                 | FuncDeclaration Type String ParametersDeclaration Statement
+                 | FuncDeclaration Type String Parameters Statement
     deriving (Eq, Show)
 
-type ParametersDeclaration = [ParameterDeclaration]
+type Parameters = [Parameter]
 
-data ParameterDeclaration = ParameterDeclaration Type String
+data Parameter = Parameter Type String
     deriving (Eq, Show)
 
 type Statements = [Statement]
