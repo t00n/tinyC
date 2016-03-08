@@ -46,13 +46,24 @@ main = hspec $ do
         it "Parses integer and char expressions" $ do
             let ast = scan_and_parse "int c = 'c' + 'b'; int a = 2 + 'c'; char c = 'c' + 2; char c = 2 + 3;"
             ast `shouldBe` [VarDeclaration IntType "c" (Just $ BinOp (Char 'c') Plus (Char 'b')), VarDeclaration IntType "a" (Just $ BinOp (Int 2) Plus (Char 'c')), VarDeclaration CharType "c" (Just $ BinOp (Char 'c') Plus (Int 2)), VarDeclaration CharType "c" (Just $ BinOp (Int 2) Plus (Int 3))]
-        it "Parses function declarations" $ do
+        it "Parses function declarations with no args and empty block" $ do
             let ast = scan_and_parse "int tiny() { }"
             ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [])]
-            let ast2 = scan_and_parse "int tiny(int a) { }"
-            ast2 `shouldBe` [FuncDeclaration IntType "tiny" [Parameter IntType "a"] (Block [] [])]
-            let ast3 = scan_and_parse "int tiny(int a, char b) { }"
-            ast3 `shouldBe` [FuncDeclaration IntType "tiny" [Parameter IntType "a", Parameter CharType "b"] (Block [] [])]
+        it "Parses function declaration with one arg and empty block" $ do
+            let ast = scan_and_parse "int tiny(int a) { }"
+            ast `shouldBe` [FuncDeclaration IntType "tiny" [Parameter IntType "a"] (Block [] [])]
+        it "Parses function declaration with two args and empty block" $ do
+            let ast = scan_and_parse "int tiny(int a, char b) { }"
+            ast `shouldBe` [FuncDeclaration IntType "tiny" [Parameter IntType "a", Parameter CharType "b"] (Block [] [])]
+        it "Parses function declaration with no args and block with too much semicolons" $ do
+            let ast = scan_and_parse "int tiny() { ;;; }"
+            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [])]
+        it "Parses function declarations with declarations" $ do
+            let ast = scan_and_parse "int tiny(int a) { int b = 2; }"
+            ast `shouldBe` [FuncDeclaration IntType "tiny" [Parameter IntType "a"] (Block [VarDeclaration IntType "b" (Just $ Int 2)] [])]
+        it "Parses function declaration with declarations and too much semicolons" $ do
+            let ast = scan_and_parse "int tiny() { ;; int b = 2;; int c = 3;;;}"
+            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [VarDeclaration IntType "b" (Just $ Int 2), VarDeclaration IntType "c" (Just $ Int 3)] [])]
         --it "Parses assignments of int and chars" $ do
         --    let ast = scan_and_parse "a = 5; b = 'c';"
         --    ast `shouldBe`[Assignment "a" (Int 5), Assignment "b" (Char 'c')]

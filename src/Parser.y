@@ -77,8 +77,13 @@ params : param            { [$1] }
 param :: { Parameter }
 param : type var                      { Parameter $1 $2 }
 
+var_declarations :: { [Declaration] }
+var_declarations : var_declarations var_declaration ';' { $1 ++ [$2] }
+                 | var_declarations ';'           { $1 }
+                 | { [] }
+
 block :: { Statement }
-block : '{' '}'                                   { Block [] [] }
+block : '{' var_declarations '}'                  { Block $2 [] }
 
           {-| var '=' Expr                          { Assignment $1 $3}
           | if '(' Expr ')' Statement             { If $3 $5 }
