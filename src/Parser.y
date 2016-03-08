@@ -1,5 +1,5 @@
 {
-module Parser (parse, Declaration(..), Statement(..), Expr(..), Type(..), BinaryOperator(..), UnaryOperator(..)) where
+module Parser (parse, Declaration(..), ParameterDeclaration(..), Statement(..), Expr(..), Type(..), BinaryOperator(..), UnaryOperator(..)) where
 import Scanner (Token(..))
 import Data.Maybe
 }
