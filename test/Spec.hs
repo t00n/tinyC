@@ -120,3 +120,6 @@ main = hspec $ do
         it "Parses function call with several args" $ do
             let ast = scan_and_parse "int tiny() { lol(2, x); }"
             ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [Call "lol" [Int 2, Var "x"]])]
+        it "Parses read and write statements" $ do
+            let ast = scan_and_parse "int tiny() { read x; write 2; write x; }"
+            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [Read "x", Write (Int 2), Write (Var "x")])]
