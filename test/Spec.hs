@@ -64,6 +64,9 @@ main = hspec $ do
         it "Parses function declaration with declarations and too much semicolons" $ do
             let ast = scan_and_parse "int tiny() { ;; int b = 2;; int c = 3;;;}"
             ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [VarDeclaration IntType "b" (Just $ Int 2), VarDeclaration IntType "c" (Just $ Int 3)] [])]
+        it "Parses function declaration with one statement" $ do
+            let ast = scan_and_parse "int tiny() { b = 3; }"
+            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [Assignment "b" (Int 3)])]
         --it "Parses assignments of int and chars" $ do
         --    let ast = scan_and_parse "a = 5; b = 'c';"
         --    ast `shouldBe`[Assignment "a" (Int 5), Assignment "b" (Char 'c')]

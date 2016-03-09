@@ -83,15 +83,18 @@ var_declarations : var_declarations var_declaration ';' { $1 ++ [$2] }
                  | { [] }
 
 block :: { Statement }
-block : '{' var_declarations '}'                  { Block $2 [] }
+block : '{' var_declarations statements '}'                  { Block $2 $3 }
 
-          {-| var '=' Expr                          { Assignment $1 $3}
-          | if '(' Expr ')' Statement             { If $3 $5 }
-          | while '(' Expr ')' Statement          { While $3 $5 }-}
+statements :: { Statements }
+statements : statements statement ';'                 { $1 ++ [$2] }
+           | statements ';'       { $1 }
+           | { [] }
 
-{-Block :: { Statement }
-Block : if '(' Expr ')' '{' Statements '}'        { IfBlock $3 $6 }
-      | while '(' Expr ')' '{' Statements '}'     { WhileBlock $3 $6 }-}
+statement :: { Statement }
+statement : var '=' expr                          { Assignment $1 $3}
+          | if '(' expr ')' statement             { If $3 $5 }
+          | while '(' expr ')' statement          { While $3 $5 }
+          | block                                 { $1 }
 
 
 expr :: { Expr }
