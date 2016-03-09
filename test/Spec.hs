@@ -114,3 +114,6 @@ main = hspec $ do
         it "Parses function call without args" $ do
             let ast = scan_and_parse "int tiny() { lol(); }"
             ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [Call "lol" []])]
+        it "Parses function call with one arg" $ do
+            let ast = scan_and_parse "int tiny() { lol(x); }"
+            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [Call "lol" [Var "x"]])]
