@@ -91,6 +91,9 @@ main = hspec $ do
         it "Parses an if else with several / 1 statements" $ do
             let ast = scan_and_parse "int tiny() { if (a == 5) { a = 3; b = 'c';} else a = 3; }"
             ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [IfElse (BinOp (Var "a") Equal (Int 5)) (Block [] [Assignment "a" (Int 3), Assignment "b" (Char 'c')]) (Assignment "a" (Int 3))])]
+        it "Parses an if else with 1/several statements" $ do
+            let ast = scan_and_parse "int tiny() { if (a == 5) a = 3; else { a = 2; b = 3; } }"
+            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [IfElse (BinOp (Var "a") Equal (Int 5)) (Assignment "a" (Int 3)) (Block [] [Assignment "a" (Int 2), Assignment "b" (Int 3)])])]
         it "Parses a while with one instruction" $ do
             let ast = scan_and_parse "int tiny() { while (a == 5) a = 3; b = 2; }"
             ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [While (BinOp (Var "a") Equal (Int 5)) (Assignment "a" (Int 3)), Assignment "b" (Int 2)])]
