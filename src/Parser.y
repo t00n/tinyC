@@ -82,24 +82,30 @@ var_declarations : var_declarations var_declaration ';' { $1 ++ [$2] }
                  | var_declarations ';'           { $1 }
                  | { [] }
 
+block_or_not :: { Statement }
+block_or_not : block { $1 }
+             | statement ';' { $1 }
+
 block :: { Statement }
 block : '{' var_declarations statements '}'                  { Block $2 $3 }
 
 statements :: { Statements }
 statements : statements statement ';'                 { $1 ++ [$2] }
+           | statements block_statement               { $1 ++ [$2] }
            | statements ';'       { $1 }
            | { [] }
 
 statement :: { Statement }
 statement : var '=' expr                          { Assignment $1 $3}
-          | if '(' expr ')' statement             { If $3 $5 }
-          | if '(' expr ')' statement else statement { IfElse $3 $5 $7 }
-          | while '(' expr ')' statement          { While $3 $5 }
           | return expr                           { Return $2 }
           | var '(' args ')'                      { Call $1 $3 }
-          | block                                 { $1 }
           | write expr                            { Write $2 }
           | read var                              { Read $2 }
+
+block_statement :: { Statement }
+block_statement : if '(' expr ')' block_or_not             { If $3 $5 }
+                | if '(' expr ')' block_or_not else block_or_not { IfElse $3 $5 $7 }
+                | while '(' expr ')' block_or_not          { While $3 $5 }
 
 args :: { [Expr] }
 args : expr            { [$1] }
