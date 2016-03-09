@@ -93,8 +93,19 @@ statements : statements statement ';'                 { $1 ++ [$2] }
 statement :: { Statement }
 statement : var '=' expr                          { Assignment $1 $3}
           | if '(' expr ')' statement             { If $3 $5 }
+          | if '(' expr ')' statement else statement { IfElse $3 $5 $7 }
           | while '(' expr ')' statement          { While $3 $5 }
+          | return expr                           { Return $2 }
+          | var '(' args ')'                      { Call $1 $3 }
           | block                                 { $1 }
+          | write expr                            { Write $2 }
+          | read var                              { Read $2 }
+
+args :: { [Expr] }
+args : expr            { [$1] }
+     | args ',' expr { $1 ++ [$3] }
+     | {- empty -}                  { [] }
+
 
 
 expr :: { Expr }
@@ -136,8 +147,13 @@ type Statements = [Statement]
 
 data Statement = Assignment String Expr
                | If Expr Statement
+               | IfElse Expr Statement Statement
                | While Expr Statement
+               | Return Expr
+               | Call String [Expr]
                | Block [Declaration] Statements
+               | Write Expr
+               | Read String
     deriving (Eq, Show)
 
 data Type = IntType | CharType
