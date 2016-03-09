@@ -111,3 +111,6 @@ main = hspec $ do
         it "Parses return statement" $ do
             let ast = scan_and_parse "int tiny() { return x + 5; }"
             ast `shouldBe` [ FuncDeclaration IntType "tiny" [] (Block [] [Return $ BinOp (Var "x") Plus (Int 5)])]
+        it "Parses function call without args" $ do
+            let ast = scan_and_parse "int tiny() { lol(); }"
+            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [Call "lol" []])]
