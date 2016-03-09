@@ -108,12 +108,6 @@ main = hspec $ do
         it "Parses a while block" $ do
             let ast = scan_and_parse "int tiny() { while (a == 5) { int b = 'c'; a = 4; } }"
             ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [While (BinOp (Var "a") Equal (Int 5)) (Block [VarDeclaration IntType "b" (Just $ Char 'c')] [Assignment "a" (Int 4)])])]
-
-
-        --it "Parses assignments of int and chars" $ do
-        --    let ast = scan_and_parse "a = 5; b = 'c';"
-        --    ast `shouldBe`[Assignment "a" (Int 5), Assignment "b" (Char 'c')]
-        --it "Uses variables in declarations and assignments" $ do
-        --    let ast = scan_and_parse "int a = b; char c = a + 5; a = 'c' + c; b = a + b;"
-        --    ast `shouldBe` [VarDeclaration IntType "a" (Just $ Var "b"), VarDeclaration CharType "c" (Just $ BinOp (Var "a") Plus (Int 5)), Assignment "a" (BinOp (Char 'c') Plus (Var "c")), Assignment "b" (BinOp (Var "a") Plus (Var "b"))]
-
+        it "Parses return statement" $ do
+            let ast = scan_and_parse "int tiny() { return x + 5; }"
+            ast `shouldBe` [ FuncDeclaration IntType "tiny" [] (Block [] [Return $ BinOp (Var "x") Plus (Int 5)])]
