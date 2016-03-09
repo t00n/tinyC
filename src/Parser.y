@@ -1,5 +1,5 @@
 {
-module Parser (parse, Declaration(..), Parameter(..), Statement(..), Expr(..), Type(..), BinaryOperator(..), UnaryOperator(..)) where
+module Parser (parse, Declaration(..), Parameter(..), Statement(..), Expr(..), Type(..), BinaryOperator(..), UnaryOperator(..), Variable(..)) where
 import Scanner (Token(..))
 import Data.Maybe
 }
@@ -37,7 +37,7 @@ import Data.Maybe
     length          { LENGTH }
     while           { WHILE }
     number          { NUMBER $$ }
-    var             { NAME $$ }
+    name            { NAME $$ }
     qchar           { QCHAR $$ }
     qstring         { QString $$ }
 
@@ -66,7 +66,7 @@ var_declaration : type var '=' expr                { VarDeclaration $1 $2 (Just 
                 | type var                         { VarDeclaration $1 $2 Nothing }
 
 func_declaration :: { Declaration }
-func_declaration : type var '(' params ')' block { FuncDeclaration $1 $2 $4 $6 }
+func_declaration : type name '(' params ')' block { FuncDeclaration $1 (Variable $2) $4 $6 }
 
 
 params :: { Parameters }
@@ -98,7 +98,7 @@ statements : statements statement ';'                 { $1 ++ [$2] }
 statement :: { Statement }
 statement : var '=' expr                          { Assignment $1 $3}
           | return expr                           { Return $2 }
-          | var '(' args ')'                      { Call $1 $3 }
+          | name '(' args ')'                      { Call (Variable $1) $3 }
           | write expr                            { Write $2 }
           | read var                              { Read $2 }
 
@@ -133,6 +133,10 @@ type :: { Type }
 type : int                                        { IntType }
      | char                                       { CharType }
 
+var :: { Variable }
+var : name  { Variable $1 }
+    | name '[' expr ']' { Array $1 $3 }
+
 {
 
 parseError :: [Token] -> a
@@ -140,26 +144,26 @@ parseError _ = error "Parse error"
 
 type Program = [Declaration]
 
-data Declaration = VarDeclaration Type String (Maybe Expr)
-                 | FuncDeclaration Type String Parameters Statement
+data Declaration = VarDeclaration Type Variable (Maybe Expr)
+                 | FuncDeclaration Type Variable Parameters Statement
     deriving (Eq, Show)
 
 type Parameters = [Parameter]
 
-data Parameter = Parameter Type String
+data Parameter = Parameter Type Variable
     deriving (Eq, Show)
 
 type Statements = [Statement]
 
-data Statement = Assignment String Expr
+data Statement = Assignment Variable Expr
                | If Expr Statement
                | IfElse Expr Statement Statement
                | While Expr Statement
                | Return Expr
-               | Call String [Expr]
+               | Call Variable [Expr]
                | Block [Declaration] Statements
                | Write Expr
-               | Read String
+               | Read Variable
     deriving (Eq, Show)
 
 data Type = IntType | CharType
@@ -173,8 +177,12 @@ data UnaryOperator = Neg | Not
 
 data Expr = Int Int
           | Char Char
-          | Var String
+          | Var Variable
           | BinOp Expr BinaryOperator Expr
           | UnOp UnaryOperator Expr
+    deriving (Eq, Show)
+
+data Variable = Variable String
+              | Array String Expr
     deriving (Eq, Show)
 }

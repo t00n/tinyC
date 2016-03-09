@@ -27,76 +27,79 @@ main = hspec $ do
     describe "Parser" $ do
         it "Parses int declarations" $ do
             let ast = scan_and_parse "int a = 2; int b;"
-            ast `shouldBe` [VarDeclaration IntType "a" (Just $ Int 2), VarDeclaration IntType "b" Nothing]
+            ast `shouldBe` [VarDeclaration IntType (Variable "a") (Just $ Int 2), VarDeclaration IntType (Variable "b") Nothing]
         it "Parses several declarations with too much semicolons" $ do
             let ast = scan_and_parse "int a = 2;;; int b = 3;; int c = 4;"
-            ast `shouldBe` [VarDeclaration IntType "a" (Just $ Int 2), VarDeclaration IntType "b" (Just $ Int 3), VarDeclaration IntType "c" (Just $ Int 4)]
+            ast `shouldBe` [VarDeclaration IntType (Variable "a") (Just $ Int 2), VarDeclaration IntType (Variable "b") (Just $ Int 3), VarDeclaration IntType (Variable "c") (Just $ Int 4)]
         it "Parses declarations without semicolons and throws an exception" $ do
             let ast = scan_and_parse "int a = 2 int b = 3;"
             evaluate ast `shouldThrow` anyErrorCall
         it "Parses integer expressions" $ do
             let ast = scan_and_parse "int a = 2 + 3; int b = 2 + 3 * 4; int c = 2 / 4 + 3 * 2; int d = 8/2 + 1;"
-            ast `shouldBe` [VarDeclaration IntType "a" (Just $ BinOp (Int 2) Plus (Int 3)), VarDeclaration IntType "b" (Just $ BinOp (Int 2) Plus $ BinOp (Int 3) Times (Int 4)), VarDeclaration IntType "c" (Just $ BinOp (BinOp (Int 2) Divide (Int 4)) Plus (BinOp (Int 3) Times (Int 2))), VarDeclaration IntType "d" (Just $ BinOp (BinOp (Int 8) Divide (Int 2)) Plus (Int 1))]
+            ast `shouldBe` [VarDeclaration IntType (Variable "a") (Just $ BinOp (Int 2) Plus (Int 3)), VarDeclaration IntType (Variable "b") (Just $ BinOp (Int 2) Plus $ BinOp (Int 3) Times (Int 4)), VarDeclaration IntType (Variable "c") (Just $ BinOp (BinOp (Int 2) Divide (Int 4)) Plus (BinOp (Int 3) Times (Int 2))), VarDeclaration IntType (Variable "d") (Just $ BinOp (BinOp (Int 8) Divide (Int 2)) Plus (Int 1))]
         it "Parses unary operators" $ do
             let ast = scan_and_parse "int a = -5; int b = -7 + -5; int c = !5;"
-            ast `shouldBe` [VarDeclaration IntType "a" (Just $ UnOp Neg (Int 5)), VarDeclaration IntType "b" (Just $ BinOp (UnOp Neg (Int 7)) Plus (UnOp Neg (Int 5))), VarDeclaration IntType "c" (Just $ UnOp Not (Int 5))]
+            ast `shouldBe` [VarDeclaration IntType (Variable "a") (Just $ UnOp Neg (Int 5)), VarDeclaration IntType (Variable "b") (Just $ BinOp (UnOp Neg (Int 7)) Plus (UnOp Neg (Int 5))), VarDeclaration IntType (Variable "c") (Just $ UnOp Not (Int 5))]
         it "Parses declaration of int with char expressions" $ do
             let ast = scan_and_parse "int a = 'c'; char c = 5;"
-            ast `shouldBe` [VarDeclaration IntType "a" (Just $ Char 'c'), VarDeclaration CharType "c" (Just $ Int 5)]
+            ast `shouldBe` [VarDeclaration IntType (Variable "a") (Just $ Char 'c'), VarDeclaration CharType (Variable "c") (Just $ Int 5)]
         it "Parses integer and char expressions" $ do
             let ast = scan_and_parse "int c = 'c' + 'b'; int a = 2 + 'c'; char c = 'c' + 2; char c = 2 + 3;"
-            ast `shouldBe` [VarDeclaration IntType "c" (Just $ BinOp (Char 'c') Plus (Char 'b')), VarDeclaration IntType "a" (Just $ BinOp (Int 2) Plus (Char 'c')), VarDeclaration CharType "c" (Just $ BinOp (Char 'c') Plus (Int 2)), VarDeclaration CharType "c" (Just $ BinOp (Int 2) Plus (Int 3))]
+            ast `shouldBe` [VarDeclaration IntType (Variable "c") (Just $ BinOp (Char 'c') Plus (Char 'b')), VarDeclaration IntType (Variable "a") (Just $ BinOp (Int 2) Plus (Char 'c')), VarDeclaration CharType (Variable "c") (Just $ BinOp (Char 'c') Plus (Int 2)), VarDeclaration CharType (Variable "c") (Just $ BinOp (Int 2) Plus (Int 3))]
+        it "Parses array declarations" $ do
+            let ast = scan_and_parse "int c[10]; char b[5+2];"
+            ast `shouldBe` [VarDeclaration IntType (Array "c" (Int 10)) Nothing, VarDeclaration CharType (Array "b" (BinOp (Int 5) Plus (Int 2))) Nothing]
         it "Parses function declarations with no args and empty block" $ do
             let ast = scan_and_parse "int tiny() { }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [])]
         it "Parses function declaration with one arg and empty block" $ do
             let ast = scan_and_parse "int tiny(int a) { }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [Parameter IntType "a"] (Block [] [])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [Parameter IntType (Variable "a")] (Block [] [])]
         it "Parses function declaration with two args and empty block" $ do
             let ast = scan_and_parse "int tiny(int a, char b) { }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [Parameter IntType "a", Parameter CharType "b"] (Block [] [])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [Parameter IntType (Variable "a"), Parameter CharType (Variable "b")] (Block [] [])]
         it "Parses function declaration with no args and block with too much semicolons" $ do
             let ast = scan_and_parse "int tiny() { ;;; }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [])]
         it "Parses function declarations with declarations" $ do
             let ast = scan_and_parse "int tiny(int a) { int b = 2; }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [Parameter IntType "a"] (Block [VarDeclaration IntType "b" (Just $ Int 2)] [])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [Parameter IntType (Variable "a")] (Block [VarDeclaration IntType (Variable "b") (Just $ Int 2)] [])]
         it "Parses function declaration with declarations and too much semicolons" $ do
             let ast = scan_and_parse "int tiny() { ;; int b = 2;; int c = 3;;;}"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [VarDeclaration IntType "b" (Just $ Int 2), VarDeclaration IntType "c" (Just $ Int 3)] [])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [VarDeclaration IntType (Variable "b") (Just $ Int 2), VarDeclaration IntType (Variable "c") (Just $ Int 3)] [])]
         it "Parses function declaration with one statement" $ do
             let ast = scan_and_parse "int tiny() { b = 3; }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [Assignment "b" (Int 3)])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Assignment (Variable "b") (Int 3)])]
         it "Parses function declaration with several statements" $ do
             let ast = scan_and_parse "int tiny() { b = 3; c = 4; }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [Assignment "b" (Int 3), Assignment "c" (Int 4)])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Assignment (Variable "b") (Int 3), Assignment (Variable "c") (Int 4)])]
         it "Parses function declaration with several statements and too much semicolons" $ do
             let ast = scan_and_parse "int tiny() { ;;;b = 3;; c = 4;; }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [Assignment "b" (Int 3), Assignment "c" (Int 4)])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Assignment (Variable "b") (Int 3), Assignment (Variable "c") (Int 4)])]
         it "Parses function declaration with several declarations and statements" $ do
             let ast = scan_and_parse "int tiny() { int a = 4; int b; b = 3; c = 4; }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [VarDeclaration IntType "a" (Just $ Int 4), VarDeclaration IntType "b" Nothing] [Assignment "b" (Int 3), Assignment "c" (Int 4)])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [VarDeclaration IntType (Variable "a") (Just $ Int 4), VarDeclaration IntType (Variable "b") Nothing] [Assignment (Variable "b") (Int 3), Assignment (Variable "c") (Int 4)])]
         it "Parses function declaration with statements before declarations and throws an exception" $ do
             let ast = scan_and_parse "int tiny() { a = 4; int b; b = 3; c = 4; }"
             evaluate ast `shouldThrow` anyErrorCall
         it "Parses an if with one instruction " $ do
             let ast = scan_and_parse "int tiny() { if (a == 5) a = 3; }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [If (BinOp (Var "a") Equal (Int 5)) (Assignment "a" (Int 3))])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [If (BinOp (Var (Variable "a")) Equal (Int 5)) (Assignment (Variable "a") (Int 3))])]
         it "Parses an if block" $ do
             let ast = scan_and_parse "int tiny() { if (a == 5) { a = 3; b = 'c';} }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [If (BinOp (Var "a") Equal (Int 5)) (Block [] [Assignment "a" (Int 3), Assignment "b" (Char 'c')])])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [If (BinOp (Var (Variable "a")) Equal (Int 5)) (Block [] [Assignment (Variable "a") (Int 3), Assignment (Variable "b") (Char 'c')])])]
         it "Parses an if else with 1/1 statement" $ do
             let ast = scan_and_parse "int tiny() { if (a == 5) a = 3; else a = 2; }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [IfElse (BinOp (Var "a") Equal (Int 5)) (Assignment "a" (Int 3)) (Assignment "a" (Int 2))])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [IfElse (BinOp (Var (Variable "a")) Equal (Int 5)) (Assignment (Variable "a") (Int 3)) (Assignment (Variable "a") (Int 2))])]
         it "Parses an if else with several / 1 statements" $ do
             let ast = scan_and_parse "int tiny() { if (a == 5) { a = 3; b = 'c';} else a = 3; }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [IfElse (BinOp (Var "a") Equal (Int 5)) (Block [] [Assignment "a" (Int 3), Assignment "b" (Char 'c')]) (Assignment "a" (Int 3))])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [IfElse (BinOp (Var (Variable "a")) Equal (Int 5)) (Block [] [Assignment (Variable "a") (Int 3), Assignment (Variable "b") (Char 'c')]) (Assignment (Variable "a") (Int 3))])]
         it "Parses an if else with 1/several statements" $ do
             let ast = scan_and_parse "int tiny() { if (a == 5) a = 3; else { a = 2; b = 3; } }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [IfElse (BinOp (Var "a") Equal (Int 5)) (Assignment "a" (Int 3)) (Block [] [Assignment "a" (Int 2), Assignment "b" (Int 3)])])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [IfElse (BinOp (Var (Variable "a")) Equal (Int 5)) (Assignment (Variable "a") (Int 3)) (Block [] [Assignment (Variable "a") (Int 2), Assignment (Variable "b") (Int 3)])])]
         it "Parses an if else with several/several statements" $ do
             let ast = scan_and_parse "int tiny() { if (a == 5) { a = 3; b = 2; } else { a = 2; b = 3; } }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [IfElse (BinOp (Var "a") Equal (Int 5)) (Block [] [Assignment "a" (Int 3), Assignment "b" (Int 2)]) (Block [] [Assignment "a" (Int 2), Assignment "b" (Int 3)])])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [IfElse (BinOp (Var (Variable "a")) Equal (Int 5)) (Block [] [Assignment (Variable "a") (Int 3), Assignment (Variable "b") (Int 2)]) (Block [] [Assignment (Variable "a") (Int 2), Assignment (Variable "b") (Int 3)])])]
         it "Parses an if else statement with missing body and throws an exception" $ do
             let ast = scan_and_parse "int tiny() { if (a == 5) else a = 2; }"
             evaluate ast `shouldThrow` anyErrorCall
@@ -104,22 +107,22 @@ main = hspec $ do
             evaluate ast2 `shouldThrow` anyErrorCall
         it "Parses a while with one instruction" $ do
             let ast = scan_and_parse "int tiny() { while (a == 5) a = 3; b = 2; }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [While (BinOp (Var "a") Equal (Int 5)) (Assignment "a" (Int 3)), Assignment "b" (Int 2)])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [While (BinOp (Var (Variable "a")) Equal (Int 5)) (Assignment (Variable "a") (Int 3)), Assignment (Variable "b") (Int 2)])]
         it "Parses a while block" $ do
             let ast = scan_and_parse "int tiny() { while (a == 5) { int b = 'c'; a = 4; } }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [While (BinOp (Var "a") Equal (Int 5)) (Block [VarDeclaration IntType "b" (Just $ Char 'c')] [Assignment "a" (Int 4)])])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [While (BinOp (Var (Variable "a")) Equal (Int 5)) (Block [VarDeclaration IntType (Variable "b") (Just $ Char 'c')] [Assignment (Variable "a") (Int 4)])])]
         it "Parses return statement" $ do
             let ast = scan_and_parse "int tiny() { return x + 5; }"
-            ast `shouldBe` [ FuncDeclaration IntType "tiny" [] (Block [] [Return $ BinOp (Var "x") Plus (Int 5)])]
+            ast `shouldBe` [ FuncDeclaration IntType (Variable "tiny") [] (Block [] [Return $ BinOp (Var (Variable "x")) Plus (Int 5)])]
         it "Parses function call without args" $ do
             let ast = scan_and_parse "int tiny() { lol(); }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [Call "lol" []])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Call (Variable "lol") []])]
         it "Parses function call with one arg" $ do
             let ast = scan_and_parse "int tiny() { lol(x); }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [Call "lol" [Var "x"]])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Call (Variable "lol") [Var (Variable "x")]])]
         it "Parses function call with several args" $ do
             let ast = scan_and_parse "int tiny() { lol(2, x); }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [Call "lol" [Int 2, Var "x"]])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Call (Variable "lol") [Int 2, Var (Variable "x")]])]
         it "Parses read and write statements" $ do
             let ast = scan_and_parse "int tiny() { read x; write 2; write x; }"
-            ast `shouldBe` [FuncDeclaration IntType "tiny" [] (Block [] [Read "x", Write (Int 2), Write (Var "x")])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Read (Variable "x"), Write (Int 2), Write (Var (Variable "x"))])]
