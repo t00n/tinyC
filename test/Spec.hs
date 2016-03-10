@@ -46,6 +46,9 @@ main = hspec $ do
         it "Parses integer and char expressions" $ do
             let ast = scan_and_parse "int c = 'c' + 'b'; int a = 2 + 'c'; char c = 'c' + 2; char c = 2 + 3;"
             ast `shouldBe` [VarDeclaration IntType (Variable "c") (Just $ BinOp (Char 'c') Plus (Char 'b')), VarDeclaration IntType (Variable "a") (Just $ BinOp (Int 2) Plus (Char 'c')), VarDeclaration CharType (Variable "c") (Just $ BinOp (Char 'c') Plus (Int 2)), VarDeclaration CharType (Variable "c") (Just $ BinOp (Int 2) Plus (Int 3))]
+        it "Parses parenthesis in expressions (change of precedence)" $ do
+            let ast = scan_and_parse "int a = (1 + 5) * 3;"
+            ast `shouldBe`[VarDeclaration IntType (Variable "a") (Just (BinOp (BinOp (Int 1) Plus (Int 5)) Times (Int 3)))]
         it "Parses array declarations" $ do
             let ast = scan_and_parse "int c[10]; char b[5+2];"
             ast `shouldBe` [VarDeclaration IntType (Array "c" (Int 10)) Nothing, VarDeclaration CharType (Array "b" (BinOp (Int 5) Plus (Int 2))) Nothing]

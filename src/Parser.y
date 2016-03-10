@@ -126,6 +126,7 @@ expr : number                                     { Int $1 }
      | expr '>' expr                              { BinOp $1 Greater $3 }
      | expr '<' expr                              { BinOp $1 Less $3 }
      | expr '!=' expr                             { BinOp $1 NotEqual $3 }
+     | '(' expr ')'                               { $2 }
      | '-' expr %prec NEG                         { UnOp Neg $2 }
      | '!' expr                                   { UnOp Not $2 }
 
