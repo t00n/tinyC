@@ -132,6 +132,7 @@ expr : number                                     { Int $1 }
      | '-' expr %prec NEG                         { UnOp Neg $2 }
      | '!' expr                                   { UnOp Not $2 }
      | name '(' args ')'                          { Call (Variable $1) $3 }
+     | length var                                 { Length $2 }
 
 type :: { Type }
 type : int                                        { IntType }
@@ -185,6 +186,7 @@ data Expr = Int Int
           | BinOp Expr BinaryOperator Expr
           | UnOp UnaryOperator Expr
           | Call Variable [Expr]
+          | Length Variable
     deriving (Eq, Show)
 
 data Variable = Variable String

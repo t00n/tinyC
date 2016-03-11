@@ -49,6 +49,9 @@ main = hspec $ do
         it "Parses function call expression" $ do
             let ast = scan_and_parse "int c = a(5);"
             ast `shouldBe` [VarDeclaration IntType (Variable "c") (Just $ Call (Variable "a") [Int 5])]
+        it "Parses length expression" $ do
+            let ast = scan_and_parse "int c = length a;"
+            ast `shouldBe` [VarDeclaration IntType (Variable "c") (Just $ Length $ Variable "a")]
         it "Parses parenthesis in expressions (change of precedence)" $ do
             let ast = scan_and_parse "int a = (1 + 5) * 3;"
             ast `shouldBe`[VarDeclaration IntType (Variable "a") (Just (BinOp (BinOp (Int 1) Plus (Int 5)) Times (Int 3)))]
