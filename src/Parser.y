@@ -100,10 +100,7 @@ statement : var '=' expr                          { Assignment $1 $3}
           | return expr                           { Return $2 }
           | write expr                            { Write $2 }
           | read var                              { Read $2 }
-          | func_call                             { $1 }
-
-func_call :: { Statement }
-func_call : name '(' args ')'                      { Call (Variable $1) $3 }
+          | expr                                  { Expression $1 }
 
 block_statement :: { Statement }
 block_statement : if '(' expr ')' block_or_not             { If $3 $5 }
@@ -132,7 +129,7 @@ expr : number                                     { Int $1 }
      | '(' expr ')'                               { $2 }
      | '-' expr %prec NEG                         { UnOp Neg $2 }
      | '!' expr                                   { UnOp Not $2 }
-     | func_call                                  { Func $1 }
+     | name '(' args ')'                          { Call (Variable $1) $3 }
 
 type :: { Type }
 type : int                                        { IntType }
@@ -165,10 +162,10 @@ data Statement = Assignment Variable Expr
                | IfElse Expr Statement Statement
                | While Expr Statement
                | Return Expr
-               | Call Variable [Expr]
                | Block [Declaration] Statements
                | Write Expr
                | Read Variable
+               | Expression Expr
     deriving (Eq, Show)
 
 data Type = IntType | CharType
@@ -185,7 +182,7 @@ data Expr = Int Int
           | Var Variable
           | BinOp Expr BinaryOperator Expr
           | UnOp UnaryOperator Expr
-          | Func Statement
+          | Call Variable [Expr]
     deriving (Eq, Show)
 
 data Variable = Variable String

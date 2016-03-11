@@ -48,7 +48,7 @@ main = hspec $ do
             ast `shouldBe` [VarDeclaration IntType (Variable "c") (Just $ BinOp (Char 'c') Plus (Char 'b')), VarDeclaration IntType (Variable "a") (Just $ BinOp (Int 2) Plus (Char 'c')), VarDeclaration CharType (Variable "c") (Just $ BinOp (Char 'c') Plus (Int 2)), VarDeclaration CharType (Variable "c") (Just $ BinOp (Int 2) Plus (Int 3))]
         it "Parses function call expression" $ do
             let ast = scan_and_parse "int c = a(5);"
-            ast `shouldBe` [VarDeclaration IntType (Variable "c") (Just $ Func $ Call (Variable "a") [Int 5])]
+            ast `shouldBe` [VarDeclaration IntType (Variable "c") (Just $ Call (Variable "a") [Int 5])]
         it "Parses parenthesis in expressions (change of precedence)" $ do
             let ast = scan_and_parse "int a = (1 + 5) * 3;"
             ast `shouldBe`[VarDeclaration IntType (Variable "a") (Just (BinOp (BinOp (Int 1) Plus (Int 5)) Times (Int 3)))]
@@ -122,13 +122,13 @@ main = hspec $ do
             ast `shouldBe` [ FuncDeclaration IntType (Variable "tiny") [] (Block [] [Return $ BinOp (Var (Variable "x")) Plus (Int 5)])]
         it "Parses function call without args" $ do
             let ast = scan_and_parse "int tiny() { lol(); }"
-            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Call (Variable "lol") []])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Expression $ Call (Variable "lol") []])]
         it "Parses function call with one arg" $ do
             let ast = scan_and_parse "int tiny() { lol(x); }"
-            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Call (Variable "lol") [Var (Variable "x")]])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Expression $ Call (Variable "lol") [Var (Variable "x")]])]
         it "Parses function call with several args" $ do
             let ast = scan_and_parse "int tiny() { lol(2, x); }"
-            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Call (Variable "lol") [Int 2, Var (Variable "x")]])]
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Expression $ Call (Variable "lol") [Int 2, Var (Variable "x")]])]
         it "Parses read and write statements" $ do
             let ast = scan_and_parse "int tiny() { read x; write 2; write x; }"
             ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Read (Variable "x"), Write (Int 2), Write (Var (Variable "x"))])]
