@@ -39,7 +39,7 @@ import Data.Maybe
     number          { NUMBER $$ }
     name            { NAME $$ }
     qchar           { QCHAR $$ }
-    qstring         { QString $$ }
+    qstring         { QSTRING $$ }
 
 %left ','
 %right '='

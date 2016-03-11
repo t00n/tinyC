@@ -40,7 +40,7 @@ tokens :-
     $digit+         { \s -> NUMBER (read s) }
     $alpha[$word]*  { \s -> NAME s }
     \'.\'           { \s -> QCHAR (s !! 1) }
-    \".*"           { \s -> QString $ take ((length s) - 2) (drop 1 s) }
+    \".*"           { \s -> QSTRING $ take ((length s) - 2) (drop 1 s) }
 
 {
 data Token = INT | IF | ELSE | NEQUAL
@@ -50,6 +50,6 @@ data Token = INT | IF | ELSE | NEQUAL
            | TIMES | DIVIDE | EQUAL | CHAR
            | WRITE | READ | GREATER | LESS
            | NOT | LENGTH | WHILE
-           | NAME String | NUMBER Int | QCHAR Char | QString String
+           | NAME String | NUMBER Int | QCHAR Char | QSTRING String
            deriving (Eq, Show)
 }
