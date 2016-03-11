@@ -34,9 +34,15 @@ main = hspec $ do
         it "Parses declarations without semicolons and throws an exception" $ do
             let ast = scan_and_parse "int a = 2 int b = 3;"
             evaluate ast `shouldThrow` anyErrorCall
+        it "Parses declarations with a statement and throws an exception" $ do
+            let ast = scan_and_parse "int a = if (a < 5) a = 2;;"
+            evaluate ast `shouldThrow` anyErrorCall
         it "Parses integer expressions" $ do
             let ast = scan_and_parse "int a = 2 + 3; int b = 2 + 3 * 4; int c = 2 / 4 + 3 * 2; int d = 8/2 + 1;"
             ast `shouldBe` [VarDeclaration IntType (Variable "a") (Just $ BinOp (Int 2) Plus (Int 3)), VarDeclaration IntType (Variable "b") (Just $ BinOp (Int 2) Plus $ BinOp (Int 3) Times (Int 4)), VarDeclaration IntType (Variable "c") (Just $ BinOp (BinOp (Int 2) Divide (Int 4)) Plus (BinOp (Int 3) Times (Int 2))), VarDeclaration IntType (Variable "d") (Just $ BinOp (BinOp (Int 8) Divide (Int 2)) Plus (Int 1))]
+        it "Parses array expression" $ do
+            let ast = scan_and_parse "int c = a[5];"
+            ast `shouldBe` [VarDeclaration IntType (Variable "c") (Just $ Var $ Array "a" (Int 5))]
         it "Parses unary operators" $ do
             let ast = scan_and_parse "int a = -5; int b = -7 + -5; int c = !5;"
             ast `shouldBe` [VarDeclaration IntType (Variable "a") (Just $ UnOp Neg (Int 5)), VarDeclaration IntType (Variable "b") (Just $ BinOp (UnOp Neg (Int 7)) Plus (UnOp Neg (Int 5))), VarDeclaration IntType (Variable "c") (Just $ UnOp Not (Int 5))]
@@ -46,13 +52,22 @@ main = hspec $ do
         it "Parses integer and char expressions" $ do
             let ast = scan_and_parse "int c = 'c' + 'b'; int a = 2 + 'c'; char c = 'c' + 2; char c = 2 + 3;"
             ast `shouldBe` [VarDeclaration IntType (Variable "c") (Just $ BinOp (Char 'c') Plus (Char 'b')), VarDeclaration IntType (Variable "a") (Just $ BinOp (Int 2) Plus (Char 'c')), VarDeclaration CharType (Variable "c") (Just $ BinOp (Char 'c') Plus (Int 2)), VarDeclaration CharType (Variable "c") (Just $ BinOp (Int 2) Plus (Int 3))]
-        it "Parses function call expression" $ do
+        it "Parses function call expression with no argument" $ do
+            let ast = scan_and_parse "int c = a();"
+            ast `shouldBe` [VarDeclaration IntType (Variable "c") (Just $ Call (Variable "a") [])]
+        it "Parses function call expression with one argument" $ do
             let ast = scan_and_parse "int c = a(5);"
             ast `shouldBe` [VarDeclaration IntType (Variable "c") (Just $ Call (Variable "a") [Int 5])]
+        it "Parses function call expression with several arguments" $ do
+            let ast = scan_and_parse "int c = a(5, b);"
+            ast `shouldBe` [VarDeclaration IntType (Variable "c") (Just $ Call (Variable "a") [Int 5, Var $ Variable "b"])]
         it "Parses length expression" $ do
             let ast = scan_and_parse "int c = length a;"
             ast `shouldBe` [VarDeclaration IntType (Variable "c") (Just $ Length $ Variable "a")]
-        it "Parses parenthesis in expressions (change of precedence)" $ do
+        it "Parses length expression with a statement and throws an exception" $ do
+            let ast = scan_and_parse "int c = length (a = 2;)"
+            evaluate ast `shouldThrow` anyErrorCall
+        it "Parses parenthesis in expressions (for precedence)" $ do
             let ast = scan_and_parse "int a = (1 + 5) * 3;"
             ast `shouldBe`[VarDeclaration IntType (Variable "a") (Just (BinOp (BinOp (Int 1) Plus (Int 5)) Times (Int 3)))]
         it "Parses array declarations" $ do
@@ -91,6 +106,9 @@ main = hspec $ do
         it "Parses function declaration with statements before declarations and throws an exception" $ do
             let ast = scan_and_parse "int tiny() { a = 4; int b; b = 3; c = 4; }"
             evaluate ast `shouldThrow` anyErrorCall
+        it "Parses array assignment" $ do
+            let ast = scan_and_parse "int tiny() { c[5] = 3; }"
+            ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Assignment (Array "c" (Int 5)) (Int 3)])]
         it "Parses an if with one instruction " $ do
             let ast = scan_and_parse "int tiny() { if (a == 5) a = 3; }"
             ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [If (BinOp (Var (Variable "a")) Equal (Int 5)) (Assignment (Variable "a") (Int 3))])]
