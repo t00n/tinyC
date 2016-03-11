@@ -62,38 +62,39 @@ declaration : var_declaration ';'                 { Just $1 }
 
 
 var_declaration :: { Declaration }
-var_declaration : type var '=' expr                { VarDeclaration $1 $2 (Just $4) }
-                | type var                         { VarDeclaration $1 $2 Nothing }
+var_declaration : type var '=' expr               { VarDeclaration $1 $2 (Just $4) }
+                | type var                        { VarDeclaration $1 $2 Nothing }
 
 func_declaration :: { Declaration }
 func_declaration : type name '(' params ')' block { FuncDeclaration $1 (Variable $2) $4 $6 }
 
 
 params :: { Parameters }
-params : param            { [$1] }
-                   | params ',' param { $1 ++ [$3] }
-                   | {- empty -}                  { [] }
+params : param                                    { [$1] }
+       | params ',' param                         { $1 ++ [$3] }
+       | {- empty -}                              { [] }
 
 param :: { Parameter }
-param : type var                      { Parameter $1 $2 }
+param : type var                                  { Parameter $1 $2 }
 
 var_declarations :: { [Declaration] }
-var_declarations : var_declarations var_declaration ';' { $1 ++ [$2] }
+var_declarations : var_declarations 
+                       var_declaration ';'        { $1 ++ [$2] }
                  | var_declarations ';'           { $1 }
-                 | { [] }
+                 | {- empty -}                    { [] }
 
 block_or_not :: { Statement }
-block_or_not : block { $1 }
-             | statement ';' { $1 }
+block_or_not : block                              { $1 }
+             | statement ';'                      { $1 }
 
 block :: { Statement }
-block : '{' var_declarations statements '}'                  { Block $2 $3 }
+block : '{' var_declarations statements '}'       { Block $2 $3 }
 
 statements :: { Statements }
-statements : statements statement ';'                 { $1 ++ [$2] }
-           | statements block_statement               { $1 ++ [$2] }
-           | statements ';'       { $1 }
-           | { [] }
+statements : statements statement ';'             { $1 ++ [$2] }
+           | statements block_statement           { $1 ++ [$2] }
+           | statements ';'                       { $1 }
+           | {- empty -}                          { [] }
 
 statement :: { Statement }
 statement : var '=' expr                          { Assignment $1 $3}
@@ -103,14 +104,15 @@ statement : var '=' expr                          { Assignment $1 $3}
           | expr                                  { Expression $1 }
 
 block_statement :: { Statement }
-block_statement : if '(' expr ')' block_or_not             { If $3 $5 }
-                | if '(' expr ')' block_or_not else block_or_not { IfElse $3 $5 $7 }
-                | while '(' expr ')' block_or_not          { While $3 $5 }
+block_statement : if '(' expr ')' block_or_not    { If $3 $5 }
+                | if '(' expr ')' block_or_not 
+                  else block_or_not               { IfElse $3 $5 $7 }
+                | while '(' expr ')' block_or_not { While $3 $5 }
 
 args :: { [Expr] }
-args : expr            { [$1] }
-     | args ',' expr { $1 ++ [$3] }
-     | {- empty -}                  { [] }
+args : expr                                       { [$1] }
+     | args ',' expr                              { $1 ++ [$3] }
+     | {- empty -}                                { [] }
 
 
 
@@ -136,8 +138,8 @@ type : int                                        { IntType }
      | char                                       { CharType }
 
 var :: { Variable }
-var : name  { Variable $1 }
-    | name '[' expr ']' { Array $1 $3 }
+var : name                                        { Variable $1 }
+    | name '[' expr ']'                           { Array $1 $3 }
 
 {
 
