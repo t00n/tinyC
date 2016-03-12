@@ -66,12 +66,12 @@ var_declaration : type var '=' expr               { VarDeclaration $1 $2 (Just $
                 | type var                        { VarDeclaration $1 $2 Nothing }
 
 func_declaration :: { Declaration }
-func_declaration : type name '(' params ')' block { FuncDeclaration $1 (Variable $2) $4 $6 }
+func_declaration : type name '(' params ')' block { FuncDeclaration $1 (Variable $2) (reverse $4) $6 }
 
 
 params :: { Parameters }
 params : param                                    { [$1] }
-       | params ',' param                         { $1 ++ [$3] }
+       | params ',' param                         { $3 : $1 }
        | {- empty -}                              { [] }
 
 param :: { Parameter }
@@ -79,7 +79,7 @@ param : type var                                  { Parameter $1 $2 }
 
 var_declarations :: { [Declaration] }
 var_declarations : var_declarations 
-                       var_declaration ';'        { $1 ++ [$2] }
+                       var_declaration ';'        { $2 : $1 }
                  | var_declarations ';'           { $1 }
                  | {- empty -}                    { [] }
 
@@ -88,11 +88,11 @@ block_or_not : block                              { $1 }
              | statement ';'                      { $1 }
 
 block :: { Statement }
-block : '{' var_declarations statements '}'       { Block $2 $3 }
+block : '{' var_declarations statements '}'       { Block (reverse $2) (reverse $3) }
 
 statements :: { Statements }
-statements : statements statement ';'             { $1 ++ [$2] }
-           | statements block_statement           { $1 ++ [$2] }
+statements : statements statement ';'             { $2 : $1 }
+           | statements block_statement           { $2 : $1 }
            | statements ';'                       { $1 }
            | {- empty -}                          { [] }
 
@@ -111,7 +111,7 @@ block_statement : if '(' expr ')' block_or_not    { If $3 $5 }
 
 args :: { [Expr] }
 args : expr                                       { [$1] }
-     | args ',' expr                              { $1 ++ [$3] }
+     | args ',' expr                              { $3 : $1 }
      | {- empty -}                                { [] }
 
 
@@ -131,7 +131,7 @@ expr : number                                     { Int $1 }
      | '(' expr ')'                               { $2 }
      | '-' expr %prec NEG                         { UnOp Neg $2 }
      | '!' expr                                   { UnOp Not $2 }
-     | name '(' args ')'                          { Call (Variable $1) $3 }
+     | name '(' args ')'                          { Call (Variable $1) (reverse $3) }
      | length var                                 { Length $2 }
 
 type :: { Type }
