@@ -2,7 +2,7 @@
     module Scanner where
 }
 
-%wrapper "basic"
+%wrapper "posn"
 $digit = 0-9
 $alpha = [a-zA-Z]
 $word = [$alpha$digit\_]
@@ -10,37 +10,37 @@ $word = [$alpha$digit\_]
 tokens :- 
     $white+         ; -- spaces etc
     \/\/.*          ; -- comments
-    int             { \s -> INT }
-    if              { \s -> IF }
-    else            { \s -> ELSE }
-    !=              { \s -> NEQUAL }
-    return          { \s -> RETURN }
-    \(              { \s -> LPAR }
-    \)              { \s -> RPAR }
-    \{              { \s -> LBRACE }
-    \}              { \s -> RBRACE }
-    \[              { \s -> LBRACK }
-    \]              { \s -> RBRACK }
-    =               { \s -> ASSIGN }
-    \;              { \s -> SEMICOLON }
-    \,              { \s -> COMMA }
-    \+              { \s -> PLUS }
-    \-              { \s -> MINUS }
-    \*              { \s -> TIMES }
-    \/              { \s -> DIVIDE }
-    ==              { \s -> EQUAL }
-    char            { \s -> CHAR }
-    write           { \s -> WRITE }
-    read            { \s -> READ }
-    >               { \s -> GREATER }
-    \<              { \s -> LESS }
-    !               { \s -> NOT }
-    length          { \s -> LENGTH }
-    while           { \s -> WHILE }
-    $digit+         { \s -> NUMBER (read s) }
-    $alpha[$word]*  { \s -> NAME s }
-    \'.\'           { \s -> QCHAR (s !! 1) }
-    \".*"           { \s -> QSTRING $ take ((length s) - 2) (drop 1 s) }
+    int             { \p s -> INT }
+    if              { \p s -> IF }
+    else            { \p s -> ELSE }
+    !=              { \p s -> NEQUAL }
+    return          { \p s -> RETURN }
+    \(              { \p s -> LPAR }
+    \)              { \p s -> RPAR }
+    \{              { \p s -> LBRACE }
+    \}              { \p s -> RBRACE }
+    \[              { \p s -> LBRACK }
+    \]              { \p s -> RBRACK }
+    =               { \p s -> ASSIGN }
+    \;              { \p s -> SEMICOLON }
+    \,              { \p s -> COMMA }
+    \+              { \p s -> PLUS }
+    \-              { \p s -> MINUS }
+    \*              { \p s -> TIMES }
+    \/              { \p s -> DIVIDE }
+    ==              { \p s -> EQUAL }
+    char            { \p s -> CHAR }
+    write           { \p s -> WRITE }
+    read            { \p s -> READ }
+    >               { \p s -> GREATER }
+    \<              { \p s -> LESS }
+    !               { \p s -> NOT }
+    length          { \p s -> LENGTH }
+    while           { \p s -> WHILE }
+    $digit+         { \p s -> NUMBER (read s) }
+    $alpha[$word]*  { \p s -> NAME s }
+    \'.\'           { \p s -> QCHAR (s !! 1) }
+    \".*"           { \p s -> QSTRING $ take ((length s) - 2) (drop 1 s) }
 
 {
 data Token = INT | IF | ELSE | NEQUAL
