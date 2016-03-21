@@ -58,9 +58,21 @@ walkProgram (x:xs) symbolTable =
 checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
 checkStatement stmt st = 
     case stmt of
-        Assignment e1 e2 -> if variableInScope (variableName e1) st then Right st else Left (SemanticError NotDeclaredError (variableName e1))
+        Assignment e1 e2 -> checkExpression e1 st >> checkExpression e2 st
         Block _ [] -> Right st
-        Block decl (x:xs) -> walkProgram decl st >>= checkStatement x
+        Block decl stmts -> walkProgram decl st >> checkStatements stmts st
+
+checkStatements :: [Statement] -> SymbolTable -> Either SemanticError SymbolTable
+checkStatements [] st = Right st
+checkStatements (x:xs) st = checkStatement x st >> checkStatements xs st
+
+checkExpression :: Expr -> SymbolTable -> Either SemanticError SymbolTable
+checkExpression expr st = 
+    let inScope s = if variableInScope s st then Right st else Left (SemanticError NotDeclaredError s) in 
+    case expr of 
+        Variable s -> inScope s
+        Array s _ -> inScope s
+        _ -> error "lololol"
 
 
 checkSemantics :: Program -> Either SemanticError SymbolTable
