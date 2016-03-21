@@ -59,6 +59,8 @@ checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
 checkStatement stmt st = 
     case stmt of
         Assignment e1 e2 -> checkExpression e1 st >> checkExpression e2 st
+        If e stmt1 -> checkExpression e st >> checkStatement stmt1 st
+        IfElse e stmt1 stmt2 -> checkExpression e st >> checkStatement stmt1 st >> checkStatement stmt2 st
         Block _ [] -> Right st
         Block decl stmts -> walkProgram decl st >> checkStatements stmts st
 

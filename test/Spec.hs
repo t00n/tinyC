@@ -155,6 +155,9 @@ main = hspec $ do
             let ast = scan_and_parse "int tiny() { read x; write 2; write x; }"
             ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Read (Variable "x"), Write (Int 2), Write (Variable "x")])]
     describe "Semantics" $ do
-        it "Checks that variables are declared before use" $ do
+        it "Checks that variables are declared before use in assignment" $ do
             let ast = scan_and_parse "int tiny() { a = 5; }"
+            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+        it "Checks that variables are declared before use in if" $ do
+            let ast = scan_and_parse "int tiny() { if (a) a = 5; }"
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
