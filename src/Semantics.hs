@@ -18,42 +18,42 @@ data SymbolTable = SymbolTable {
 } deriving (Eq, Show)
 
 emptySymbolTable :: Maybe SymbolTable -> SymbolTable
-emptySymbolTable parent = SymbolTable Map.empty parent
+emptySymbolTable = SymbolTable Map.empty
 
 insertSymbol :: String -> Info -> SymbolTable -> SymbolTable
-insertSymbol s i st = SymbolTable (Map.insert s i (symbols st)) (parent st)
+insertSymbol s i = SymbolTable <$> Map.insert s i . symbols <*> parent
 
 variableName :: Expr -> String
-variableName e = case e of Variable s -> s
-                           Array s _ -> s
-                           _ -> error "Not a variable declaration"
+variableName (Variable s) = s
+variableName (Array s _) = s
+variableName _ = error "Not a variable declaration"
 
 variableArray :: Expr -> Bool
-variableArray e = case e of Array _ _ -> True
-                            Variable _ -> False
-                            _ -> error "Not a variable declaration"
+variableArray (Array _ _) = True
+variableArray (Variable _) = False
+variableArray _ = error "Not a variable declaration"
 
 variableInScope :: String -> SymbolTable -> Bool
-variableInScope n st = if Map.member n (symbols st) then True else variableInParent n st
+variableInScope n st = Map.member n (symbols st) || variableInParent n st
     where variableInParent _ (SymbolTable _ Nothing) = False
           variableInParent n (SymbolTable s (Just p)) = variableInScope n p
 
 walkProgram :: Program -> SymbolTable -> Either String SymbolTable
 walkProgram [] symbolTable = Right symbolTable
-walkProgram (x:xs) symbolTable = do
+walkProgram (x:xs) symbolTable =
     case x of
         VarDeclaration t e _ -> walkProgram xs 
                                     (insertSymbol (variableName e) (Info t (variableArray e)) symbolTable)
-        FuncDeclaration t e params stmt -> (walkProgram xs
-                                    (insertSymbol (variableName e) (Info t False) symbolTable)) >>= checkStatement stmt 
+        FuncDeclaration t e params stmt -> walkProgram xs
+                                    (insertSymbol (variableName e) (Info t False) symbolTable) >>= checkStatement stmt 
 
 checkStatement :: Statement -> SymbolTable -> Either String SymbolTable
 checkStatement stmt st = 
     case stmt of
         Assignment e1 e2 -> if variableInScope (variableName e1) st then Right st else Left "lolol"
         Block _ [] -> Right st
-        Block decl (x:xs) -> (walkProgram decl st) >>= checkStatement x
+        Block decl (x:xs) -> walkProgram decl st >>= checkStatement x
 
 
 checkSemantics :: Program -> Either String SymbolTable
-checkSemantics program = walkProgram program (emptySymbolTable Nothing)
+checkSemantics = flip walkProgram (emptySymbolTable Nothing)
