@@ -176,4 +176,14 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
             let ast2 = scan_and_parse "int a = 5; int tiny() { return a; }"
             checkSemantics ast2 `shouldBe` Right ()
+        it "Checks that variables are declared before use in IO" $ do
+            let ast = scan_and_parse "int tiny() { write a; }"
+            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+            let ast2 = scan_and_parse "int a = 5; int tiny() { read a; }"
+            checkSemantics ast2 `shouldBe` Right ()
+        it "Checks that variables are declared before use in expression" $ do
+            let ast = scan_and_parse "int tiny() { a; }"
+            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+            let ast2 = scan_and_parse "int a = 5; int tiny() { a; }"
+            checkSemantics ast2 `shouldBe` Right ()
 

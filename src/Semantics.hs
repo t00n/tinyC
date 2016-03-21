@@ -65,6 +65,9 @@ checkStatement stmt st =
         Return e -> checkExpression e st
         Block _ [] -> Right st
         Block decl stmts -> walkProgram decl st >> checkStatements stmts st
+        Write e -> checkExpression e st
+        Read e -> checkExpression e st
+        Expression e -> checkExpression e st
 
 checkStatements :: [Statement] -> SymbolTable -> Either SemanticError SymbolTable
 checkStatements [] st = Right st
