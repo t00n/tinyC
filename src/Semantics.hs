@@ -1,4 +1,4 @@
-module Semantics (checkSemantics) where
+module Semantics (checkSemantics, SemanticError(..), ErrorType(..)) where
 
 import Control.Monad (void)
 import qualified Data.Map.Strict as Map
@@ -15,6 +15,14 @@ type Symbols = Map.Map String Info
 data SymbolTable = SymbolTable {
     symbols :: Symbols,
     parent :: Maybe SymbolTable
+} deriving (Eq, Show)
+
+data ErrorType = NotDeclaredError
+    deriving (Eq, Show)
+
+data SemanticError = SemanticError {
+    errorType :: ErrorType,
+    errorVariable :: String
 } deriving (Eq, Show)
 
 emptySymbolTable :: Maybe SymbolTable -> SymbolTable
@@ -38,7 +46,7 @@ variableInScope n st = Map.member n (symbols st) || variableInParent n st
     where variableInParent _ (SymbolTable _ Nothing) = False
           variableInParent n (SymbolTable s (Just p)) = variableInScope n p
 
-walkProgram :: Program -> SymbolTable -> Either String SymbolTable
+walkProgram :: Program -> SymbolTable -> Either SemanticError SymbolTable
 walkProgram [] symbolTable = Right symbolTable
 walkProgram (x:xs) symbolTable =
     case x of
@@ -47,13 +55,13 @@ walkProgram (x:xs) symbolTable =
         FuncDeclaration t e params stmt -> walkProgram xs
                                     (insertSymbol (variableName e) (Info t False) symbolTable) >>= checkStatement stmt 
 
-checkStatement :: Statement -> SymbolTable -> Either String SymbolTable
+checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
 checkStatement stmt st = 
     case stmt of
-        Assignment e1 e2 -> if variableInScope (variableName e1) st then Right st else Left "lolol"
+        Assignment e1 e2 -> if variableInScope (variableName e1) st then Right st else Left (SemanticError NotDeclaredError (variableName e1))
         Block _ [] -> Right st
         Block decl (x:xs) -> walkProgram decl st >>= checkStatement x
 
 
-checkSemantics :: Program -> Either String SymbolTable
+checkSemantics :: Program -> Either SemanticError SymbolTable
 checkSemantics = flip walkProgram (emptySymbolTable Nothing)

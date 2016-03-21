@@ -157,4 +157,4 @@ main = hspec $ do
     describe "Semantics" $ do
         it "Checks that variables are declared before use" $ do
             let ast = scan_and_parse "int tiny() { a = 5; }"
-            checkSemantics ast `shouldBe` Left "lolol"
+            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
