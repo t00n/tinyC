@@ -44,6 +44,9 @@ variableArray (Array _ _) = True
 variableArray (Variable _) = False
 variableArray _ = error "Not a variable declaration"
 
+getNameInfo :: String -> SymbolTable -> Maybe Info
+getNameInfo s st = Map.lookup s (symbols st) >> parent st >>= getNameInfo s
+
 variableInScope :: String -> SymbolTable -> Bool
 variableInScope n st = Map.member n (symbols st) || variableInParent n st
     where variableInParent _ (SymbolTable _ Nothing) = False
@@ -78,7 +81,8 @@ checkStatements (x:xs) st = checkStatement x st >> checkStatements xs st
 
 checkExpression :: Expr -> SymbolTable -> Either SemanticError SymbolTable
 checkExpression expr st = 
-    let inScope s = if variableInScope s st then Right st else Left (SemanticError NotDeclaredError s) in 
+    let inScope s = if variableInScope s st then Right st else Left (SemanticError NotDeclaredError s) 
+        isType s t = inScope s  in 
     case expr of 
         BinOp e1 _ e2 -> checkExpression e1 st >> checkExpression e2 st
         UnOp _ e -> checkExpression e st
