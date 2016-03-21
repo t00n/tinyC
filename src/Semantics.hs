@@ -62,6 +62,7 @@ checkStatement stmt st =
         If e stmt1 -> checkExpression e st >> checkStatement stmt1 st
         IfElse e stmt1 stmt2 -> checkExpression e st >> checkStatement stmt1 st >> checkStatement stmt2 st
         While e stmt1 -> checkExpression e st >> checkStatement stmt1 st
+        Return e -> checkExpression e st
         Block _ [] -> Right st
         Block decl stmts -> walkProgram decl st >> checkStatements stmts st
 
