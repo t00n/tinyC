@@ -5,9 +5,12 @@ import qualified Data.Map.Strict as Map
 
 import Parser (Program, Declaration(..), Parameter(..), Statement(..), Expr(..), Type(..), BinaryOperator(..), UnaryOperator(..))
 
+data Kind = V | F | A
+    deriving (Eq, Show)
+
 data Info = Info {
     infoType :: Type,
-    infoArray :: Bool
+    infoKind :: Kind
 } deriving (Eq, Show)
 
 type Symbols = Map.Map String Info
@@ -51,9 +54,9 @@ walkProgram [] symbolTable = Right symbolTable
 walkProgram (x:xs) symbolTable =
     case x of
         VarDeclaration t e _ -> walkProgram xs 
-                                    (insertSymbol (variableName e) (Info t (variableArray e)) symbolTable)
+                                    (insertSymbol (variableName e) (Info t (if variableArray e then A else V)) symbolTable)
         FuncDeclaration t e params stmt -> walkProgram xs
-                                    (insertSymbol (variableName e) (Info t False) symbolTable) >>= checkStatement stmt 
+                                    (insertSymbol (variableName e) (Info t F) symbolTable) >>= checkStatement stmt 
 
 checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
 checkStatement stmt st = 
