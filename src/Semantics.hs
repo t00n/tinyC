@@ -74,8 +74,8 @@ checkExpression expr st =
     case expr of 
         Variable s -> inScope s
         Array s _ -> inScope s
-        _ -> error "lololol"
+        _ -> Right st
 
 
-checkSemantics :: Program -> Either SemanticError SymbolTable
-checkSemantics = flip walkProgram (emptySymbolTable Nothing)
+checkSemantics :: Program -> Either SemanticError ()
+checkSemantics = void . flip walkProgram (emptySymbolTable Nothing)

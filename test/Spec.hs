@@ -3,6 +3,7 @@ import Test.QuickCheck
 import Control.Exception (evaluate, ErrorCall)
 import System.IO
 
+
 import Scanner
 import Parser
 import Semantics
@@ -161,3 +162,6 @@ main = hspec $ do
         it "Checks that variables are declared before use in if" $ do
             let ast = scan_and_parse "int tiny() { if (a) a = 5; }"
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+            let ast2 = scan_and_parse "int a = 5; int tiny() { int c = 3; if (a) a = 3; }"
+            checkSemantics ast2 `shouldBe` Right ()
+
