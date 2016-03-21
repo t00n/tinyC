@@ -5,6 +5,7 @@ import System.IO
 
 import Scanner
 import Parser
+import Semantics
 
 scan_and_parse = parse . alexScanTokens
 
@@ -153,3 +154,7 @@ main = hspec $ do
         it "Parses read and write statements" $ do
             let ast = scan_and_parse "int tiny() { read x; write 2; write x; }"
             ast `shouldBe` [FuncDeclaration IntType (Variable "tiny") [] (Block [] [Read (Variable "x"), Write (Int 2), Write (Variable "x")])]
+    describe "Semantics" $ do
+        it "Checks that variables are declared before use" $ do
+            let ast = scan_and_parse "int tiny() { a = 5; }"
+            checkSemantics ast `shouldBe` Left "lolol"
