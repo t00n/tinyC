@@ -77,6 +77,8 @@ checkExpression :: Expr -> SymbolTable -> Either SemanticError SymbolTable
 checkExpression expr st = 
     let inScope s = if variableInScope s st then Right st else Left (SemanticError NotDeclaredError s) in 
     case expr of 
+        BinOp e1 _ e2 -> checkExpression e1 st >> checkExpression e2 st
+        UnOp _ e -> checkExpression e st
         Variable s -> inScope s
         Array s _ -> inScope s
         _ -> Right st

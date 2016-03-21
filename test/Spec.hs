@@ -186,4 +186,18 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
             let ast2 = scan_and_parse "int a = 5; int tiny() { a; }"
             checkSemantics ast2 `shouldBe` Right ()
+        it "Checks that variables are declared before use in binary operations" $ do
+            let ast = scan_and_parse "int tiny() { a + 5; }"
+            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+            let ast2 = scan_and_parse "int a = 5; int tiny() { a + 5; }"
+            checkSemantics ast2 `shouldBe` Right ()
+            let ast3 = scan_and_parse "int tiny() { 5 + a; }"
+            checkSemantics ast3 `shouldBe` Left (SemanticError NotDeclaredError "a")
+            let ast4 = scan_and_parse "int a = 5; int tiny() { 5 + a; }"
+            checkSemantics ast4 `shouldBe` Right ()
+        it "Checks that variables are declared before use in unary operations" $ do
+            let ast = scan_and_parse "int tiny() { -a; }"
+            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+            let ast2 = scan_and_parse "int a = 5; int tiny() { -a; }"
+            checkSemantics ast2 `shouldBe` Right ()
 
