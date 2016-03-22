@@ -1,5 +1,5 @@
 {
-module Parser (parse, Program, Declaration(..), Parameter(..), Statement(..), Expr(..), Type(..), BinaryOperator(..), UnaryOperator(..)) where
+module Parser (parse, Program, Declaration(..), Parameter(..), Statement(..), Expression(..), Type(..), BinaryOperator(..), UnaryOperator(..), Variable(..)) where
 import Scanner (Token(..))
 import Data.Maybe
 }
@@ -69,7 +69,7 @@ func_declaration :: { Declaration }
 func_declaration : type name '(' params ')' block { FuncDeclaration $1 (Variable $2) (reverse $4) $6 }
 
 
-params :: { Parameters }
+params ::{ [Parameter] }
 params : param                                    { [$1] }
        | params ',' param                         { $3 : $1 }
        | {- empty -}                              { [] }
@@ -90,7 +90,7 @@ block_or_not : block                              { $1 }
 block :: { Statement }
 block : '{' var_declarations statements '}'       { Block (reverse $2) (reverse $3) }
 
-statements :: { Statements }
+statements :: { [Statement] }
 statements : statements statement ';'             { $2 : $1 }
            | statements block_statement           { $2 : $1 }
            | statements ';'                       { $1 }
@@ -101,7 +101,7 @@ statement : var '=' expr                          { Assignment $1 $3}
           | return expr                           { Return $2 }
           | write expr                            { Write $2 }
           | read var                              { Read $2 }
-          | expr                                  { Expression $1 }
+          | expr                                  { Expr $1 }
 
 block_statement :: { Statement }
 block_statement : if '(' expr ')' block_or_not    { If $3 $5 }
@@ -109,17 +109,17 @@ block_statement : if '(' expr ')' block_or_not    { If $3 $5 }
                   else block_or_not               { IfElse $3 $5 $7 }
                 | while '(' expr ')' block_or_not { While $3 $5 }
 
-args :: { [Expr] }
+args :: { [Expression] }
 args : expr                                       { [$1] }
      | args ',' expr                              { $3 : $1 }
      | {- empty -}                                { [] }
 
 
 
-expr :: { Expr }
+expr :: { Expression }
 expr : number                                     { Int $1 }
      | qchar                                      { Char $1 }
-     | var                                        { $1 }
+     | var                                        { Var $1 }
      | expr '+' expr                              { BinOp $1 Plus $3 }
      | expr '-' expr                              { BinOp $1 Minus $3 }
      | expr '*' expr                              { BinOp $1 Times $3 }
@@ -138,7 +138,7 @@ type :: { Type }
 type : int                                        { IntType }
      | char                                       { CharType }
 
-var :: { Expr }
+var :: { Variable }
 var : name                                        { Variable $1 }
     | name '[' expr ']'                           { Array $1 $3 }
 
@@ -149,26 +149,22 @@ parseError _ = error "Parse error"
 
 type Program = [Declaration]
 
-data Declaration = VarDeclaration Type Expr (Maybe Expr)
-                 | FuncDeclaration Type Expr Parameters Statement
+data Declaration = VarDeclaration Type Variable (Maybe Expression)
+                 | FuncDeclaration Type Variable [Parameter] Statement
     deriving (Eq, Show)
 
-type Parameters = [Parameter]
-
-data Parameter = Parameter Type Expr
+data Parameter = Parameter Type Variable
     deriving (Eq, Show)
 
-type Statements = [Statement]
-
-data Statement = Assignment Expr Expr
-               | If Expr Statement
-               | IfElse Expr Statement Statement
-               | While Expr Statement
-               | Return Expr
-               | Block [Declaration] Statements
-               | Write Expr
-               | Read Expr
-               | Expression Expr
+data Statement = Assignment Variable Expression
+               | If Expression Statement
+               | IfElse Expression Statement Statement
+               | While Expression Statement
+               | Return Expression
+               | Block [Declaration] [Statement]
+               | Write Expression
+               | Read Variable
+               | Expr Expression
     deriving (Eq, Show)
 
 data Type = IntType | CharType
@@ -180,13 +176,16 @@ data BinaryOperator = Plus | Minus | Times | Divide | Equal | Greater | Less | N
 data UnaryOperator = Neg | Not
     deriving (Eq, Show)
 
-data Expr = Int Int
-          | Char Char
-          | BinOp Expr BinaryOperator Expr
-          | UnOp UnaryOperator Expr
-          | Call Expr [Expr]
-          | Length Expr
-          | Variable String
-          | Array String Expr
+data Expression = Int Int
+                | Char Char
+                | BinOp Expression BinaryOperator Expression
+                | UnOp UnaryOperator Expression
+                | Call Variable [Expression]
+                | Length Variable
+                | Var Variable
+    deriving (Eq, Show)
+
+data Variable = Variable String
+              | Array String Expression
     deriving (Eq, Show)
 }

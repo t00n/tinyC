@@ -4,7 +4,7 @@ import Control.Monad (void, foldM)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, fromJust)
 
-import Parser (Program, Declaration(..), Parameter(..), Statement(..), Expr(..), Type(..), BinaryOperator(..), UnaryOperator(..))
+import Parser
 
 data Kind = V | F | A
     deriving (Eq, Show)
@@ -35,12 +35,12 @@ emptySymbolTable = SymbolTable Map.empty
 insertSymbol :: String -> Info -> SymbolTable -> SymbolTable
 insertSymbol s i = SymbolTable <$> Map.insert s i . symbols <*> parent
 
-variableName :: Expr -> String
+variableName :: Variable -> String
 variableName (Variable s) = s
 variableName (Array s _) = s
 variableName _ = error "Not a variable declaration"
 
-variableArray :: Expr -> Bool
+variableArray :: Variable -> Bool
 variableArray (Array _ _) = True
 variableArray (Variable _) = False
 variableArray _ = error "Not a variable declaration"
@@ -67,33 +67,36 @@ walkProgram (x:xs) symbolTable =
 checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
 checkStatement stmt st = 
     case stmt of
-        Assignment e1 e2 -> checkExpression e1 st >> checkExpression e2 st
+        Assignment v e -> checkVariable v st >> checkExpression e st
         If e stmt1 -> checkExpression e st >> checkStatement stmt1 st
         IfElse e stmt1 stmt2 -> checkExpression e st >> checkStatement stmt1 st >> checkStatement stmt2 st
         While e stmt1 -> checkExpression e st >> checkStatement stmt1 st
         Return e -> checkExpression e st
         Block decl stmts -> walkProgram decl (emptySymbolTable $ Just st) >> checkStatements stmts st
         Write e -> checkExpression e st
-        Read e -> checkExpression e st
-        Expression e -> checkExpression e st
+        Read v -> checkVariable v st
+        Expr e -> checkExpression e st
 
 checkStatements :: [Statement] -> SymbolTable -> Either SemanticError SymbolTable
 checkStatements [] st = Right st
 checkStatements (x:xs) st = checkStatement x st >> checkStatements xs st
 
-checkExpression :: Expr -> SymbolTable -> Either SemanticError SymbolTable
+checkExpression :: Expression -> SymbolTable -> Either SemanticError SymbolTable
 checkExpression expr st = 
-    let inScope s = if variableInScope s st then Right st else Left (SemanticError NotDeclaredError s) 
-        isType s t = inScope s  in 
     case expr of 
         BinOp e1 _ e2 -> checkExpression e1 st >> checkExpression e2 st
         UnOp _ e -> checkExpression e st
-        Call e@(Variable s) params -> checkExpression e st >> if infoKind (fromJust (getNameInfo s st)) /= F then Left (SemanticError NotAFunctionError s) else Right st >> foldM (flip checkExpression) st params
+        Call v@(Variable s) params -> checkVariable v st >> if infoKind (fromJust (getNameInfo s st)) /= F then Left (SemanticError NotAFunctionError s) else Right st >> foldM (flip checkExpression) st params
         Call (Array s _) _ -> Left (SemanticError NotAFunctionError s)
-        Variable s -> inScope s
-        Array s _ -> inScope s
+        Var v -> checkVariable v st
         _ -> Right st
 
+checkVariable :: Variable -> SymbolTable -> Either SemanticError SymbolTable
+checkVariable var st = 
+    let inScope s = if variableInScope s st then Right st else Left (SemanticError NotDeclaredError s) in
+    case var of
+        Variable s -> inScope s
+        Array s e -> inScope s >> checkExpression e st
 
 checkSemantics :: Program -> Either SemanticError ()
 checkSemantics = void . flip walkProgram (emptySymbolTable Nothing)
