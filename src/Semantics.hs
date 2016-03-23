@@ -21,7 +21,12 @@ data SymbolTable = SymbolTable {
     parent :: Maybe SymbolTable
 } deriving (Eq, Show)
 
-data ErrorType = NotDeclaredError | NotAFunctionError | NameExistsError | NotAnArrayError | NotAScalarError
+data ErrorType = NotDeclaredError 
+               | NotAFunctionError 
+               | NameExistsError 
+               | NotAnArrayError 
+               | NotAScalarError
+               | NameExistsWarning
     deriving (Eq, Show)
 
 data SemanticError = SemanticError {
@@ -72,9 +77,13 @@ nameKind (NameSubscription _ _) = ArrayKind
 nameKind (Name _) = VariableKind
 
 checkNameExistsBeforeInsert :: Name -> Type -> Kind -> SymbolTable -> Either SemanticError SymbolTable
-checkNameExistsBeforeInsert n t k st = if symbolIsSameLevel (nameString n) st 
-                                           then Left (SemanticError NameExistsError (nameString n))
-                                       else Right $ insertSymbol (nameString n) (Info t k) st
+checkNameExistsBeforeInsert name t k st = 
+    let n = nameString name in
+        if symbolIsSameLevel n st 
+            then Left (SemanticError NameExistsError n)
+        else if symbolIsInScope n st
+            then Left (SemanticError NameExistsWarning n)
+        else Right $ insertSymbol n (Info t k) st
 
 checkNameInScope :: Name -> SymbolTable -> Either SemanticError SymbolTable
 checkNameInScope name st = 
@@ -87,7 +96,7 @@ checkNameIsKind name kind st =
     let n = nameString name in
         if symbolIsKind n kind st then Right st
         else Left (SemanticError (kindToError kind) n)
-        
+
 walkProgram :: Program -> SymbolTable -> Either SemanticError SymbolTable
 walkProgram [] st = Right st
 walkProgram (x:xs) st =
