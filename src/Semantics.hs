@@ -9,9 +9,13 @@ import Parser
 data Kind = VariableKind | FunctionKind | ArrayKind
     deriving (Eq, Show)
 
-data Info = Info {
+data Info = VarInfo {
     infoType :: Type,
     infoKind :: Kind
+}         | FuncInfo {
+    infoType :: Type,
+    infoKind :: Kind,
+    infoParams :: [Info]
 } deriving (Eq, Show)
 
 type Symbols = Map.Map String Info
@@ -47,8 +51,8 @@ insertSymbol s i = SymbolTable <$> Map.insert s i . symbols <*> parent
 
 getSymbolInfo :: String -> SymbolTable -> Maybe Info
 getSymbolInfo s st = let res = Map.lookup s (symbols st) in 
-                       if res == Nothing then parent st >>= getSymbolInfo s
-                       else res
+                         if res == Nothing then parent st >>= getSymbolInfo s
+                         else res
 
 symbolIsInScope :: String -> SymbolTable -> Bool
 symbolIsInScope n st = Map.member n (symbols st) || variableInParent n st
@@ -76,14 +80,16 @@ nameKind :: Name -> Kind
 nameKind (NameSubscription _ _) = ArrayKind
 nameKind (Name _) = VariableKind
 
-checkNameExistsBeforeInsert :: Name -> Type -> Kind -> SymbolTable -> Either SemanticError SymbolTable
-checkNameExistsBeforeInsert name t k st = 
+checkNameExistsBeforeInsert :: Name -> Type -> Kind -> [Info] -> SymbolTable -> Either SemanticError SymbolTable
+checkNameExistsBeforeInsert name t k p st = 
     let n = nameString name in
         if symbolIsSameLevel n st 
             then Left (SemanticError NameExistsError n)
         else if symbolIsInScope n st
             then Left (SemanticError NameExistsWarning n)
-        else Right $ insertSymbol n (Info t k) st
+        else if k == FunctionKind
+            then Right $ insertSymbol n (FuncInfo t k p) st
+        else Right $ insertSymbol n (VarInfo t k) st
 
 checkNameInScope :: Name -> SymbolTable -> Either SemanticError SymbolTable
 checkNameInScope name st = 
@@ -100,9 +106,10 @@ checkNameIsKind name kind st =
 walkProgram :: Program -> SymbolTable -> Either SemanticError SymbolTable
 walkProgram [] st = Right st
 walkProgram (x:xs) st =
+    let paramToInfo (Parameter t n) = VarInfo t (nameKind n) in
         case x of
-            VarDeclaration t n _ -> checkNameExistsBeforeInsert n t (nameKind n) st >>= walkProgram xs  
-            FuncDeclaration t n params stmt -> checkNameExistsBeforeInsert n t FunctionKind st >>= walkProgram xs >>= checkStatement stmt 
+            VarDeclaration t n _ -> checkNameExistsBeforeInsert n t (nameKind n) [] st >>= walkProgram xs  
+            FuncDeclaration t n params stmt -> checkNameExistsBeforeInsert n t FunctionKind (map paramToInfo params) st >>= walkProgram xs >>= checkStatement stmt 
 
 checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
 checkStatement stmt st = 
