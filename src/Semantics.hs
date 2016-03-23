@@ -21,7 +21,7 @@ data SymbolTable = SymbolTable {
     parent :: Maybe SymbolTable
 } deriving (Eq, Show)
 
-data ErrorType = NotDeclaredError | NotAFunctionError
+data ErrorType = NotDeclaredError | NotAFunctionError | NameExistsError
     deriving (Eq, Show)
 
 data SemanticError = SemanticError {
@@ -45,8 +45,8 @@ nameIsInScope n st = Map.member n (symbols st) || variableInParent n st
     where variableInParent _ (SymbolTable _ Nothing) = False
           variableInParent n (SymbolTable s (Just p)) = nameIsInScope n p
 
-nameIsMasked :: String -> SymbolTable -> Bool
-nameIsMasked n st = Map.member n (symbols st)
+nameExists :: String -> SymbolTable -> Bool
+nameExists n st = Map.member n (symbols st)
 
 nameIsKind :: String -> Kind -> SymbolTable -> Bool
 nameIsKind s k st = let info = getNameInfo s st in
@@ -69,11 +69,12 @@ variableKind (Variable _) = VariableKind
 walkProgram :: Program -> SymbolTable -> Either SemanticError SymbolTable
 walkProgram [] symbolTable = Right symbolTable
 walkProgram (x:xs) symbolTable =
-    case x of
-        VarDeclaration t e _ -> walkProgram xs 
-                                    (insertSymbol (variableName e) (Info t (variableKind e)) symbolTable)
-        FuncDeclaration t e params stmt -> walkProgram xs
-                                    (insertSymbol (variableName e) (Info t FunctionKind) symbolTable) >>= checkStatement stmt 
+    let newSymbolTable t e k = if nameExists (variableName e) symbolTable then Left (SemanticError NameExistsError (variableName e))
+                               else Right $ insertSymbol (variableName e) (Info t k) symbolTable 
+        in
+        case x of
+            VarDeclaration t e _ -> newSymbolTable t e (variableKind e) >>= walkProgram xs  
+            FuncDeclaration t e params stmt -> newSymbolTable t e FunctionKind >>= walkProgram xs >>= checkStatement stmt 
 
 checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
 checkStatement stmt st = 

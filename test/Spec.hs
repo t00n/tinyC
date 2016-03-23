@@ -205,4 +205,10 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
             let ast2 = scan_and_parse "int a = 5; int tiny() { a(); }"
             checkSemantics ast2 `shouldBe` Left (SemanticError NotAFunctionError "a")
+        it "Checks that variables with same name are declared only once on a certain scope level" $ do
+            let ast = scan_and_parse "int tiny() { int a; int a; }"
+            checkSemantics ast `shouldBe` Left (SemanticError NameExistsError "a")
+        it "Checks that variables with same name can be declared more than once a different scope level" $ do
+            let ast = scan_and_parse "int a; int tiny() { int a; }"
+            checkSemantics ast `shouldBe` Right ()
 
