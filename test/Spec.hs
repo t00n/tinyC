@@ -205,6 +205,13 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
             let ast2 = scan_and_parse "int a = 5; int tiny() { a(); }"
             checkSemantics ast2 `shouldBe` Left (SemanticError NotAFunctionError "a")
+        it "Checks that variables are declared before use in a length expression and that the variable is an array" $ do
+            let ast = scan_and_parse "int tiny() { length a; }"
+            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+            let ast2 = scan_and_parse "int a; int tiny() { length a; }"
+            checkSemantics ast2 `shouldBe` Left (SemanticError NotAnArrayError "a")
+            let ast3 = scan_and_parse "int a[5]; int tiny() { length a; }"
+            checkSemantics ast3 `shouldBe` Right ()
         it "Checks that variables with same name are declared only once on a certain scope level" $ do
             let ast = scan_and_parse "int tiny() { int a; int a; }"
             checkSemantics ast `shouldBe` Left (SemanticError NameExistsError "a")

@@ -21,7 +21,7 @@ data SymbolTable = SymbolTable {
     parent :: Maybe SymbolTable
 } deriving (Eq, Show)
 
-data ErrorType = NotDeclaredError | NotAFunctionError | NameExistsError
+data ErrorType = NotDeclaredError | NotAFunctionError | NameExistsError | NotAnArrayError
     deriving (Eq, Show)
 
 data SemanticError = SemanticError {
@@ -103,6 +103,9 @@ checkExpression expr st =
             else Left (SemanticError NotAFunctionError s) 
             >> foldM (flip checkExpression) st params
         Call (Array s _) _ -> Left (SemanticError NotAFunctionError s)
+        Length v@(Variable s) -> checkVariable v st >> 
+            if nameIsKind s ArrayKind st then Right st
+            else Left (SemanticError NotAnArrayError s)
         Var v -> checkVariable v st
         _ -> Right st
 
