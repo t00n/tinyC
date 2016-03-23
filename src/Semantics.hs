@@ -6,7 +6,7 @@ import Data.Maybe (isJust, fromJust)
 
 import Parser
 
-data Kind = V | F | A
+data Kind = VariableKind | FunctionKind | ArrayKind
     deriving (Eq, Show)
 
 data Info = Info {
@@ -35,34 +35,45 @@ emptySymbolTable = SymbolTable Map.empty
 insertSymbol :: String -> Info -> SymbolTable -> SymbolTable
 insertSymbol s i = SymbolTable <$> Map.insert s i . symbols <*> parent
 
-variableName :: Variable -> String
-variableName (Variable s) = s
-variableName (Array s _) = s
-variableName _ = error "Not a variable declaration"
-
-variableArray :: Variable -> Bool
-variableArray (Array _ _) = True
-variableArray (Variable _) = False
-variableArray _ = error "Not a variable declaration"
-
 getNameInfo :: String -> SymbolTable -> Maybe Info
 getNameInfo s st = let res = Map.lookup s (symbols st) in 
                        if res == Nothing then parent st >>= getNameInfo s
                        else res
 
-variableInScope :: String -> SymbolTable -> Bool
-variableInScope n st = Map.member n (symbols st) || variableInParent n st
+nameIsInScope :: String -> SymbolTable -> Bool
+nameIsInScope n st = Map.member n (symbols st) || variableInParent n st
     where variableInParent _ (SymbolTable _ Nothing) = False
-          variableInParent n (SymbolTable s (Just p)) = variableInScope n p
+          variableInParent n (SymbolTable s (Just p)) = nameIsInScope n p
+
+nameIsMasked :: String -> SymbolTable -> Bool
+nameIsMasked n st = Map.member n (symbols st)
+
+nameIsKind :: String -> Kind -> SymbolTable -> Bool
+nameIsKind s k st = let info = getNameInfo s st in
+    if isJust info then infoKind (fromJust info) == k
+    else False
+
+nameIsType :: String -> Type -> SymbolTable -> Bool
+nameIsType s t st = let info = getNameInfo s st in
+    if isJust info then infoType (fromJust info) == t
+    else False
+
+variableName :: Variable -> String
+variableName (Variable s) = s
+variableName (Array s _) = s
+
+variableKind :: Variable -> Kind
+variableKind (Array _ _) = ArrayKind
+variableKind (Variable _) = VariableKind
 
 walkProgram :: Program -> SymbolTable -> Either SemanticError SymbolTable
 walkProgram [] symbolTable = Right symbolTable
 walkProgram (x:xs) symbolTable =
     case x of
         VarDeclaration t e _ -> walkProgram xs 
-                                    (insertSymbol (variableName e) (Info t (if variableArray e then A else V)) symbolTable)
+                                    (insertSymbol (variableName e) (Info t (variableKind e)) symbolTable)
         FuncDeclaration t e params stmt -> walkProgram xs
-                                    (insertSymbol (variableName e) (Info t F) symbolTable) >>= checkStatement stmt 
+                                    (insertSymbol (variableName e) (Info t FunctionKind) symbolTable) >>= checkStatement stmt 
 
 checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
 checkStatement stmt st = 
@@ -78,25 +89,29 @@ checkStatement stmt st =
         Expr e -> checkExpression e st
 
 checkStatements :: [Statement] -> SymbolTable -> Either SemanticError SymbolTable
-checkStatements [] st = Right st
-checkStatements (x:xs) st = checkStatement x st >> checkStatements xs st
+checkStatements = flip $ foldM $ flip checkStatement
 
 checkExpression :: Expression -> SymbolTable -> Either SemanticError SymbolTable
 checkExpression expr st = 
     case expr of 
         BinOp e1 _ e2 -> checkExpression e1 st >> checkExpression e2 st
         UnOp _ e -> checkExpression e st
-        Call v@(Variable s) params -> checkVariable v st >> if infoKind (fromJust (getNameInfo s st)) /= F then Left (SemanticError NotAFunctionError s) else Right st >> foldM (flip checkExpression) st params
+        Call v@(Variable s) params -> 
+            checkVariable v st >> 
+            if nameIsKind s FunctionKind st then Right st
+            else Left (SemanticError NotAFunctionError s) 
+            >> foldM (flip checkExpression) st params
         Call (Array s _) _ -> Left (SemanticError NotAFunctionError s)
         Var v -> checkVariable v st
         _ -> Right st
 
 checkVariable :: Variable -> SymbolTable -> Either SemanticError SymbolTable
 checkVariable var st = 
-    let inScope s = if variableInScope s st then Right st else Left (SemanticError NotDeclaredError s) in
-    case var of
-        Variable s -> inScope s
-        Array s e -> inScope s >> checkExpression e st
+    let inScope s = if nameIsInScope s st then Right st 
+                    else Left (SemanticError NotDeclaredError s) in
+        case var of
+            Variable s -> inScope s
+            Array s e -> inScope s >> checkExpression e st
 
 checkSemantics :: Program -> Either SemanticError ()
 checkSemantics = void . flip walkProgram (emptySymbolTable Nothing)
