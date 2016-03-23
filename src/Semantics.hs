@@ -21,13 +21,18 @@ data SymbolTable = SymbolTable {
     parent :: Maybe SymbolTable
 } deriving (Eq, Show)
 
-data ErrorType = NotDeclaredError | NotAFunctionError | NameExistsError | NotAnArrayError
+data ErrorType = NotDeclaredError | NotAFunctionError | NameExistsError | NotAnArrayError | NotAScalarError
     deriving (Eq, Show)
 
 data SemanticError = SemanticError {
     errorType :: ErrorType,
     errorVariable :: String
 } deriving (Eq, Show)
+
+kindToError :: Kind -> ErrorType
+kindToError VariableKind = NotAScalarError
+kindToError FunctionKind = NotAFunctionError
+kindToError ArrayKind = NotAnArrayError
 
 emptySymbolTable :: Maybe SymbolTable -> SymbolTable
 emptySymbolTable = SymbolTable Map.empty
@@ -45,8 +50,8 @@ symbolIsInScope n st = Map.member n (symbols st) || variableInParent n st
     where variableInParent _ (SymbolTable _ Nothing) = False
           variableInParent n (SymbolTable s (Just p)) = symbolIsInScope n p
 
-symbolExists :: String -> SymbolTable -> Bool
-symbolExists n st = Map.member n (symbols st)
+symbolIsSameLevel :: String -> SymbolTable -> Bool
+symbolIsSameLevel n st = Map.member n (symbols st)
 
 symbolIsKind :: String -> Kind -> SymbolTable -> Bool
 symbolIsKind s k st = let info = getSymbolInfo s st in
@@ -66,27 +71,41 @@ nameKind :: Name -> Kind
 nameKind (NameSubscription _ _) = ArrayKind
 nameKind (Name _) = VariableKind
 
+checkNameExistsBeforeInsert :: Name -> Type -> Kind -> SymbolTable -> Either SemanticError SymbolTable
+checkNameExistsBeforeInsert n t k st = if symbolIsSameLevel (nameString n) st 
+                                           then Left (SemanticError NameExistsError (nameString n))
+                                       else Right $ insertSymbol (nameString n) (Info t k) st
+
+checkNameInScope :: Name -> SymbolTable -> Either SemanticError SymbolTable
+checkNameInScope name st = 
+    let n = nameString name in
+        if symbolIsInScope n st then Right st 
+        else Left (SemanticError NotDeclaredError n)
+
+checkNameIsKind :: Name -> Kind -> SymbolTable -> Either SemanticError SymbolTable
+checkNameIsKind name kind st = 
+    let n = nameString name in
+        if symbolIsKind n kind st then Right st
+        else Left (SemanticError (kindToError kind) n)
+        
 walkProgram :: Program -> SymbolTable -> Either SemanticError SymbolTable
-walkProgram [] symbolTable = Right symbolTable
-walkProgram (x:xs) symbolTable =
-    let newSymbolTable t e k = if symbolExists (nameString e) symbolTable then Left (SemanticError NameExistsError (nameString e))
-                               else Right $ insertSymbol (nameString e) (Info t k) symbolTable 
-        in
+walkProgram [] st = Right st
+walkProgram (x:xs) st =
         case x of
-            VarDeclaration t e _ -> newSymbolTable t e (nameKind e) >>= walkProgram xs  
-            FuncDeclaration t e params stmt -> newSymbolTable t e FunctionKind >>= walkProgram xs >>= checkStatement stmt 
+            VarDeclaration t n _ -> checkNameExistsBeforeInsert n t (nameKind n) st >>= walkProgram xs  
+            FuncDeclaration t n params stmt -> checkNameExistsBeforeInsert n t FunctionKind st >>= walkProgram xs >>= checkStatement stmt 
 
 checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
 checkStatement stmt st = 
     case stmt of
-        Assignment v e -> checkVariable v st >> checkExpression e st
+        Assignment v e -> checkNameInScope v st >> checkExpression e st
         If e stmt1 -> checkExpression e st >> checkStatement stmt1 st
         IfElse e stmt1 stmt2 -> checkExpression e st >> checkStatement stmt1 st >> checkStatement stmt2 st
         While e stmt1 -> checkExpression e st >> checkStatement stmt1 st
         Return e -> checkExpression e st
         Block decl stmts -> walkProgram decl (emptySymbolTable $ Just st) >> checkStatements stmts st
         Write e -> checkExpression e st
-        Read v -> checkVariable v st
+        Read v -> checkNameInScope v st
         Expr e -> checkExpression e st
 
 checkStatements :: [Statement] -> SymbolTable -> Either SemanticError SymbolTable
@@ -97,25 +116,12 @@ checkExpression expr st =
     case expr of 
         BinOp e1 _ e2 -> checkExpression e1 st >> checkExpression e2 st
         UnOp _ e -> checkExpression e st
-        Call v@(Name s) params -> 
-            checkVariable v st >> 
-            if symbolIsKind s FunctionKind st then Right st
-            else Left (SemanticError NotAFunctionError s) 
+        Call n params -> 
+            checkNameInScope n st >> checkNameIsKind n FunctionKind st
             >> foldM (flip checkExpression) st params
-        Call (NameSubscription s _) _ -> Left (SemanticError NotAFunctionError s)
-        Length v@(Name s) -> checkVariable v st >> 
-            if symbolIsKind s ArrayKind st then Right st
-            else Left (SemanticError NotAnArrayError s)
-        Var v -> checkVariable v st
+        Length n -> checkNameInScope n st >> checkNameIsKind n ArrayKind st
+        Var n -> checkNameInScope n st
         _ -> Right st
-
-checkVariable :: Name -> SymbolTable -> Either SemanticError SymbolTable
-checkVariable var st = 
-    let inScope s = if symbolIsInScope s st then Right st 
-                    else Left (SemanticError NotDeclaredError s) in
-        case var of
-            Name s -> inScope s
-            NameSubscription s e -> inScope s >> checkExpression e st
 
 checkSemantics :: Program -> Either SemanticError ()
 checkSemantics = void . flip walkProgram (emptySymbolTable Nothing)
