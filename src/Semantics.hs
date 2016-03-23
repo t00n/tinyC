@@ -30,6 +30,7 @@ data ErrorType = NotDeclaredError
                | NameExistsError 
                | NotAnArrayError 
                | NotAScalarError
+               | NotSameKindError
                | NameExistsWarning
     deriving (Eq, Show)
 
@@ -54,6 +55,12 @@ getSymbolInfo s st = let res = Map.lookup s (symbols st) in
                          if res == Nothing then parent st >>= getSymbolInfo s
                          else res
 
+unsafeGetSymbolInfo :: String -> SymbolTable -> Info
+unsafeGetSymbolInfo s st = let info = getSymbolInfo s st in
+    if isJust info then fromJust info
+    else error ("Symbol " ++ s ++ " is not in symbol table " ++ show st)
+
+
 symbolIsInScope :: String -> SymbolTable -> Bool
 symbolIsInScope n st = Map.member n (symbols st) || variableInParent n st
     where variableInParent _ (SymbolTable _ Nothing) = False
@@ -62,15 +69,20 @@ symbolIsInScope n st = Map.member n (symbols st) || variableInParent n st
 symbolIsSameLevel :: String -> SymbolTable -> Bool
 symbolIsSameLevel n st = Map.member n (symbols st)
 
+(...) :: (Functor f, Functor f1) => (a -> b) -> f (f1 a) -> f (f1 b)
+(...) = fmap . fmap
+
+symbolType :: String -> SymbolTable -> Type
+symbolType = infoType ... unsafeGetSymbolInfo
+
+symbolKind :: String -> SymbolTable -> Kind
+symbolKind = infoKind ... unsafeGetSymbolInfo
+
 symbolIsKind :: String -> Kind -> SymbolTable -> Bool
-symbolIsKind s k st = let info = getSymbolInfo s st in
-    if isJust info then infoKind (fromJust info) == k
-    else False
+symbolIsKind s k st = (symbolKind s st) == k
 
 symbolIsType :: String -> Type -> SymbolTable -> Bool
-symbolIsType s t st = let info = getSymbolInfo s st in
-    if isJust info then infoType (fromJust info) == t
-    else False
+symbolIsType s t st = (symbolType s st) == t
 
 nameString :: Name -> String
 nameString (Name s) = s
@@ -132,12 +144,27 @@ checkExpression expr st =
     case expr of 
         BinOp e1 _ e2 -> checkExpression e1 st >> checkExpression e2 st
         UnOp _ e -> checkExpression e st
-        Call n params -> 
-            checkNameInScope n st >> checkNameIsKind n FunctionKind st
+        Call n params -> checkNameInScope n st >> checkNameIsKind n FunctionKind st
             >> foldM (flip checkExpression) st params
         Length n -> checkNameInScope n st >> checkNameIsKind n ArrayKind st
         Var n -> checkNameInScope n st
         _ -> Right st
+
+expressionKind :: Expression -> SymbolTable -> Either SemanticError Kind
+expressionKind expr st = 
+    case expr of 
+        BinOp e1 _ e2 -> do
+            k1 <- expressionKind e1 st
+            k2 <- expressionKind e2 st
+            if k1 /= k2 
+                then Left (SemanticError NotSameKindError "todo")
+            else Right k1
+        UnOp _ e -> expressionKind e st
+        Call n _ -> Right $ (symbolKind . nameString) n st
+        Length n -> Right $ (symbolKind . nameString) n st
+        Var n -> Right $ (symbolKind . nameString) n st
+        Int x -> Right VariableKind
+        Char x -> Right VariableKind
 
 checkSemantics :: Program -> Either SemanticError ()
 checkSemantics = void . flip walkProgram (emptySymbolTable Nothing)
