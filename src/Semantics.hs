@@ -35,45 +35,45 @@ emptySymbolTable = SymbolTable Map.empty
 insertSymbol :: String -> Info -> SymbolTable -> SymbolTable
 insertSymbol s i = SymbolTable <$> Map.insert s i . symbols <*> parent
 
-getNameInfo :: String -> SymbolTable -> Maybe Info
-getNameInfo s st = let res = Map.lookup s (symbols st) in 
-                       if res == Nothing then parent st >>= getNameInfo s
+getSymbolInfo :: String -> SymbolTable -> Maybe Info
+getSymbolInfo s st = let res = Map.lookup s (symbols st) in 
+                       if res == Nothing then parent st >>= getSymbolInfo s
                        else res
 
-nameIsInScope :: String -> SymbolTable -> Bool
-nameIsInScope n st = Map.member n (symbols st) || variableInParent n st
+symbolIsInScope :: String -> SymbolTable -> Bool
+symbolIsInScope n st = Map.member n (symbols st) || variableInParent n st
     where variableInParent _ (SymbolTable _ Nothing) = False
-          variableInParent n (SymbolTable s (Just p)) = nameIsInScope n p
+          variableInParent n (SymbolTable s (Just p)) = symbolIsInScope n p
 
-nameExists :: String -> SymbolTable -> Bool
-nameExists n st = Map.member n (symbols st)
+symbolExists :: String -> SymbolTable -> Bool
+symbolExists n st = Map.member n (symbols st)
 
-nameIsKind :: String -> Kind -> SymbolTable -> Bool
-nameIsKind s k st = let info = getNameInfo s st in
+symbolIsKind :: String -> Kind -> SymbolTable -> Bool
+symbolIsKind s k st = let info = getSymbolInfo s st in
     if isJust info then infoKind (fromJust info) == k
     else False
 
-nameIsType :: String -> Type -> SymbolTable -> Bool
-nameIsType s t st = let info = getNameInfo s st in
+symbolIsType :: String -> Type -> SymbolTable -> Bool
+symbolIsType s t st = let info = getSymbolInfo s st in
     if isJust info then infoType (fromJust info) == t
     else False
 
-variableName :: Variable -> String
-variableName (Variable s) = s
-variableName (Array s _) = s
+nameString :: Name -> String
+nameString (Name s) = s
+nameString (NameSubscription s _) = s
 
-variableKind :: Variable -> Kind
-variableKind (Array _ _) = ArrayKind
-variableKind (Variable _) = VariableKind
+nameKind :: Name -> Kind
+nameKind (NameSubscription _ _) = ArrayKind
+nameKind (Name _) = VariableKind
 
 walkProgram :: Program -> SymbolTable -> Either SemanticError SymbolTable
 walkProgram [] symbolTable = Right symbolTable
 walkProgram (x:xs) symbolTable =
-    let newSymbolTable t e k = if nameExists (variableName e) symbolTable then Left (SemanticError NameExistsError (variableName e))
-                               else Right $ insertSymbol (variableName e) (Info t k) symbolTable 
+    let newSymbolTable t e k = if symbolExists (nameString e) symbolTable then Left (SemanticError NameExistsError (nameString e))
+                               else Right $ insertSymbol (nameString e) (Info t k) symbolTable 
         in
         case x of
-            VarDeclaration t e _ -> newSymbolTable t e (variableKind e) >>= walkProgram xs  
+            VarDeclaration t e _ -> newSymbolTable t e (nameKind e) >>= walkProgram xs  
             FuncDeclaration t e params stmt -> newSymbolTable t e FunctionKind >>= walkProgram xs >>= checkStatement stmt 
 
 checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
@@ -97,25 +97,25 @@ checkExpression expr st =
     case expr of 
         BinOp e1 _ e2 -> checkExpression e1 st >> checkExpression e2 st
         UnOp _ e -> checkExpression e st
-        Call v@(Variable s) params -> 
+        Call v@(Name s) params -> 
             checkVariable v st >> 
-            if nameIsKind s FunctionKind st then Right st
+            if symbolIsKind s FunctionKind st then Right st
             else Left (SemanticError NotAFunctionError s) 
             >> foldM (flip checkExpression) st params
-        Call (Array s _) _ -> Left (SemanticError NotAFunctionError s)
-        Length v@(Variable s) -> checkVariable v st >> 
-            if nameIsKind s ArrayKind st then Right st
+        Call (NameSubscription s _) _ -> Left (SemanticError NotAFunctionError s)
+        Length v@(Name s) -> checkVariable v st >> 
+            if symbolIsKind s ArrayKind st then Right st
             else Left (SemanticError NotAnArrayError s)
         Var v -> checkVariable v st
         _ -> Right st
 
-checkVariable :: Variable -> SymbolTable -> Either SemanticError SymbolTable
+checkVariable :: Name -> SymbolTable -> Either SemanticError SymbolTable
 checkVariable var st = 
-    let inScope s = if nameIsInScope s st then Right st 
+    let inScope s = if symbolIsInScope s st then Right st 
                     else Left (SemanticError NotDeclaredError s) in
         case var of
-            Variable s -> inScope s
-            Array s e -> inScope s >> checkExpression e st
+            Name s -> inScope s
+            NameSubscription s e -> inScope s >> checkExpression e st
 
 checkSemantics :: Program -> Either SemanticError ()
 checkSemantics = void . flip walkProgram (emptySymbolTable Nothing)

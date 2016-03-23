@@ -1,5 +1,5 @@
 {
-module Parser (parse, Program, Declaration(..), Parameter(..), Statement(..), Expression(..), Type(..), BinaryOperator(..), UnaryOperator(..), Variable(..)) where
+module Parser (parse, Program, Declaration(..), Parameter(..), Statement(..), Expression(..), Type(..), BinaryOperator(..), UnaryOperator(..), Name(..)) where
 import Scanner (Token(..))
 import Data.Maybe
 }
@@ -66,7 +66,7 @@ var_declaration : type var '=' expr               { VarDeclaration $1 $2 (Just $
                 | type var                        { VarDeclaration $1 $2 Nothing }
 
 func_declaration :: { Declaration }
-func_declaration : type name '(' params ')' block { FuncDeclaration $1 (Variable $2) (reverse $4) $6 }
+func_declaration : type name '(' params ')' block { FuncDeclaration $1 (Name $2) (reverse $4) $6 }
 
 
 params ::{ [Parameter] }
@@ -131,16 +131,16 @@ expr : number                                     { Int $1 }
      | '(' expr ')'                               { $2 }
      | '-' expr %prec NEG                         { UnOp Neg $2 }
      | '!' expr                                   { UnOp Not $2 }
-     | name '(' args ')'                          { Call (Variable $1) (reverse $3) }
+     | name '(' args ')'                          { Call (Name $1) (reverse $3) }
      | length var                                 { Length $2 }
 
 type :: { Type }
 type : int                                        { IntType }
      | char                                       { CharType }
 
-var :: { Variable }
-var : name                                        { Variable $1 }
-    | name '[' expr ']'                           { Array $1 $3 }
+var :: { Name }
+var : name                                        { Name $1 }
+    | name '[' expr ']'                           { NameSubscription $1 $3 }
 
 {
 
@@ -149,21 +149,21 @@ parseError _ = error "Parse error"
 
 type Program = [Declaration]
 
-data Declaration = VarDeclaration Type Variable (Maybe Expression)
-                 | FuncDeclaration Type Variable [Parameter] Statement
+data Declaration = VarDeclaration Type Name (Maybe Expression)
+                 | FuncDeclaration Type Name [Parameter] Statement
     deriving (Eq, Show)
 
-data Parameter = Parameter Type Variable
+data Parameter = Parameter Type Name
     deriving (Eq, Show)
 
-data Statement = Assignment Variable Expression
+data Statement = Assignment Name Expression
                | If Expression Statement
                | IfElse Expression Statement Statement
                | While Expression Statement
                | Return Expression
                | Block [Declaration] [Statement]
                | Write Expression
-               | Read Variable
+               | Read Name
                | Expr Expression
     deriving (Eq, Show)
 
@@ -180,12 +180,12 @@ data Expression = Int Int
                 | Char Char
                 | BinOp Expression BinaryOperator Expression
                 | UnOp UnaryOperator Expression
-                | Call Variable [Expression]
-                | Length Variable
-                | Var Variable
+                | Call Name [Expression]
+                | Length Name
+                | Var Name
     deriving (Eq, Show)
 
-data Variable = Variable String
-              | Array String Expression
+data Name = Name String
+          | NameSubscription String Expression
     deriving (Eq, Show)
 }
