@@ -1,18 +1,19 @@
 module Semantics (checkSemantics, SemanticError(..), ErrorType(..), SymbolTable(..)) where
 
 import Control.Monad (void, foldM)
+import Control.Monad.State (runState, State(..))
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, fromJust)
 
 import Parser
 
 -- Symbols data types
-data Kind = VariableKind | ArrayKind
+data Scalarity = Scalar | Array
     deriving (Eq, Show)
 
 data Info = VarInfo {
     infoType :: Type,
-    infoKind :: Kind
+    infoScalarity :: Scalarity
 }         | FuncInfo {
     infoType :: Type,
     infoParams :: [Info]
@@ -47,11 +48,11 @@ unsafeGetSymbolInfo s st = let info = getSymbolInfo s st in
 symbolType :: String -> SymbolTable -> Type
 symbolType = infoType ... unsafeGetSymbolInfo
 
-symbolKind :: String -> SymbolTable -> Kind
-symbolKind = infoKind ... unsafeGetSymbolInfo
+symbolScalarity :: String -> SymbolTable -> Scalarity
+symbolScalarity = infoScalarity ... unsafeGetSymbolInfo
 
-symbolIsKind :: String -> Kind -> SymbolTable -> Bool
-symbolIsKind s k st = (symbolKind s st) == k
+symbolIsScalarity :: String -> Scalarity -> SymbolTable -> Bool
+symbolIsScalarity s k st = (symbolScalarity s st) == k
 
 symbolIsType :: String -> Type -> SymbolTable -> Bool
 symbolIsType s t st = (symbolType s st) == t
@@ -60,9 +61,9 @@ nameString :: Name -> String
 nameString (Name s) = s
 nameString (NameSubscription s _) = s
 
-nameKind :: Name -> Kind
-nameKind (Name _) = VariableKind
-nameKind (NameSubscription _ _) = ArrayKind
+nameScalarity :: Name -> Scalarity
+nameScalarity (Name _) = Scalar
+nameScalarity (NameSubscription _ _) = Array
 
 -- Errors data types
 data ErrorType = NotDeclaredError 
@@ -70,7 +71,7 @@ data ErrorType = NotDeclaredError
                | NameExistsError 
                | NotAnArrayError 
                | NotAScalarError
-               | NotSameKindError
+               | NotSameScalarityError
                | NameExistsWarning
     deriving (Eq, Show)
 
@@ -79,9 +80,9 @@ data SemanticError = SemanticError {
     errorVariable :: String
 } deriving (Eq, Show)
 
-kindToError :: Kind -> ErrorType
-kindToError VariableKind = NotAScalarError
-kindToError ArrayKind = NotAnArrayError
+kindToError :: Scalarity -> ErrorType
+kindToError Scalar = NotAScalarError
+kindToError Array = NotAnArrayError
 
 infoToError :: Info -> ErrorType
 infoToError (VarInfo _ k) = kindToError k
@@ -104,7 +105,7 @@ checkNameExists name st =
         then Left (SemanticError NameExistsWarning name)
     else Right st
 
-insertVariable :: String -> Type -> Kind -> SymbolTable -> Either SemanticError SymbolTable
+insertVariable :: String -> Type -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
 insertVariable name t k st = checkNameExists name st >>= return . insertSymbol name (VarInfo t k)
 
 
@@ -114,9 +115,9 @@ insertFunction name ret params st = checkNameExists name st >>= return . insertS
 checkDeclarations :: [Declaration] -> SymbolTable -> Either SemanticError SymbolTable
 checkDeclarations [] st = Right st
 checkDeclarations (x:xs) st =
-    let paramToInfo (Parameter t n) = VarInfo t (nameKind n) in
+    let paramToInfo (Parameter t n) = VarInfo t (nameScalarity n) in
         case x of
-            VarDeclaration t n _ -> insertVariable (nameString n) t (nameKind n) st >>= checkDeclarations xs  
+            VarDeclaration t n _ -> insertVariable (nameString n) t (nameScalarity n) st >>= checkDeclarations xs  
             FuncDeclaration t n params stmt -> insertFunction (nameString n) t (map paramToInfo params) st >>= checkDeclarations xs >>= checkStatement stmt 
 
 checkNameInScope :: Name -> SymbolTable -> Either SemanticError SymbolTable
@@ -125,10 +126,10 @@ checkNameInScope name st =
         if symbolIsInScope n st then Right st 
         else Left (SemanticError NotDeclaredError n)
 
-checkNameIsKind :: Name -> Kind -> SymbolTable -> Either SemanticError SymbolTable
-checkNameIsKind name kind st = 
+checkNameIsScalarity :: Name -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
+checkNameIsScalarity name kind st = 
     let n = nameString name in
-        if symbolIsKind n kind st then Right st
+        if symbolIsScalarity n kind st then Right st
         else Left (SemanticError (kindToError kind) n)
 
 checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
@@ -153,27 +154,37 @@ checkExpression expr st =
         BinOp e1 _ e2 -> checkExpression e1 st >> checkExpression e2 st
         UnOp _ e -> checkExpression e st
         Call n params -> checkNameInScope n st 
-        -- >> checkNameIsKind n FunctionKind st
+        -- >> checkNameIsScalarity n FunctionScalarity st
         --    >> foldM (flip checkExpression) st params
-        Length n -> checkNameInScope n st >> checkNameIsKind n ArrayKind st
+        Length n -> checkNameInScope n st >> checkNameIsScalarity n Array st
         Var n -> checkNameInScope n st
         _ -> Right st
 
-expressionKind :: Expression -> SymbolTable -> Either SemanticError Kind
-expressionKind expr st = 
+expressionIsScalar :: Expression -> SymbolTable -> Bool
+expressionIsScalar expr st = 
     case expr of 
-        BinOp e1 _ e2 -> do
-            k1 <- expressionKind e1 st
-            k2 <- expressionKind e2 st
-            if k1 /= k2 
-                then Left (SemanticError NotSameKindError "todo")
-            else Right k1
-        UnOp _ e -> expressionKind e st
-        Call n _ -> Right $ (symbolKind . nameString) n st
-        Length n -> Right $ (symbolKind . nameString) n st
-        Var n -> Right $ (symbolKind . nameString) n st
-        Int x -> Right VariableKind
-        Char x -> Right VariableKind
+        BinOp e1 _ e2 -> expressionIsScalar e1 st && expressionIsScalar e2 st
+        UnOp _ e -> expressionIsScalar e st
+        Call _ _ -> True
+        Length _ -> True
+        Var name -> symbolScalarity (nameString name) st == Scalar
+        Int _ -> True
+        Char _ -> True
+
+expressionNamesExist :: Expression -> SymbolTable -> Either SemanticError SymbolTable
+expressionNamesExist expr st = 
+    case expr of
+        BinOp e1 _ e2 -> expressionNamesExist e1 st >>= expressionNamesExist e2
+        UnOp _ e -> expressionNamesExist e st
+        Call n params -> checkNameInScope n st
+        Length n -> checkNameInScope n st
+        Var n -> checkNameInScope n st
+        _ -> Right st
+
+--expressionCheckScalarity :: Expression -> SymbolTable -> Either SemanticError SymbolTable
+--expressionCheckScalarity expr st = 
+--    case expr of
+--        BinOp e1 _ e2 -> 
 
 checkSemantics :: Program -> Either SemanticError ()
 checkSemantics = void . flip checkDeclarations (emptySymbolTable Nothing)
