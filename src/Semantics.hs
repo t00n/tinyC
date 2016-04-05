@@ -104,12 +104,12 @@ instance Checkable Declaration where
 instance Checkable Statement where
     check stmt st = 
         case stmt of
-            Assignment v e -> nameIsInScope v st >> check e st
-            If e stmt1 -> check e st >> check stmt1 st
-            IfElse e stmt1 stmt2 -> check e st >> check stmt1 st >> check stmt2 st
-            While e stmt1 -> check e st >> check stmt1 st
+            Assignment v e -> nameIsInScope v st >>= check e
+            If e stmt1 -> check e st >>= check stmt1
+            IfElse e stmt1 stmt2 -> check e st >>= check stmt1 >>= check stmt2
+            While e stmt1 -> check e st >>= check stmt1
             Return e -> check e st
-            Block decl stmts -> check decl (emptySymbolTable $ Just st) >> check stmts st
+            Block decl stmts -> check decl (emptySymbolTable $ Just st) >>= check stmts
             Write e -> check e st
             Read v -> nameIsInScope v st
             Expr e -> check e st
@@ -117,12 +117,12 @@ instance Checkable Statement where
 instance Checkable Expression where
     check expr st = 
         case expr of 
-            BinOp e1 _ e2 -> check e1 st >> check e2 st
+            BinOp e1 _ e2 -> check e1 st >>= check e2
             UnOp _ e -> check e st
             Call n params -> nameIsInScope n st 
             -- >> nameIsScalarity n FunctionScalarity st
             --    >> foldM (flip check) st params
-            Length n -> nameIsInScope n st >> nameIsScalarity n Array st
+            Length n -> nameIsInScope n st >>= nameIsScalarity n Array
             Var n -> nameIsInScope n st
             _ -> Right st
 
@@ -189,8 +189,11 @@ expressionNamesExist expr st =
 --    case expr of
 --        BinOp e1 _ e2 -> 
 
+runCheck :: Program -> Either SemanticError SymbolTable
+runCheck = flip check (emptySymbolTable Nothing)
+
 checkSemantics :: Program -> Either SemanticError ()
-checkSemantics = void . flip check (emptySymbolTable Nothing)
+checkSemantics = void . runCheck
 
 symbolTable :: Program -> Either SemanticError SymbolTable
-symbolTable = flip check (emptySymbolTable Nothing)
+symbolTable = runCheck
