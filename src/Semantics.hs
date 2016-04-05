@@ -98,8 +98,8 @@ instance Checkable a => Checkable [a] where
 instance Checkable Declaration where
     check x st = let paramToInfo (Parameter t n) = VarInfo t (nameScalarity n) in
         case x of
-            VarDeclaration t n _ -> declareVariable n t (nameScalarity n) st 
-            FuncDeclaration t n params stmt -> declareFunction n t (map paramToInfo params) st >>= check stmt 
+            VarDeclaration t n _ -> declareName n (VarInfo t (nameScalarity n)) st
+            FuncDeclaration t n params stmt -> declareName n (FuncInfo t (map paramToInfo params)) st >>= check stmt 
 
 instance Checkable Statement where
     check stmt st = 
@@ -143,12 +143,8 @@ checkNameNotDeclared n st =
         then Left (SemanticError NameExistsWarning (nameString n))
     else Right st
 
-declareVariable :: Name -> Type -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
-declareVariable name t k st = checkNameNotDeclared name st >>= return . insertSymbol (nameString name) (VarInfo t k)
-
-
-declareFunction :: Name -> Type -> [Info] -> SymbolTable -> Either SemanticError SymbolTable
-declareFunction name ret params st = checkNameNotDeclared name st >>= return . insertSymbol (nameString name) (FuncInfo ret params)
+declareName :: Name -> Info -> SymbolTable -> Either SemanticError SymbolTable
+declareName name info st = checkNameNotDeclared name st >>= return . insertSymbol (nameString name) info
 
 checkNameDeclared :: Name -> SymbolTable -> Either SemanticError SymbolTable
 checkNameDeclared name st = 
