@@ -6,7 +6,7 @@ import Data.Maybe (isJust, fromJust)
 
 import Parser
 
-data Kind = VariableKind | FunctionKind | ArrayKind
+data Kind = VariableKind | ArrayKind
     deriving (Eq, Show)
 
 data Info = VarInfo {
@@ -14,7 +14,6 @@ data Info = VarInfo {
     infoKind :: Kind
 }         | FuncInfo {
     infoType :: Type,
-    infoKind :: Kind,
     infoParams :: [Info]
 } deriving (Eq, Show)
 
@@ -41,8 +40,11 @@ data SemanticError = SemanticError {
 
 kindToError :: Kind -> ErrorType
 kindToError VariableKind = NotAScalarError
-kindToError FunctionKind = NotAFunctionError
 kindToError ArrayKind = NotAnArrayError
+
+infoToError :: Info -> ErrorType
+infoToError (VarInfo _ k) = kindToError k
+infoToError (FuncInfo _ _) = NotAFunctionError
 
 emptySymbolTable :: Maybe SymbolTable -> SymbolTable
 emptySymbolTable = SymbolTable Map.empty
@@ -66,8 +68,8 @@ symbolIsInScope n st = Map.member n (symbols st) || variableInParent n st
     where variableInParent _ (SymbolTable _ Nothing) = False
           variableInParent n (SymbolTable s (Just p)) = symbolIsInScope n p
 
-symbolIsSameLevel :: String -> SymbolTable -> Bool
-symbolIsSameLevel n st = Map.member n (symbols st)
+symbolIsInBlock :: String -> SymbolTable -> Bool
+symbolIsInBlock n st = Map.member n (symbols st)
 
 (...) :: (Functor f, Functor f1) => (a -> b) -> f (f1 a) -> f (f1 b)
 (...) = fmap . fmap
@@ -92,16 +94,28 @@ nameKind :: Name -> Kind
 nameKind (NameSubscription _ _) = ArrayKind
 nameKind (Name _) = VariableKind
 
-checkNameExistsBeforeInsert :: Name -> Type -> Kind -> [Info] -> SymbolTable -> Either SemanticError SymbolTable
-checkNameExistsBeforeInsert name t k p st = 
-    let n = nameString name in
-        if symbolIsSameLevel n st 
-            then Left (SemanticError NameExistsError n)
-        else if symbolIsInScope n st
-            then Left (SemanticError NameExistsWarning n)
-        else if k == FunctionKind
-            then Right $ insertSymbol n (FuncInfo t k p) st
-        else Right $ insertSymbol n (VarInfo t k) st
+checkNameExists :: String -> SymbolTable -> Either SemanticError SymbolTable
+checkNameExists name st = 
+    if symbolIsInBlock name st
+        then Left (SemanticError NameExistsError name)
+    else if symbolIsInScope name st
+        then Left (SemanticError NameExistsWarning name)
+    else Right st
+
+insertVariable :: String -> Type -> Kind -> SymbolTable -> Either SemanticError SymbolTable
+insertVariable name t k st = checkNameExists name st >>= return . insertSymbol name (VarInfo t k)
+
+
+insertFunction :: String -> Type -> [Info] -> SymbolTable -> Either SemanticError SymbolTable
+insertFunction name ret params st = checkNameExists name st >>= return . insertSymbol name (FuncInfo ret params)
+
+walkProgram :: Program -> SymbolTable -> Either SemanticError SymbolTable
+walkProgram [] st = Right st
+walkProgram (x:xs) st =
+    let paramToInfo (Parameter t n) = VarInfo t (nameKind n) in
+        case x of
+            VarDeclaration t n _ -> insertVariable (nameString n) t (nameKind n) st >>= walkProgram xs  
+            FuncDeclaration t n params stmt -> insertFunction (nameString n) t (map paramToInfo params) st >>= walkProgram xs >>= checkStatement stmt 
 
 checkNameInScope :: Name -> SymbolTable -> Either SemanticError SymbolTable
 checkNameInScope name st = 
@@ -114,14 +128,6 @@ checkNameIsKind name kind st =
     let n = nameString name in
         if symbolIsKind n kind st then Right st
         else Left (SemanticError (kindToError kind) n)
-
-walkProgram :: Program -> SymbolTable -> Either SemanticError SymbolTable
-walkProgram [] st = Right st
-walkProgram (x:xs) st =
-    let paramToInfo (Parameter t n) = VarInfo t (nameKind n) in
-        case x of
-            VarDeclaration t n _ -> checkNameExistsBeforeInsert n t (nameKind n) [] st >>= walkProgram xs  
-            FuncDeclaration t n params stmt -> checkNameExistsBeforeInsert n t FunctionKind (map paramToInfo params) st >>= walkProgram xs >>= checkStatement stmt 
 
 checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
 checkStatement stmt st = 
@@ -144,8 +150,8 @@ checkExpression expr st =
     case expr of 
         BinOp e1 _ e2 -> checkExpression e1 st >> checkExpression e2 st
         UnOp _ e -> checkExpression e st
-        Call n params -> checkNameInScope n st >> checkNameIsKind n FunctionKind st
-            >> foldM (flip checkExpression) st params
+        --Call n params -> checkNameInScope n st >> checkNameIsKind n FunctionKind st
+        --    >> foldM (flip checkExpression) st params
         Length n -> checkNameInScope n st >> checkNameIsKind n ArrayKind st
         Var n -> checkNameInScope n st
         _ -> Right st
@@ -166,5 +172,5 @@ expressionKind expr st =
         Int x -> Right VariableKind
         Char x -> Right VariableKind
 
-checkSemantics :: Program -> Either SemanticError ()
-checkSemantics = void . flip walkProgram (emptySymbolTable Nothing)
+checkSemantics :: Program -> Either SemanticError SymbolTable
+checkSemantics = flip walkProgram (emptySymbolTable Nothing)

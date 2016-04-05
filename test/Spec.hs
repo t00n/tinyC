@@ -156,66 +156,66 @@ main = hspec $ do
             let ast = scan_and_parse "int tiny() { read x; write 2; write x; }"
             ast `shouldBe` [FuncDeclaration IntType (Name "tiny") [] (Block [] [Read (Name "x"), Write (Int 2), Write (Var $ Name "x")])]
     describe "Semantics" $ do
-        it "Checks that variables are declared before use in assignment" $ do
-            let ast = scan_and_parse "int tiny() { a = 5; }"
-            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
-            let ast2 = scan_and_parse "int a = 5; int tiny() { a = 3; }"
-            checkSemantics ast2 `shouldBe` Right ()
-        it "Checks that variables are declared before use in if" $ do
-            let ast = scan_and_parse "int tiny() { if (a) a = 5; }"
-            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
-            let ast2 = scan_and_parse "int a = 5; int tiny() { int c = 3; if (a) a = 3; }"
-            checkSemantics ast2 `shouldBe` Right ()
-        it "Checks that variables are declared before use in while" $ do
-            let ast = scan_and_parse "int tiny() { while (a) a = 5; }"
-            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
-            let ast2 = scan_and_parse "int a = 5; int tiny() { while (a) a = 5; }"
-            checkSemantics ast2 `shouldBe` Right ()
-        it "Checks that variables are declared before use in return" $ do
-            let ast = scan_and_parse "int tiny() { return a; }"
-            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
-            let ast2 = scan_and_parse "int a = 5; int tiny() { return a; }"
-            checkSemantics ast2 `shouldBe` Right ()
-        it "Checks that variables are declared before use in IO" $ do
-            let ast = scan_and_parse "int tiny() { write a; }"
-            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
-            let ast2 = scan_and_parse "int a = 5; int tiny() { read a; }"
-            checkSemantics ast2 `shouldBe` Right ()
-        it "Checks that variables are declared before use in expression" $ do
-            let ast = scan_and_parse "int tiny() { a; }"
-            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
-            let ast2 = scan_and_parse "int a = 5; int tiny() { a; }"
-            checkSemantics ast2 `shouldBe` Right ()
-        it "Checks that variables are declared before use in binary operations" $ do
-            let ast = scan_and_parse "int tiny() { a + 5; }"
-            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
-            let ast2 = scan_and_parse "int a = 5; int tiny() { a + 5; }"
-            checkSemantics ast2 `shouldBe` Right ()
-            let ast3 = scan_and_parse "int tiny() { 5 + a; }"
-            checkSemantics ast3 `shouldBe` Left (SemanticError NotDeclaredError "a")
-            let ast4 = scan_and_parse "int a = 5; int tiny() { 5 + a; }"
-            checkSemantics ast4 `shouldBe` Right ()
-        it "Checks that variables are declared before use in unary operations" $ do
-            let ast = scan_and_parse "int tiny() { -a; }"
-            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
-            let ast2 = scan_and_parse "int a = 5; int tiny() { -a; }"
-            checkSemantics ast2 `shouldBe` Right ()
-        it "Checks that variables are declared before use in function calls and that the variable is a function" $ do
-            let ast = scan_and_parse "int tiny() { a(); }"
-            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
-            let ast2 = scan_and_parse "int a = 5; int tiny() { a(); }"
-            checkSemantics ast2 `shouldBe` Left (SemanticError NotAFunctionError "a")
-        it "Checks that variables are declared before use in a length expression and that the variable is an array" $ do
-            let ast = scan_and_parse "int tiny() { length a; }"
-            checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
-            let ast2 = scan_and_parse "int a; int tiny() { length a; }"
-            checkSemantics ast2 `shouldBe` Left (SemanticError NotAnArrayError "a")
-            let ast3 = scan_and_parse "int a[5]; int tiny() { length a; }"
-            checkSemantics ast3 `shouldBe` Right ()
         it "Checks that variables with same name are declared only once on a certain scope level" $ do
             let ast = scan_and_parse "int tiny() { int a; int a; }"
             checkSemantics ast `shouldBe` Left (SemanticError NameExistsError "a")
         it "Checks that variables with same name can be declared more than once a different scope level with a warning" $ do
             let ast = scan_and_parse "int a; int tiny() { int a; }"
             checkSemantics ast `shouldBe` Left (SemanticError NameExistsWarning "a")
+        --it "Checks that variables are declared before use in assignment" $ do
+        --    let ast = scan_and_parse "int tiny() { a = 5; }"
+        --    checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+        --    let ast2 = scan_and_parse "int a = 5; int tiny() { a = 3; }"
+        --    checkSemantics ast2 `shouldBe` Right ()
+        --it "Checks that variables are declared before use in if" $ do
+        --    let ast = scan_and_parse "int tiny() { if (a) a = 5; }"
+        --    checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+        --    let ast2 = scan_and_parse "int a = 5; int tiny() { int c = 3; if (a) a = 3; }"
+        --    checkSemantics ast2 `shouldBe` Right ()
+        --it "Checks that variables are declared before use in while" $ do
+        --    let ast = scan_and_parse "int tiny() { while (a) a = 5; }"
+        --    checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+        --    let ast2 = scan_and_parse "int a = 5; int tiny() { while (a) a = 5; }"
+        --    checkSemantics ast2 `shouldBe` Right ()
+        --it "Checks that variables are declared before use in return" $ do
+        --    let ast = scan_and_parse "int tiny() { return a; }"
+        --    checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+        --    let ast2 = scan_and_parse "int a = 5; int tiny() { return a; }"
+        --    checkSemantics ast2 `shouldBe` Right ()
+        --it "Checks that variables are declared before use in IO" $ do
+        --    let ast = scan_and_parse "int tiny() { write a; }"
+        --    checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+        --    let ast2 = scan_and_parse "int a = 5; int tiny() { read a; }"
+        --    checkSemantics ast2 `shouldBe` Right ()
+        --it "Checks that variables are declared before use in expression" $ do
+        --    let ast = scan_and_parse "int tiny() { a; }"
+        --    checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+        --    let ast2 = scan_and_parse "int a = 5; int tiny() { a; }"
+        --    checkSemantics ast2 `shouldBe` Right ()
+        --it "Checks that variables are declared before use in binary operations" $ do
+        --    let ast = scan_and_parse "int tiny() { a + 5; }"
+        --    checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+        --    let ast2 = scan_and_parse "int a = 5; int tiny() { a + 5; }"
+        --    checkSemantics ast2 `shouldBe` Right ()
+        --    let ast3 = scan_and_parse "int tiny() { 5 + a; }"
+        --    checkSemantics ast3 `shouldBe` Left (SemanticError NotDeclaredError "a")
+        --    let ast4 = scan_and_parse "int a = 5; int tiny() { 5 + a; }"
+        --    checkSemantics ast4 `shouldBe` Right ()
+        --it "Checks that variables are declared before use in unary operations" $ do
+        --    let ast = scan_and_parse "int tiny() { -a; }"
+        --    checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+        --    let ast2 = scan_and_parse "int a = 5; int tiny() { -a; }"
+        --    checkSemantics ast2 `shouldBe` Right ()
+        --it "Checks that variables are declared before use in function calls and that the variable is a function" $ do
+        --    let ast = scan_and_parse "int tiny() { a(); }"
+        --    checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+        --    let ast2 = scan_and_parse "int a = 5; int tiny() { a(); }"
+        --    checkSemantics ast2 `shouldBe` Left (SemanticError NotAFunctionError "a")
+        --it "Checks that variables are declared before use in a length expression and that the variable is an array" $ do
+        --    let ast = scan_and_parse "int tiny() { length a; }"
+        --    checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
+        --    let ast2 = scan_and_parse "int a; int tiny() { length a; }"
+        --    checkSemantics ast2 `shouldBe` Left (SemanticError NotAnArrayError "a")
+        --    let ast3 = scan_and_parse "int a[5]; int tiny() { length a; }"
+        --    checkSemantics ast3 `shouldBe` Right ()
 
