@@ -120,9 +120,10 @@ instance Checkable Expression where
             BinOp e1 _ e2 -> check e1 st >>= check e2
             UnOp _ e -> check e st
             Call n params -> checkNameDeclared n st 
-            -- >> nameIsScalarity n FunctionScalarity st
+                >>= checkNameIsFunction n
+            -- >> checkNameScalarity n FunctionScalarity st
             --    >> foldM (flip check) st params
-            Length n -> checkNameDeclared n st >>= nameIsScalarity n Array
+            Length n -> checkNameDeclared n st >>= checkNameScalarity n Array
             Var n -> checkNameDeclared n st
             _ -> Right st
 
@@ -134,6 +135,17 @@ nameInScope n = (||) <$> nameInBlock n <*> variableInParent n
 
 nameInBlock :: Name -> SymbolTable -> Bool
 nameInBlock n st = Map.member (nameString n) (symbols st)
+
+expressionIsScalar :: Expression -> SymbolTable -> Bool
+expressionIsScalar expr st = 
+    case expr of 
+        BinOp e1 _ e2 -> expressionIsScalar e1 st && expressionIsScalar e2 st
+        UnOp _ e -> expressionIsScalar e st
+        Call _ _ -> True
+        Length _ -> True
+        Var name -> unsafeSymbolScalarity (nameString name) st == Scalar
+        Int _ -> True
+        Char _ -> True
 
 checkNameNotDeclared :: Name -> SymbolTable -> Either SemanticError SymbolTable
 checkNameNotDeclared n st = 
@@ -151,38 +163,20 @@ checkNameDeclared name st =
     if nameInScope name st then Right st 
     else Left (SemanticError NotDeclaredError (nameString name))
 
-nameIsScalarity :: Name -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
-nameIsScalarity name kind st = 
+checkNameScalarity :: Name -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
+checkNameScalarity name kind st = 
     let n = nameString name in
         if unsafeSymbolIsScalarity n kind st then Right st
         else Left (SemanticError (scalarityError kind) n)
 
+checkNameIsFunction :: Name -> SymbolTable -> Either SemanticError SymbolTable
+checkNameIsFunction name st = 
+    let n = nameString name
+        info = unsafeGetSymbolInfo n st in
+    case info of
+        (VarInfo _ _) -> Left (SemanticError NotAFunctionError n)
+        (FuncInfo _ _) -> Right st
 
-expressionIsScalar :: Expression -> SymbolTable -> Bool
-expressionIsScalar expr st = 
-    case expr of 
-        BinOp e1 _ e2 -> expressionIsScalar e1 st && expressionIsScalar e2 st
-        UnOp _ e -> expressionIsScalar e st
-        Call _ _ -> True
-        Length _ -> True
-        Var name -> unsafeSymbolScalarity (nameString name) st == Scalar
-        Int _ -> True
-        Char _ -> True
-
-expressionNamesExist :: Expression -> SymbolTable -> Either SemanticError SymbolTable
-expressionNamesExist expr st = 
-    case expr of
-        BinOp e1 _ e2 -> expressionNamesExist e1 st >>= expressionNamesExist e2
-        UnOp _ e -> expressionNamesExist e st
-        Call n params -> checkNameDeclared n st
-        Length n -> checkNameDeclared n st
-        Var n -> checkNameDeclared n st
-        _ -> Right st
-
---expressionCheckScalarity :: Expression -> SymbolTable -> Either SemanticError SymbolTable
---expressionCheckScalarity expr st = 
---    case expr of
---        BinOp e1 _ e2 -> 
 
 runCheck :: Program -> Either SemanticError SymbolTable
 runCheck = flip check (emptySymbolTable Nothing)
