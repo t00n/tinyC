@@ -98,20 +98,20 @@ instance Checkable a => Checkable [a] where
 instance Checkable Declaration where
     check x st = let paramToInfo (Parameter t n) = VarInfo t (nameScalarity n) in
         case x of
-            VarDeclaration t n _ -> insertVariable (nameString n) t (nameScalarity n) st 
-            FuncDeclaration t n params stmt -> insertFunction (nameString n) t (map paramToInfo params) st >>= check stmt 
+            VarDeclaration t n _ -> declareVariable n t (nameScalarity n) st 
+            FuncDeclaration t n params stmt -> declareFunction n t (map paramToInfo params) st >>= check stmt 
 
 instance Checkable Statement where
     check stmt st = 
         case stmt of
-            Assignment v e -> nameIsInScope v st >>= check e
+            Assignment v e -> checkNameDeclared v st >>= check e
             If e stmt1 -> check e st >>= check stmt1
             IfElse e stmt1 stmt2 -> check e st >>= check stmt1 >>= check stmt2
             While e stmt1 -> check e st >>= check stmt1
             Return e -> check e st
             Block decl stmts -> check decl (emptySymbolTable $ Just st) >>= check stmts
             Write e -> check e st
-            Read v -> nameIsInScope v st
+            Read v -> checkNameDeclared v st
             Expr e -> check e st
 
 instance Checkable Expression where
@@ -119,42 +119,41 @@ instance Checkable Expression where
         case expr of 
             BinOp e1 _ e2 -> check e1 st >>= check e2
             UnOp _ e -> check e st
-            Call n params -> nameIsInScope n st 
+            Call n params -> checkNameDeclared n st 
             -- >> nameIsScalarity n FunctionScalarity st
             --    >> foldM (flip check) st params
-            Length n -> nameIsInScope n st >>= nameIsScalarity n Array
-            Var n -> nameIsInScope n st
+            Length n -> checkNameDeclared n st >>= nameIsScalarity n Array
+            Var n -> checkNameDeclared n st
             _ -> Right st
 
 -- Helpers
-symbolIsInScope :: String -> SymbolTable -> Bool
-symbolIsInScope n st = Map.member n (symbols st) || variableInParent n st
+nameInScope :: Name -> SymbolTable -> Bool
+nameInScope n = (||) <$> nameInBlock n <*> variableInParent n
     where variableInParent _ (SymbolTable _ Nothing) = False
-          variableInParent n (SymbolTable s (Just p)) = symbolIsInScope n p
+          variableInParent n (SymbolTable s (Just p)) = nameInScope n p
 
-symbolIsInBlock :: String -> SymbolTable -> Bool
-symbolIsInBlock n st = Map.member n (symbols st)
+nameInBlock :: Name -> SymbolTable -> Bool
+nameInBlock n st = Map.member (nameString n) (symbols st)
 
-symbolExists :: String -> SymbolTable -> Either SemanticError SymbolTable
-symbolExists s st = 
-    if symbolIsInBlock s st
-        then Left (SemanticError NameExistsError s)
-    else if symbolIsInScope s st
-        then Left (SemanticError NameExistsWarning s)
+checkNameNotDeclared :: Name -> SymbolTable -> Either SemanticError SymbolTable
+checkNameNotDeclared n st = 
+    if nameInBlock n st
+        then Left (SemanticError NameExistsError (nameString n))
+    else if nameInScope n st
+        then Left (SemanticError NameExistsWarning (nameString n))
     else Right st
 
-insertVariable :: String -> Type -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
-insertVariable name t k st = symbolExists name st >>= return . insertSymbol name (VarInfo t k)
+declareVariable :: Name -> Type -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
+declareVariable name t k st = checkNameNotDeclared name st >>= return . insertSymbol (nameString name) (VarInfo t k)
 
 
-insertFunction :: String -> Type -> [Info] -> SymbolTable -> Either SemanticError SymbolTable
-insertFunction name ret params st = symbolExists name st >>= return . insertSymbol name (FuncInfo ret params)
+declareFunction :: Name -> Type -> [Info] -> SymbolTable -> Either SemanticError SymbolTable
+declareFunction name ret params st = checkNameNotDeclared name st >>= return . insertSymbol (nameString name) (FuncInfo ret params)
 
-nameIsInScope :: Name -> SymbolTable -> Either SemanticError SymbolTable
-nameIsInScope name st = 
-    let n = nameString name in
-        if symbolIsInScope n st then Right st 
-        else Left (SemanticError NotDeclaredError n)
+checkNameDeclared :: Name -> SymbolTable -> Either SemanticError SymbolTable
+checkNameDeclared name st = 
+    if nameInScope name st then Right st 
+    else Left (SemanticError NotDeclaredError (nameString name))
 
 nameIsScalarity :: Name -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
 nameIsScalarity name kind st = 
@@ -179,9 +178,9 @@ expressionNamesExist expr st =
     case expr of
         BinOp e1 _ e2 -> expressionNamesExist e1 st >>= expressionNamesExist e2
         UnOp _ e -> expressionNamesExist e st
-        Call n params -> nameIsInScope n st
-        Length n -> nameIsInScope n st
-        Var n -> nameIsInScope n st
+        Call n params -> checkNameDeclared n st
+        Length n -> checkNameDeclared n st
+        Var n -> checkNameDeclared n st
         _ -> Right st
 
 --expressionCheckScalarity :: Expression -> SymbolTable -> Either SemanticError SymbolTable
