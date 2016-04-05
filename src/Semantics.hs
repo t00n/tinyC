@@ -88,7 +88,45 @@ infoError :: Info -> ErrorType
 infoError (VarInfo _ k) = scalarityError k
 infoError (FuncInfo _ _) = NotAFunctionError
 
--- Declarations
+-- Check functions
+class Checkable a where
+    check :: a -> SymbolTable -> Either SemanticError SymbolTable
+
+instance Checkable a => Checkable [a] where
+    check x st = foldM (flip check) st x
+
+instance Checkable Declaration where
+    check x st = let paramToInfo (Parameter t n) = VarInfo t (nameScalarity n) in
+        case x of
+            VarDeclaration t n _ -> insertVariable (nameString n) t (nameScalarity n) st 
+            FuncDeclaration t n params stmt -> insertFunction (nameString n) t (map paramToInfo params) st >>= check stmt 
+
+instance Checkable Statement where
+    check stmt st = 
+        case stmt of
+            Assignment v e -> nameIsInScope v st >> check e st
+            If e stmt1 -> check e st >> check stmt1 st
+            IfElse e stmt1 stmt2 -> check e st >> check stmt1 st >> check stmt2 st
+            While e stmt1 -> check e st >> check stmt1 st
+            Return e -> check e st
+            Block decl stmts -> check decl (emptySymbolTable $ Just st) >> check stmts st
+            Write e -> check e st
+            Read v -> nameIsInScope v st
+            Expr e -> check e st
+
+instance Checkable Expression where
+    check expr st = 
+        case expr of 
+            BinOp e1 _ e2 -> check e1 st >> check e2 st
+            UnOp _ e -> check e st
+            Call n params -> nameIsInScope n st 
+            -- >> nameIsScalarity n FunctionScalarity st
+            --    >> foldM (flip check) st params
+            Length n -> nameIsInScope n st >> nameIsScalarity n Array st
+            Var n -> nameIsInScope n st
+            _ -> Right st
+
+-- Helpers
 symbolIsInScope :: String -> SymbolTable -> Bool
 symbolIsInScope n st = Map.member n (symbols st) || variableInParent n st
     where variableInParent _ (SymbolTable _ Nothing) = False
@@ -97,68 +135,33 @@ symbolIsInScope n st = Map.member n (symbols st) || variableInParent n st
 symbolIsInBlock :: String -> SymbolTable -> Bool
 symbolIsInBlock n st = Map.member n (symbols st)
 
-checkNameExists :: String -> SymbolTable -> Either SemanticError SymbolTable
-checkNameExists name st = 
-    if symbolIsInBlock name st
-        then Left (SemanticError NameExistsError name)
-    else if symbolIsInScope name st
-        then Left (SemanticError NameExistsWarning name)
+symbolExists :: String -> SymbolTable -> Either SemanticError SymbolTable
+symbolExists s st = 
+    if symbolIsInBlock s st
+        then Left (SemanticError NameExistsError s)
+    else if symbolIsInScope s st
+        then Left (SemanticError NameExistsWarning s)
     else Right st
 
 insertVariable :: String -> Type -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
-insertVariable name t k st = checkNameExists name st >>= return . insertSymbol name (VarInfo t k)
+insertVariable name t k st = symbolExists name st >>= return . insertSymbol name (VarInfo t k)
 
 
 insertFunction :: String -> Type -> [Info] -> SymbolTable -> Either SemanticError SymbolTable
-insertFunction name ret params st = checkNameExists name st >>= return . insertSymbol name (FuncInfo ret params)
+insertFunction name ret params st = symbolExists name st >>= return . insertSymbol name (FuncInfo ret params)
 
-checkDeclarations :: [Declaration] -> SymbolTable -> Either SemanticError SymbolTable
-checkDeclarations [] st = Right st
-checkDeclarations (x:xs) st =
-    let paramToInfo (Parameter t n) = VarInfo t (nameScalarity n) in
-        case x of
-            VarDeclaration t n _ -> insertVariable (nameString n) t (nameScalarity n) st >>= checkDeclarations xs  
-            FuncDeclaration t n params stmt -> insertFunction (nameString n) t (map paramToInfo params) st >>= checkDeclarations xs >>= checkStatement stmt 
-
-checkNameInScope :: Name -> SymbolTable -> Either SemanticError SymbolTable
-checkNameInScope name st = 
+nameIsInScope :: Name -> SymbolTable -> Either SemanticError SymbolTable
+nameIsInScope name st = 
     let n = nameString name in
         if symbolIsInScope n st then Right st 
         else Left (SemanticError NotDeclaredError n)
 
-checkNameIsScalarity :: Name -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
-checkNameIsScalarity name kind st = 
+nameIsScalarity :: Name -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
+nameIsScalarity name kind st = 
     let n = nameString name in
         if unsafeSymbolIsScalarity n kind st then Right st
         else Left (SemanticError (scalarityError kind) n)
 
-checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
-checkStatement stmt st = 
-    case stmt of
-        Assignment v e -> checkNameInScope v st >> checkExpression e st
-        If e stmt1 -> checkExpression e st >> checkStatement stmt1 st
-        IfElse e stmt1 stmt2 -> checkExpression e st >> checkStatement stmt1 st >> checkStatement stmt2 st
-        While e stmt1 -> checkExpression e st >> checkStatement stmt1 st
-        Return e -> checkExpression e st
-        Block decl stmts -> checkDeclarations decl (emptySymbolTable $ Just st) >> checkStatements stmts st
-        Write e -> checkExpression e st
-        Read v -> checkNameInScope v st
-        Expr e -> checkExpression e st
-
-checkStatements :: [Statement] -> SymbolTable -> Either SemanticError SymbolTable
-checkStatements = flip $ foldM $ flip checkStatement
-
-checkExpression :: Expression -> SymbolTable -> Either SemanticError SymbolTable
-checkExpression expr st = 
-    case expr of 
-        BinOp e1 _ e2 -> checkExpression e1 st >> checkExpression e2 st
-        UnOp _ e -> checkExpression e st
-        Call n params -> checkNameInScope n st 
-        -- >> checkNameIsScalarity n FunctionScalarity st
-        --    >> foldM (flip checkExpression) st params
-        Length n -> checkNameInScope n st >> checkNameIsScalarity n Array st
-        Var n -> checkNameInScope n st
-        _ -> Right st
 
 expressionIsScalar :: Expression -> SymbolTable -> Bool
 expressionIsScalar expr st = 
@@ -176,9 +179,9 @@ expressionNamesExist expr st =
     case expr of
         BinOp e1 _ e2 -> expressionNamesExist e1 st >>= expressionNamesExist e2
         UnOp _ e -> expressionNamesExist e st
-        Call n params -> checkNameInScope n st
-        Length n -> checkNameInScope n st
-        Var n -> checkNameInScope n st
+        Call n params -> nameIsInScope n st
+        Length n -> nameIsInScope n st
+        Var n -> nameIsInScope n st
         _ -> Right st
 
 --expressionCheckScalarity :: Expression -> SymbolTable -> Either SemanticError SymbolTable
@@ -187,7 +190,7 @@ expressionNamesExist expr st =
 --        BinOp e1 _ e2 -> 
 
 checkSemantics :: Program -> Either SemanticError ()
-checkSemantics = void . flip checkDeclarations (emptySymbolTable Nothing)
+checkSemantics = void . flip check (emptySymbolTable Nothing)
 
 symbolTable :: Program -> Either SemanticError SymbolTable
-symbolTable = flip checkDeclarations (emptySymbolTable Nothing)
+symbolTable = flip check (emptySymbolTable Nothing)
