@@ -1,4 +1,4 @@
-module Semantics (checkSemantics, SemanticError(..), ErrorType(..)) where
+module Semantics (checkSemantics, SemanticError(..), ErrorType(..), SymbolTable(..)) where
 
 import Control.Monad (void, foldM)
 import qualified Data.Map.Strict as Map
@@ -6,6 +6,7 @@ import Data.Maybe (isJust, fromJust)
 
 import Parser
 
+-- Symbols data types
 data Kind = VariableKind | ArrayKind
     deriving (Eq, Show)
 
@@ -24,6 +25,46 @@ data SymbolTable = SymbolTable {
     parent :: Maybe SymbolTable
 } deriving (Eq, Show)
 
+emptySymbolTable :: Maybe SymbolTable -> SymbolTable
+emptySymbolTable = SymbolTable Map.empty
+
+insertSymbol :: String -> Info -> SymbolTable -> SymbolTable
+insertSymbol s i = SymbolTable <$> Map.insert s i . symbols <*> parent
+
+getSymbolInfo :: String -> SymbolTable -> Maybe Info
+getSymbolInfo s st = let res = Map.lookup s (symbols st) in 
+                         if res == Nothing then parent st >>= getSymbolInfo s
+                         else res
+
+unsafeGetSymbolInfo :: String -> SymbolTable -> Info
+unsafeGetSymbolInfo s st = let info = getSymbolInfo s st in
+    if isJust info then fromJust info
+    else error ("Symbol " ++ s ++ " is not in symbol table " ++ show st)
+
+(...) :: (Functor f, Functor f1) => (a -> b) -> f (f1 a) -> f (f1 b)
+(...) = fmap . fmap
+
+symbolType :: String -> SymbolTable -> Type
+symbolType = infoType ... unsafeGetSymbolInfo
+
+symbolKind :: String -> SymbolTable -> Kind
+symbolKind = infoKind ... unsafeGetSymbolInfo
+
+symbolIsKind :: String -> Kind -> SymbolTable -> Bool
+symbolIsKind s k st = (symbolKind s st) == k
+
+symbolIsType :: String -> Type -> SymbolTable -> Bool
+symbolIsType s t st = (symbolType s st) == t
+
+nameString :: Name -> String
+nameString (Name s) = s
+nameString (NameSubscription s _) = s
+
+nameKind :: Name -> Kind
+nameKind (Name _) = VariableKind
+nameKind (NameSubscription _ _) = ArrayKind
+
+-- Errors data types
 data ErrorType = NotDeclaredError 
                | NotAFunctionError 
                | NameExistsError 
@@ -46,23 +87,7 @@ infoToError :: Info -> ErrorType
 infoToError (VarInfo _ k) = kindToError k
 infoToError (FuncInfo _ _) = NotAFunctionError
 
-emptySymbolTable :: Maybe SymbolTable -> SymbolTable
-emptySymbolTable = SymbolTable Map.empty
-
-insertSymbol :: String -> Info -> SymbolTable -> SymbolTable
-insertSymbol s i = SymbolTable <$> Map.insert s i . symbols <*> parent
-
-getSymbolInfo :: String -> SymbolTable -> Maybe Info
-getSymbolInfo s st = let res = Map.lookup s (symbols st) in 
-                         if res == Nothing then parent st >>= getSymbolInfo s
-                         else res
-
-unsafeGetSymbolInfo :: String -> SymbolTable -> Info
-unsafeGetSymbolInfo s st = let info = getSymbolInfo s st in
-    if isJust info then fromJust info
-    else error ("Symbol " ++ s ++ " is not in symbol table " ++ show st)
-
-
+-- Declarations
 symbolIsInScope :: String -> SymbolTable -> Bool
 symbolIsInScope n st = Map.member n (symbols st) || variableInParent n st
     where variableInParent _ (SymbolTable _ Nothing) = False
@@ -70,29 +95,6 @@ symbolIsInScope n st = Map.member n (symbols st) || variableInParent n st
 
 symbolIsInBlock :: String -> SymbolTable -> Bool
 symbolIsInBlock n st = Map.member n (symbols st)
-
-(...) :: (Functor f, Functor f1) => (a -> b) -> f (f1 a) -> f (f1 b)
-(...) = fmap . fmap
-
-symbolType :: String -> SymbolTable -> Type
-symbolType = infoType ... unsafeGetSymbolInfo
-
-symbolKind :: String -> SymbolTable -> Kind
-symbolKind = infoKind ... unsafeGetSymbolInfo
-
-symbolIsKind :: String -> Kind -> SymbolTable -> Bool
-symbolIsKind s k st = (symbolKind s st) == k
-
-symbolIsType :: String -> Type -> SymbolTable -> Bool
-symbolIsType s t st = (symbolType s st) == t
-
-nameString :: Name -> String
-nameString (Name s) = s
-nameString (NameSubscription s _) = s
-
-nameKind :: Name -> Kind
-nameKind (NameSubscription _ _) = ArrayKind
-nameKind (Name _) = VariableKind
 
 checkNameExists :: String -> SymbolTable -> Either SemanticError SymbolTable
 checkNameExists name st = 
@@ -109,13 +111,13 @@ insertVariable name t k st = checkNameExists name st >>= return . insertSymbol n
 insertFunction :: String -> Type -> [Info] -> SymbolTable -> Either SemanticError SymbolTable
 insertFunction name ret params st = checkNameExists name st >>= return . insertSymbol name (FuncInfo ret params)
 
-walkProgram :: Program -> SymbolTable -> Either SemanticError SymbolTable
-walkProgram [] st = Right st
-walkProgram (x:xs) st =
+checkDeclarations :: [Declaration] -> SymbolTable -> Either SemanticError SymbolTable
+checkDeclarations [] st = Right st
+checkDeclarations (x:xs) st =
     let paramToInfo (Parameter t n) = VarInfo t (nameKind n) in
         case x of
-            VarDeclaration t n _ -> insertVariable (nameString n) t (nameKind n) st >>= walkProgram xs  
-            FuncDeclaration t n params stmt -> insertFunction (nameString n) t (map paramToInfo params) st >>= walkProgram xs >>= checkStatement stmt 
+            VarDeclaration t n _ -> insertVariable (nameString n) t (nameKind n) st >>= checkDeclarations xs  
+            FuncDeclaration t n params stmt -> insertFunction (nameString n) t (map paramToInfo params) st >>= checkDeclarations xs >>= checkStatement stmt 
 
 checkNameInScope :: Name -> SymbolTable -> Either SemanticError SymbolTable
 checkNameInScope name st = 
@@ -137,7 +139,7 @@ checkStatement stmt st =
         IfElse e stmt1 stmt2 -> checkExpression e st >> checkStatement stmt1 st >> checkStatement stmt2 st
         While e stmt1 -> checkExpression e st >> checkStatement stmt1 st
         Return e -> checkExpression e st
-        Block decl stmts -> walkProgram decl (emptySymbolTable $ Just st) >> checkStatements stmts st
+        Block decl stmts -> checkDeclarations decl (emptySymbolTable $ Just st) >> checkStatements stmts st
         Write e -> checkExpression e st
         Read v -> checkNameInScope v st
         Expr e -> checkExpression e st
@@ -150,7 +152,8 @@ checkExpression expr st =
     case expr of 
         BinOp e1 _ e2 -> checkExpression e1 st >> checkExpression e2 st
         UnOp _ e -> checkExpression e st
-        --Call n params -> checkNameInScope n st >> checkNameIsKind n FunctionKind st
+        Call n params -> checkNameInScope n st 
+        -- >> checkNameIsKind n FunctionKind st
         --    >> foldM (flip checkExpression) st params
         Length n -> checkNameInScope n st >> checkNameIsKind n ArrayKind st
         Var n -> checkNameInScope n st
@@ -172,5 +175,8 @@ expressionKind expr st =
         Int x -> Right VariableKind
         Char x -> Right VariableKind
 
-checkSemantics :: Program -> Either SemanticError SymbolTable
-checkSemantics = flip walkProgram (emptySymbolTable Nothing)
+checkSemantics :: Program -> Either SemanticError ()
+checkSemantics = void . flip checkDeclarations (emptySymbolTable Nothing)
+
+symbolTable :: Program -> Either SemanticError SymbolTable
+symbolTable = flip checkDeclarations (emptySymbolTable Nothing)
