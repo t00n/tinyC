@@ -45,17 +45,17 @@ unsafeGetSymbolInfo s st = let info = getSymbolInfo s st in
 (...) :: (Functor f, Functor f1) => (a -> b) -> f (f1 a) -> f (f1 b)
 (...) = fmap . fmap
 
-symbolType :: String -> SymbolTable -> Type
-symbolType = infoType ... unsafeGetSymbolInfo
+unsafeSymbolType :: String -> SymbolTable -> Type
+unsafeSymbolType = infoType ... unsafeGetSymbolInfo
 
-symbolScalarity :: String -> SymbolTable -> Scalarity
-symbolScalarity = infoScalarity ... unsafeGetSymbolInfo
+unsafeSymbolScalarity :: String -> SymbolTable -> Scalarity
+unsafeSymbolScalarity = infoScalarity ... unsafeGetSymbolInfo
 
-symbolIsScalarity :: String -> Scalarity -> SymbolTable -> Bool
-symbolIsScalarity s k st = (symbolScalarity s st) == k
+unsafeSymbolIsScalarity :: String -> Scalarity -> SymbolTable -> Bool
+unsafeSymbolIsScalarity s k st = (unsafeSymbolScalarity s st) == k
 
-symbolIsType :: String -> Type -> SymbolTable -> Bool
-symbolIsType s t st = (symbolType s st) == t
+unsafeSymbolIsType :: String -> Type -> SymbolTable -> Bool
+unsafeSymbolIsType s t st = (unsafeSymbolType s st) == t
 
 nameString :: Name -> String
 nameString (Name s) = s
@@ -80,13 +80,13 @@ data SemanticError = SemanticError {
     errorVariable :: String
 } deriving (Eq, Show)
 
-kindToError :: Scalarity -> ErrorType
-kindToError Scalar = NotAScalarError
-kindToError Array = NotAnArrayError
+scalarityError :: Scalarity -> ErrorType
+scalarityError Scalar = NotAScalarError
+scalarityError Array = NotAnArrayError
 
-infoToError :: Info -> ErrorType
-infoToError (VarInfo _ k) = kindToError k
-infoToError (FuncInfo _ _) = NotAFunctionError
+infoError :: Info -> ErrorType
+infoError (VarInfo _ k) = scalarityError k
+infoError (FuncInfo _ _) = NotAFunctionError
 
 -- Declarations
 symbolIsInScope :: String -> SymbolTable -> Bool
@@ -129,8 +129,8 @@ checkNameInScope name st =
 checkNameIsScalarity :: Name -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
 checkNameIsScalarity name kind st = 
     let n = nameString name in
-        if symbolIsScalarity n kind st then Right st
-        else Left (SemanticError (kindToError kind) n)
+        if unsafeSymbolIsScalarity n kind st then Right st
+        else Left (SemanticError (scalarityError kind) n)
 
 checkStatement :: Statement -> SymbolTable -> Either SemanticError SymbolTable
 checkStatement stmt st = 
@@ -167,7 +167,7 @@ expressionIsScalar expr st =
         UnOp _ e -> expressionIsScalar e st
         Call _ _ -> True
         Length _ -> True
-        Var name -> symbolScalarity (nameString name) st == Scalar
+        Var name -> unsafeSymbolScalarity (nameString name) st == Scalar
         Int _ -> True
         Char _ -> True
 
