@@ -106,15 +106,12 @@ instance Checkable Statement where
     check stmt st = 
         case stmt of
             Assignment v e -> checkNameDeclared v st >>= check e >>= checkNameExpressionSameScalarity v e
-            If e stmt1 -> check e st >>= check stmt1
-            IfElse e stmt1 stmt2 -> check e st >>= check stmt1 >>= check stmt2
-            While e stmt1 -> check e st >>= check stmt1
+            If e stmt1 -> check e st >>= checkExpressionIsScalar e >>= check stmt1
+            IfElse e stmt1 stmt2 -> check e st >>= checkExpressionIsScalar e >>= check stmt1 >>= check stmt2
+            While e stmt1 -> check e st >>= checkExpressionIsScalar e >>= check stmt1
             Return e -> check e st >>= checkExpressionIsScalar e
             Block decl stmts -> check decl st >>= check stmts
-            Write e -> check e st >> 
-                if checkExpressionScalarity e st /= Right Scalar
-                    then Left $ SemanticError NotAScalarError (show e)
-                else Right st
+            Write e -> check e st >>= checkExpressionIsScalar e
             Read v -> checkNameDeclared v st >>= checkNameIsScalarity v Scalar
             Expr e -> check e st
 

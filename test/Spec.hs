@@ -276,3 +276,12 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Right ()
             let ast = scan_and_parse "int b[5]; int tiny() { return b; }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"b\")"})
+        it "Checks that if and while statements have scalar expressions" $ do
+            let ast = scan_and_parse "int tiny() { while (5) {} if (5) {} }"
+            checkSemantics ast `shouldBe` Right ()
+            let ast = scan_and_parse "int a[5]; int tiny() { while (a) {} }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int a[5]; int tiny() { if (a) {} }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int a[5]; int tiny() { if (a) {} else if (a) {} }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"a\")"})
