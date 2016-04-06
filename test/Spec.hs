@@ -226,8 +226,8 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NameExistsError, errorVariable = "a"})
         it "Checks the arguments of a function call" $ do
             let ast = scan_and_parse "int a = 5; int tiny(int a, int b) { tiny(a, 5); }"
-            checkSemantics ast `shouldBe` Right ()
-            let ast = scan_and_parse "int a = 5; int tiny(int a, int b) { tiny(a, c); }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NameExistsWarning, errorVariable = "a"})
+            let ast = scan_and_parse "int tiny(int a, int b) { tiny(a, c); }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotDeclaredError, errorVariable = "c"})
             let ast = scan_and_parse "int a[5]; int tiny(int b) { tiny(a); }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"a\")"})

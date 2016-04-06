@@ -97,10 +97,10 @@ instance Checkable a => Checkable [a] where
 
 instance Checkable Declaration where
     check x st = let paramToInfo (Parameter t n) = VarInfo t (nameScalarity n) 
-                     paramToSymbol p@(Parameter _ n) = (nameString n, paramToInfo p) in
+                     paramToSymbol p@(Parameter _ n) = (n, paramToInfo p) in
         case x of
             VarDeclaration t n _ -> declareName n (VarInfo t (nameScalarity n)) st
-            FuncDeclaration t n params stmt -> declareName n (FuncInfo t (map paramToInfo params)) st >>= return  . (SymbolTable $ Map.fromList $ map paramToSymbol params) . Just >>= check stmt
+            FuncDeclaration t n params stmt -> declareName n (FuncInfo t (map paramToInfo params)) st >>= flip (foldl (\acc x -> acc >>= (uncurry declareName) x )) (map paramToSymbol params) . return . emptySymbolTable . Just >>= check stmt
 
 instance Checkable Statement where
     check stmt st = 
