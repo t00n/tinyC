@@ -121,6 +121,7 @@ instance Checkable Expression where
             UnOp _ e -> check e st >>= checkExpressionIsScalar e
             Call n args -> checkNameDeclared n st >>= checkNameIsFunction n
                         >> foldM (flip check) st args
+                        >> checkCallArgumentsScalarity args n st
             Length n -> checkNameDeclared n st >>= checkNameScalarity n Array
             Var name -> checkNameDeclared name st >>
                 case name of
@@ -162,6 +163,18 @@ checkExpressionIsScalar expr st =
         then Right st
     else
         Left $ SemanticError NotAScalarError $ show expr
+
+checkCallArgumentsScalarity :: [Expression] -> Name -> SymbolTable -> Either SemanticError SymbolTable
+checkCallArgumentsScalarity args func st = 
+    let funcName = nameString func
+        params = (infoParams ... unsafeGetSymbolInfo) funcName st 
+        comp arg param = 
+            if expressionIsScalar arg st && infoScalarity param /= Scalar
+                then Left $ SemanticError NotAnArrayError $ show arg
+            else if (not $ expressionIsScalar arg st) && infoScalarity param /= Array
+                then Left $ SemanticError NotAScalarError $ show arg
+            else Right st in
+    foldl (>>) (Right st) $ zipWith comp args params
 
 -- Helpers
 nameInScope :: Name -> SymbolTable -> Bool
