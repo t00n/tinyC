@@ -121,7 +121,7 @@ instance Checkable Expression where
             BinOp e1 _ e2 -> check e1 st >>= check e2 >>= checkExpressionIsScalar e1 >>= checkExpressionIsScalar e2
             UnOp _ e -> check e st >>= checkExpressionIsScalar e
             Call n args -> checkNameDeclared n st >>= checkNameIsFunction n
-                        >> foldM (flip check) st args
+                        >>= check args
                         >> checkCallArgumentsScalarity args n st
             Length n -> checkNameDeclared n st >>= checkNameIsScalarity n Array
             Var name -> checkNameDeclared name st >>
