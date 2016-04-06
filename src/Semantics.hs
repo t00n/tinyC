@@ -96,10 +96,11 @@ instance Checkable a => Checkable [a] where
     check x st = foldM (flip check) st x
 
 instance Checkable Declaration where
-    check x st = let paramToInfo (Parameter t n) = VarInfo t (nameScalarity n) in
+    check x st = let paramToInfo (Parameter t n) = VarInfo t (nameScalarity n) 
+                     paramToSymbol p@(Parameter _ n) = (nameString n, paramToInfo p) in
         case x of
             VarDeclaration t n _ -> declareName n (VarInfo t (nameScalarity n)) st
-            FuncDeclaration t n params stmt -> declareName n (FuncInfo t (map paramToInfo params)) st >>= check stmt 
+            FuncDeclaration t n params stmt -> declareName n (FuncInfo t (map paramToInfo params)) st >>= return  . (SymbolTable $ Map.fromList $ map paramToSymbol params) . Just >>= check stmt
 
 instance Checkable Statement where
     check stmt st = 
@@ -109,7 +110,7 @@ instance Checkable Statement where
             IfElse e stmt1 stmt2 -> check e st >>= check stmt1 >>= check stmt2
             While e stmt1 -> check e st >>= check stmt1
             Return e -> check e st
-            Block decl stmts -> check decl (emptySymbolTable $ Just st) >>= check stmts
+            Block decl stmts -> check decl st >>= check stmts
             Write e -> check e st >> 
                 if checkExpressionScalarity e st /= Right Scalar
                     then Left $ SemanticError NotAScalarError (show e)
