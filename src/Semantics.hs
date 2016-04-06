@@ -110,8 +110,11 @@ instance Checkable Statement where
             While e stmt1 -> check e st >>= check stmt1
             Return e -> check e st
             Block decl stmts -> check decl (emptySymbolTable $ Just st) >>= check stmts
-            Write e -> check e st
-            Read v -> checkNameDeclared v st
+            Write e -> check e st >> 
+                if checkExpressionScalarity e st /= Right Scalar
+                    then Left $ SemanticError NotAScalarError (show e)
+                else Right st
+            Read v -> checkNameDeclared v st >>= checkNameIsScalarity v Scalar
             Expr e -> check e st
 
 instance Checkable Expression where

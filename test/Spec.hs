@@ -182,11 +182,17 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
             let ast = scan_and_parse "int a = 5; int tiny() { return a; }"
             checkSemantics ast `shouldBe` Right ()
-        it "Checks that variables are declared before use in IO" $ do
+        it "Checks that variables are declared and scalar before use in IO" $ do
             let ast = scan_and_parse "int tiny() { write a; }"
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
             let ast = scan_and_parse "int a = 5; int tiny() { read a; }"
             checkSemantics ast `shouldBe` Right ()
+            let ast = scan_and_parse "int a = 5; int tiny() { write a; }"
+            checkSemantics ast `shouldBe` Right ()
+            let ast = scan_and_parse "int a[5]; int tiny() { write a; }"
+            checkSemantics ast `shouldBe`  Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int a[5]; int tiny() { read a; }"
+            checkSemantics ast `shouldBe`  Left (SemanticError {errorType = NotAScalarError, errorVariable = "a"})
         it "Checks that variables are declared before use in expression" $ do
             let ast = scan_and_parse "int tiny() { a; }"
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
