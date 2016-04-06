@@ -42,9 +42,6 @@ unsafeGetSymbolInfo s st = let info = getSymbolInfo s st in
     if isJust info then fromJust info
     else error ("Symbol " ++ s ++ " is not in symbol table " ++ show st)
 
-(...) :: (Functor f, Functor f1) => (a -> b) -> f (f1 a) -> f (f1 b)
-(...) = fmap . fmap
-
 unsafeSymbolType :: String -> SymbolTable -> Type
 unsafeSymbolType = infoType ... unsafeGetSymbolInfo
 
@@ -105,7 +102,7 @@ instance Checkable Declaration where
 instance Checkable Statement where
     check stmt st = 
         case stmt of
-            Assignment v e -> checkNameDeclared v st >>= check e >>= checkNameExpressionSameScalarity v e
+            Assignment v e -> checkNameDeclared v st >>= check e >>= checkAssignment v e
             If e stmt1 -> check e st >>= checkExpressionIsScalar e >>= check stmt1
             IfElse e stmt1 stmt2 -> check e st >>= checkExpressionIsScalar e >>= check stmt1 >>= check stmt2
             While e stmt1 -> check e st >>= checkExpressionIsScalar e >>= check stmt1
@@ -122,7 +119,7 @@ instance Checkable Expression where
             UnOp _ e -> check e st >>= checkExpressionIsScalar e
             Call n args -> checkNameDeclared n st >>= checkNameIsFunction n
                         >>= check args
-                        >> checkCallArgumentsScalarity args n st
+                        >> checkArguments args n st
             Length n -> checkNameDeclared n st >>= checkNameIsScalarity n Array
             Var name -> checkNameDeclared name st >>
                 case name of
@@ -157,8 +154,8 @@ checkNameIsFunction name st =
         (VarInfo _ _) -> Left (SemanticError NotAFunctionError n)
         (FuncInfo _ _) -> Right st
 
-checkNameScalarity :: Name -> SymbolTable -> Either SemanticError Scalarity
-checkNameScalarity name st = let s = unsafeSymbolScalarity (nameString name) st in
+getNameScalarity :: Name -> SymbolTable -> Either SemanticError Scalarity
+getNameScalarity name st = let s = unsafeSymbolScalarity (nameString name) st in
     case name of
         (Name _) -> Right $ if s == Scalar then Scalar else Array
         (NameSubscription _ _) -> if s == Scalar then Left $ SemanticError NotAnArrayError (show name) else Right Scalar
@@ -170,17 +167,17 @@ checkExpressionIsScalar expr st =
     else
         Left $ SemanticError NotAScalarError $ show expr
 
-checkNameExpressionSameScalarity :: Name -> Expression -> SymbolTable -> Either SemanticError SymbolTable
-checkNameExpressionSameScalarity name expr st = do
-    s1 <- checkNameScalarity name st
-    s2 <- checkExpressionScalarity expr st
+checkAssignment :: Name -> Expression -> SymbolTable -> Either SemanticError SymbolTable
+checkAssignment name expr st = do
+    s1 <- getNameScalarity name st
+    s2 <- getExpressionScalarity expr st
     if s1 /= s2
         then Left $ SemanticError NotSameScalarityError (show name ++ " " ++ show expr)
     else
         Right st
 
-checkCallArgumentsScalarity :: [Expression] -> Name -> SymbolTable -> Either SemanticError SymbolTable
-checkCallArgumentsScalarity args func st = 
+checkArguments :: [Expression] -> Name -> SymbolTable -> Either SemanticError SymbolTable
+checkArguments args func st = 
     let funcName = nameString func
         params = (infoParams ... unsafeGetSymbolInfo) funcName st 
         comp arg param = 
@@ -191,21 +188,25 @@ checkCallArgumentsScalarity args func st =
             else Right st in
     foldl (>>) (Right st) $ zipWith comp args params
 
-checkExpressionScalarity :: Expression -> SymbolTable -> Either SemanticError Scalarity
-checkExpressionScalarity expr st = 
+getExpressionScalarity :: Expression -> SymbolTable -> Either SemanticError Scalarity
+getExpressionScalarity expr st = 
     case expr of 
         (BinOp e1 _ e2) -> do
-            s1 <- checkExpressionScalarity e1 st
-            s2 <- checkExpressionScalarity e2 st
+            s1 <- getExpressionScalarity e1 st
+            s2 <- getExpressionScalarity e2 st
             if s1 /= s2
                 then Left $ SemanticError NotSameScalarityError (show e1 ++ " " ++ show e2)
             else
                 Right s1
-        (UnOp _ e) -> checkExpressionScalarity e st
-        (Var name) -> checkNameScalarity name st
+        (UnOp _ e) -> getExpressionScalarity e st
+        (Var name) -> getNameScalarity name st
         _ -> Right Scalar
 
 -- Helpers
+-- composition operator for 2 args functions
+(...) :: (Functor f, Functor f1) => (a -> b) -> f (f1 a) -> f (f1 b)
+(...) = fmap . fmap
+
 nameInScope :: Name -> SymbolTable -> Bool
 nameInScope n = (||) <$> nameInBlock n <*> variableInParent n
     where variableInParent _ (SymbolTable _ Nothing) = False
@@ -215,13 +216,7 @@ nameInBlock :: Name -> SymbolTable -> Bool
 nameInBlock n st = Map.member (nameString n) (symbols st)
 
 expressionIsScalar :: Expression -> SymbolTable -> Bool
-expressionIsScalar expr st = 
-    case expr of 
-        BinOp e1 _ e2 -> expressionIsScalar e1 st && expressionIsScalar e2 st
-        UnOp _ e -> expressionIsScalar e st
-        Var (Name n) -> unsafeSymbolScalarity n st == Scalar
-        Var (NameSubscription n _) -> unsafeSymbolScalarity n st == Array
-        _ -> True
+expressionIsScalar = ((==) (Right Scalar)) ... getExpressionScalarity
 
 declareName :: Name -> Info -> SymbolTable -> Either SemanticError SymbolTable
 declareName name info st = checkNameNotDeclared name st >>= return . insertSymbol (nameString name) info
