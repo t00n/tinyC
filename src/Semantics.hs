@@ -100,7 +100,7 @@ instance Checkable Declaration where
                      paramToSymbol p@(Parameter _ n) = (n, paramToInfo p) in
         case x of
             VarDeclaration t n _ -> declareName n (VarInfo t (nameScalarity n)) st
-            FuncDeclaration t n params stmt -> declareName n (FuncInfo t (map paramToInfo params)) st >>= flip (foldl (\acc x -> acc >>= (uncurry declareName) x )) (map paramToSymbol params) . return . emptySymbolTable . Just >>= check stmt
+            FuncDeclaration t n params stmt -> declareName n (FuncInfo t (map paramToInfo params)) st >>= declareNames (map paramToSymbol params) . emptySymbolTable . Just >>= check stmt
 
 instance Checkable Statement where
     check stmt st = 
@@ -228,6 +228,9 @@ expressionIsScalar expr st =
 
 declareName :: Name -> Info -> SymbolTable -> Either SemanticError SymbolTable
 declareName name info st = checkNameNotDeclared name st >>= return . insertSymbol (nameString name) info
+
+declareNames :: [(Name, Info)] -> SymbolTable -> Either SemanticError SymbolTable
+declareNames xs = flip (foldl (\acc x -> acc >>= (uncurry declareName) x )) xs . return
 
 -- API
 
