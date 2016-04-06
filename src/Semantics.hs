@@ -90,7 +90,7 @@ class Checkable a where
     check :: a -> SymbolTable -> Either SemanticError SymbolTable
 
 instance Checkable a => Checkable [a] where
-    check x st = foldM (flip check) st x
+    check = flip $ foldM $ flip check
 
 instance Checkable Declaration where
     check x st = let paramToInfo (Parameter t n) = VarInfo t (nameScalarity n) 
@@ -115,11 +115,15 @@ instance Checkable Statement where
 instance Checkable Expression where
     check expr st = 
         case expr of 
-            BinOp e1 _ e2 -> check e1 st >>= check e2 >>= checkExpressionIsScalar e1 >>= checkExpressionIsScalar e2
+            BinOp e1 _ e2 -> check e1 st 
+                        >>= check e2 
+                        >>= checkExpressionIsScalar e1 
+                        >>= checkExpressionIsScalar e2
             UnOp _ e -> check e st >>= checkExpressionIsScalar e
-            Call n args -> checkNameDeclared n st >>= checkNameIsFunction n
+            Call n args -> checkNameDeclared n st 
+                        >>= checkNameIsFunction n
                         >>= check args
-                        >> checkArguments args n st
+                        >>= checkArguments args n
             Length n -> checkNameDeclared n st >>= checkNameIsScalarity n Array
             Var name -> checkNameDeclared name st >>
                 case name of
@@ -155,7 +159,8 @@ checkNameIsFunction name st =
         (FuncInfo _ _) -> Right st
 
 getNameScalarity :: Name -> SymbolTable -> Either SemanticError Scalarity
-getNameScalarity name st = let s = unsafeSymbolScalarity (nameString name) st in
+getNameScalarity name st = 
+    let s = unsafeSymbolScalarity (nameString name) st in
     case name of
         (Name _) -> Right $ if s == Scalar then Scalar else Array
         (NameSubscription _ _) -> if s == Scalar then Left $ SemanticError NotAnArrayError (show name) else Right Scalar
