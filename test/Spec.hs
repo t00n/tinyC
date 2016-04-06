@@ -211,6 +211,13 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
             let ast2 = scan_and_parse "int a = 5; int tiny() { a(); }"
             checkSemantics ast2 `shouldBe` Left (SemanticError NotAFunctionError "a")
+            let ast3 = scan_and_parse "int tiny() { tiny(); }"
+            checkSemantics ast3 `shouldBe` Right ()
+        it "Checks the arguments of a function call" $ do
+            let ast = scan_and_parse "int a = 5; int tiny(int a, int b) { tiny(a, 5); }"
+            checkSemantics ast `shouldBe` Right ()
+            let ast = scan_and_parse "int a = 5; int tiny(int a, int b) { tiny(a, c); }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotDeclaredError, errorVariable = "c"})
         it "Checks that variables are declared before use in a length expression and that the variable is an array" $ do
             let ast = scan_and_parse "int tiny() { length a; }"
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")
