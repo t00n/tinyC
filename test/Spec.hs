@@ -225,6 +225,12 @@ main = hspec $ do
             checkSemantics ast2 `shouldBe` Right ()
             let ast3 = scan_and_parse "int a = 5; int tiny() { a + 5; }"
             checkSemantics ast3 `shouldBe` Right ()
-            --let ast4 = scan_and_parse "int a = 5; int tiny() { a[5] + 5; }"
-            --checkSemantics ast4 `shouldBe` Right ()
+        it "Checks that name subscriptions are used with an array" $ do
+            let ast = scan_and_parse "int a = 5; int tiny() { a[5] + 5; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAnArrayError, errorVariable = "a"})
+        it "Checks that names are subscribed with scalar expressions" $ do
+            let ast = scan_and_parse "int a[5]; int b[6]; int tiny() { a[b]; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"b\")"})
+            let ast2 = scan_and_parse "int a[5]; int b[6]; int tiny() { a[b[3]]; }"
+            checkSemantics ast2 `shouldBe` Right ()
 

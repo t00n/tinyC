@@ -124,7 +124,10 @@ instance Checkable Expression where
             -- >> checkNameScalarity n FunctionScalarity st
             --    >> foldM (flip check) st params
             Length n -> checkNameDeclared n st >>= checkNameScalarity n Array
-            Var n -> checkNameDeclared n st
+            Var name -> checkNameDeclared name st >>
+                case name of
+                    (NameSubscription n e) -> checkNameScalarity name Array st >>= checkExpressionIsScalar e
+                    _ -> return st
             _ -> Right st
 
 
