@@ -104,7 +104,7 @@ instance Checkable Declaration where
 instance Checkable Statement where
     check stmt st = 
         case stmt of
-            Assignment v e -> checkNameDeclared v st >>= check e
+            Assignment v e -> checkNameDeclared v st >>= check e >>= checkNameExpressionSameScalarity v e
             If e stmt1 -> check e st >>= check stmt1
             IfElse e stmt1 stmt2 -> check e st >>= check stmt1 >>= check stmt2
             While e stmt1 -> check e st >>= check stmt1
@@ -122,13 +122,12 @@ instance Checkable Expression where
             Call n args -> checkNameDeclared n st >>= checkNameIsFunction n
                         >> foldM (flip check) st args
                         >> checkCallArgumentsScalarity args n st
-            Length n -> checkNameDeclared n st >>= checkNameScalarity n Array
+            Length n -> checkNameDeclared n st >>= checkNameIsScalarity n Array
             Var name -> checkNameDeclared name st >>
                 case name of
-                    (NameSubscription n e) -> checkNameScalarity name Array st >>= checkExpressionIsScalar e
+                    (NameSubscription n e) -> checkNameIsScalarity name Array st >>= check e >>= checkExpressionIsScalar e
                     _ -> return st
             _ -> Right st
-
 
 checkNameNotDeclared :: Name -> SymbolTable -> Either SemanticError SymbolTable
 checkNameNotDeclared n st = 
@@ -143,8 +142,8 @@ checkNameDeclared name st =
     if nameInScope name st then Right st 
     else Left (SemanticError NotDeclaredError (nameString name))
 
-checkNameScalarity :: Name -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
-checkNameScalarity name kind st = 
+checkNameIsScalarity :: Name -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
+checkNameIsScalarity name kind st = 
     let n = nameString name in
         if unsafeSymbolIsScalarity n kind st then Right st
         else Left (SemanticError (scalarityError kind) n)
@@ -157,12 +156,27 @@ checkNameIsFunction name st =
         (VarInfo _ _) -> Left (SemanticError NotAFunctionError n)
         (FuncInfo _ _) -> Right st
 
+checkNameScalarity :: Name -> SymbolTable -> Either SemanticError Scalarity
+checkNameScalarity name st = let s = unsafeSymbolScalarity (nameString name) st in
+    case name of
+        (Name _) -> Right $ if s == Scalar then Scalar else Array
+        (NameSubscription _ _) -> if s == Scalar then Left $ SemanticError NotAnArrayError (show name) else Right Scalar
+
 checkExpressionIsScalar :: Expression -> SymbolTable -> Either SemanticError SymbolTable
 checkExpressionIsScalar expr st = 
     if expressionIsScalar expr st
         then Right st
     else
         Left $ SemanticError NotAScalarError $ show expr
+
+checkNameExpressionSameScalarity :: Name -> Expression -> SymbolTable -> Either SemanticError SymbolTable
+checkNameExpressionSameScalarity name expr st = do
+    s1 <- checkNameScalarity name st
+    s2 <- checkExpressionScalarity expr st
+    if s1 /= s2
+        then Left $ SemanticError NotSameScalarityError (show name ++ " " ++ show expr)
+    else
+        Right st
 
 checkCallArgumentsScalarity :: [Expression] -> Name -> SymbolTable -> Either SemanticError SymbolTable
 checkCallArgumentsScalarity args func st = 
@@ -175,6 +189,20 @@ checkCallArgumentsScalarity args func st =
                 then Left $ SemanticError NotAScalarError $ show arg
             else Right st in
     foldl (>>) (Right st) $ zipWith comp args params
+
+checkExpressionScalarity :: Expression -> SymbolTable -> Either SemanticError Scalarity
+checkExpressionScalarity expr st = 
+    case expr of 
+        (BinOp e1 _ e2) -> do
+            s1 <- checkExpressionScalarity e1 st
+            s2 <- checkExpressionScalarity e2 st
+            if s1 /= s2
+                then Left $ SemanticError NotSameScalarityError (show e1 ++ " " ++ show e2)
+            else
+                Right s1
+        (UnOp _ e) -> checkExpressionScalarity e st
+        (Var name) -> checkNameScalarity name st
+        _ -> Right Scalar
 
 -- Helpers
 nameInScope :: Name -> SymbolTable -> Bool

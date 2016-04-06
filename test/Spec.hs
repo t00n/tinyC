@@ -244,4 +244,17 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"b\")"})
             let ast = scan_and_parse "int a[5]; int b[6]; int tiny() { a[b[3]]; }"
             checkSemantics ast `shouldBe` Right ()
+        it "Checks that assignments have the same scalarity" $ do
+            let ast = scan_and_parse "int a; int b; int tiny() { a = b; }"
+            checkSemantics ast `shouldBe` Right ()
+            let ast = scan_and_parse "int a; int b[5]; int tiny() { a = b; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotSameScalarityError, errorVariable = "Name \"a\" Var (Name \"b\")"})
+            let ast = scan_and_parse "int a[5]; int b; int tiny() { a = b; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotSameScalarityError, errorVariable = "Name \"a\" Var (Name \"b\")"})
+            let ast = scan_and_parse "int a; int b[5]; int tiny() { a = b[2]; }"
+            checkSemantics ast `shouldBe` Right ()
+            let ast = scan_and_parse "int a; int b[5]; int tiny() { b[2] = a; }"
+            checkSemantics ast `shouldBe` Right ()
+            let ast = scan_and_parse "int a[2]; int b[5]; int tiny() { a = b; }"
+            checkSemantics ast `shouldBe` Right ()
 
