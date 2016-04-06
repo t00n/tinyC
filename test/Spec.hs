@@ -271,4 +271,8 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Right ()
             let ast = scan_and_parse "int a[2]; int b[5]; int tiny() { a = b; }"
             checkSemantics ast `shouldBe` Right ()
-
+        it "Checks that return statement have scalar expression" $ do
+            let ast = scan_and_parse "int tiny() { return 4; }"
+            checkSemantics ast `shouldBe` Right ()
+            let ast = scan_and_parse "int b[5]; int tiny() { return b; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"b\")"})
