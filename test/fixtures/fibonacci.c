@@ -14,11 +14,10 @@ int fibonacci(int n) {
     }
 }
 
-int main(int argc, char** argv) {
+int tiny() {
     int i = 0;
     while (i < 10) {
-        // printf("%i\n", fibonacci(i));
-        write(fibonacci(i));
+        write fibonacci(i);
         i = i + 1;
     }
 }

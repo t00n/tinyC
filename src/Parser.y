@@ -86,6 +86,7 @@ var_declarations : var_declarations
 block_or_not :: { Statement }
 block_or_not : block                              { $1 }
              | statement ';'                      { $1 }
+             | block_statement                    { $1 }
 
 block :: { Statement }
 block : '{' var_declarations statements '}'       { Block (reverse $2) (reverse $3) }
