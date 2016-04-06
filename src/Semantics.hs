@@ -1,4 +1,4 @@
-module Semantics (checkSemantics, SemanticError(..), ErrorType(..), SymbolTable(..)) where
+module Semantics (checkSemantics, symbolTable, SemanticError(..), ErrorType(..), SymbolTable(..)) where
 
 import Control.Monad (void, foldM)
 import Control.Monad.State (runState, State(..))
@@ -117,8 +117,8 @@ instance Checkable Statement where
 instance Checkable Expression where
     check expr st = 
         case expr of 
-            BinOp e1 _ e2 -> check e1 st >>= check e2
-            UnOp _ e -> check e st
+            BinOp e1 _ e2 -> check e1 st >>= check e2 >>= checkExpressionIsScalar e1 >>= checkExpressionIsScalar e2
+            UnOp _ e -> check e st >>= checkExpressionIsScalar e
             Call n params -> checkNameDeclared n st 
                 >>= checkNameIsFunction n
             -- >> checkNameScalarity n FunctionScalarity st
@@ -127,25 +127,6 @@ instance Checkable Expression where
             Var n -> checkNameDeclared n st
             _ -> Right st
 
--- Helpers
-nameInScope :: Name -> SymbolTable -> Bool
-nameInScope n = (||) <$> nameInBlock n <*> variableInParent n
-    where variableInParent _ (SymbolTable _ Nothing) = False
-          variableInParent n (SymbolTable s (Just p)) = nameInScope n p
-
-nameInBlock :: Name -> SymbolTable -> Bool
-nameInBlock n st = Map.member (nameString n) (symbols st)
-
-expressionIsScalar :: Expression -> SymbolTable -> Bool
-expressionIsScalar expr st = 
-    case expr of 
-        BinOp e1 _ e2 -> expressionIsScalar e1 st && expressionIsScalar e2 st
-        UnOp _ e -> expressionIsScalar e st
-        Call _ _ -> True
-        Length _ -> True
-        Var name -> unsafeSymbolScalarity (nameString name) st == Scalar
-        Int _ -> True
-        Char _ -> True
 
 checkNameNotDeclared :: Name -> SymbolTable -> Either SemanticError SymbolTable
 checkNameNotDeclared n st = 
@@ -154,9 +135,6 @@ checkNameNotDeclared n st =
     else if nameInScope n st
         then Left (SemanticError NameExistsWarning (nameString n))
     else Right st
-
-declareName :: Name -> Info -> SymbolTable -> Either SemanticError SymbolTable
-declareName name info st = checkNameNotDeclared name st >>= return . insertSymbol (nameString name) info
 
 checkNameDeclared :: Name -> SymbolTable -> Either SemanticError SymbolTable
 checkNameDeclared name st = 
@@ -177,6 +155,35 @@ checkNameIsFunction name st =
         (VarInfo _ _) -> Left (SemanticError NotAFunctionError n)
         (FuncInfo _ _) -> Right st
 
+checkExpressionIsScalar :: Expression -> SymbolTable -> Either SemanticError SymbolTable
+checkExpressionIsScalar expr st = 
+    if expressionIsScalar expr st
+        then Right st
+    else
+        Left $ SemanticError NotAScalarError $ show expr
+
+-- Helpers
+nameInScope :: Name -> SymbolTable -> Bool
+nameInScope n = (||) <$> nameInBlock n <*> variableInParent n
+    where variableInParent _ (SymbolTable _ Nothing) = False
+          variableInParent n (SymbolTable s (Just p)) = nameInScope n p
+
+nameInBlock :: Name -> SymbolTable -> Bool
+nameInBlock n st = Map.member (nameString n) (symbols st)
+
+expressionIsScalar :: Expression -> SymbolTable -> Bool
+expressionIsScalar expr st = 
+    case expr of 
+        BinOp e1 _ e2 -> expressionIsScalar e1 st && expressionIsScalar e2 st
+        UnOp _ e -> expressionIsScalar e st
+        Var (Name n) -> unsafeSymbolScalarity n st == Scalar
+        Var (NameSubscription n _) -> unsafeSymbolScalarity n st == Array
+        _ -> True
+
+declareName :: Name -> Info -> SymbolTable -> Either SemanticError SymbolTable
+declareName name info st = checkNameNotDeclared name st >>= return . insertSymbol (nameString name) info
+
+-- API
 
 runCheck :: Program -> Either SemanticError SymbolTable
 runCheck = flip check (emptySymbolTable Nothing)

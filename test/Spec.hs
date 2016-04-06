@@ -218,4 +218,13 @@ main = hspec $ do
             checkSemantics ast2 `shouldBe` Left (SemanticError NotAnArrayError "a")
             let ast3 = scan_and_parse "int a[5]; int tiny() { length a; }"
             checkSemantics ast3 `shouldBe` Right ()
+        it "Checks that only scalar expressions are used in binary and unary operations" $ do
+            let ast = scan_and_parse "int a[5]; int tiny() { a + 5; }"
+            checkSemantics ast `shouldBe` Left (SemanticError NotAScalarError "Var (Name \"a\")")
+            let ast2 = scan_and_parse "int a[5]; int tiny() { a[2] + 5; }"
+            checkSemantics ast2 `shouldBe` Right ()
+            let ast3 = scan_and_parse "int a = 5; int tiny() { a + 5; }"
+            checkSemantics ast3 `shouldBe` Right ()
+            --let ast4 = scan_and_parse "int a = 5; int tiny() { a[5] + 5; }"
+            --checkSemantics ast4 `shouldBe` Right ()
 
