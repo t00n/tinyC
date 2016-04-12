@@ -1,13 +1,21 @@
-module TACGenerator (tacGenerate) where
+module TACGenerator (generateTAC) where
+
+import Control.Monad.Supply
+import Control.Monad (void, foldM)
 
 import Parser
 import Utility
 
+generateTAC :: [Declaration] -> [TACLine]
+generateTAC xs = do
+    evalSupply (tacGenerate xs) ["t" ++ show i | i <- [1..]]
+
 class TACGenerator a where
-    tacGenerate :: a -> [TACLine]
+    tacGenerate :: a -> Supply String [TACLine]
 
 instance TACGenerator a => TACGenerator [a] where
-    tacGenerate = (reverse ... concatMap) tacGenerate
+    tacGenerate [] = return []
+    tacGenerate (x:xs) = tacGenerate xs >> tacGenerate x
 
 instance TACGenerator Declaration where
     tacGenerate (VarDeclaration t name expr) = undefined

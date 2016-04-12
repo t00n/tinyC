@@ -23,6 +23,7 @@ library
                      , array
                      , containers
                      , mtl
+                     , monad-supply
   default-language:    Haskell2010
 
 executable tinyC-exe
