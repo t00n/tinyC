@@ -6,6 +6,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, fromJust)
 
 import Parser
+import Utility
 
 -- Symbols data types
 data Scalarity = Scalar | Array
@@ -208,10 +209,6 @@ getExpressionScalarity expr st =
         _ -> Right Scalar
 
 -- Helpers
--- composition operator for 2 args functions
-(...) :: (Functor f, Functor f1) => (a -> b) -> f (f1 a) -> f (f1 b)
-(...) = fmap . fmap
-
 nameInScope :: Name -> SymbolTable -> Bool
 nameInScope n = (||) <$> nameInBlock n <*> variableInParent n
     where variableInParent _ (SymbolTable _ Nothing) = False
