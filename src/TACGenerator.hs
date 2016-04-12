@@ -18,7 +18,9 @@ instance TACGenerator a => TACGenerator [a] where
     tacGenerate (x:xs) = tacGenerate xs >> tacGenerate x
 
 instance TACGenerator Declaration where
-    tacGenerate (VarDeclaration t name expr) = undefined
+    tacGenerate (VarDeclaration t name expr) = do
+        newName <- supply
+        return [(0, TACReturn $ TACVar newName)]
     tacGenerate (FuncDeclaration t name params stmt) = undefined
 
 instance TACGenerator Statement where

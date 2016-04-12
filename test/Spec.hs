@@ -7,8 +7,13 @@ import System.IO
 import Scanner
 import Parser
 import Semantics
+import TACGenerator
 
 scan_and_parse = parse . alexScanTokens
+
+scan_parse_check xs = let ast = scan_and_parse xs in
+    if checkSemantics ast == Right () then ast
+    else error "lolol"
 
 testTokens s r = do
     it ("Tokenizes " ++ s) $ do
@@ -285,3 +290,7 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"a\")"})
             let ast = scan_and_parse "int a[5]; int tiny() { if (a) {} else if (a) {} }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"a\")"})
+    describe "The generation of three-address-code" $ do
+        it "Generates a few declarations" $ do
+            let ast = scan_parse_check "int a = 2; int b = 3;"
+            putStrLn $ show $ generateTAC ast
