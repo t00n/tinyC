@@ -8,6 +8,7 @@ import Scanner
 import Parser
 import Semantics
 import TACGenerator
+import MonadNames
 
 scan_and_parse = parse . alexScanTokens
 
@@ -294,3 +295,7 @@ main = hspec $ do
         it "Generates a few declarations" $ do
             let ast = scan_parse_check "int a = 2; int b = 3;"
             putStrLn $ show $ generateTAC ast
+
+    describe "Do the name generator works ????" $ do
+        it "Tests everything" $ do
+            evalNames (do { s1 <- nextVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]
