@@ -293,8 +293,8 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"a\")"})
     describe "The generation of three-address-code" $ do
         it "Generates a few declarations" $ do
-            let ast = scan_parse_check "int a = 2; int b = 3;"
-            putStrLn $ show $ generateTAC ast
+            let ast = scan_parse_check "int a; int b;"
+            generateTAC ast `shouldBe` TACProgram [TACLine Nothing $ TACCopy (TACVar $ "a") (TACInt 0), TACLine Nothing $ TACCopy (TACVar $ "b") (TACInt 0)]
 
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do

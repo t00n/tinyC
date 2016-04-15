@@ -55,10 +55,6 @@ unsafeSymbolIsScalarity s k st = (unsafeSymbolScalarity s st) == k
 unsafeSymbolIsType :: String -> Type -> SymbolTable -> Bool
 unsafeSymbolIsType s t st = (unsafeSymbolType s st) == t
 
-nameString :: Name -> String
-nameString (Name s) = s
-nameString (NameSubscription s _) = s
-
 nameScalarity :: Name -> Scalarity
 nameScalarity (Name _) = Scalar
 nameScalarity (NameSubscription _ _) = Array

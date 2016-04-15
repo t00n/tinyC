@@ -1,5 +1,5 @@
 {
-module Parser (parse, Program, Declaration(..), Parameter(..), Statement(..), Expression(..), Type(..), BinaryOperator(..), UnaryOperator(..), Name(..)) where
+module Parser (parse, Program, Declaration(..), Parameter(..), Statement(..), Expression(..), Type(..), BinaryOperator(..), UnaryOperator(..), Name(..), nameString) where
 import Scanner (Token(..))
 import Data.Maybe
 }
@@ -189,4 +189,8 @@ data Expression = Int Int
 data Name = Name String
           | NameSubscription String Expression
     deriving (Eq, Show)
+
+nameString :: Name -> String
+nameString (Name s) = s
+nameString (NameSubscription s _) = s
 }
