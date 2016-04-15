@@ -1,17 +1,18 @@
 module TACGenerator (generateTAC) where
 
-import Control.Monad.Supply
-import Control.Monad (void, foldM)
-
 import Parser
+import MonadNames
 import Utility
+
+infiniteNames :: String -> [String]
+infiniteNames s = [s ++ show i | i <- [1..]]
 
 generateTAC :: [Declaration] -> [TACLine]
 generateTAC xs = do
-    evalSupply (tacGenerate xs) ["t" ++ show i | i <- [1..]]
+    evalNames (tacGenerate xs) (infiniteNames "t") (infiniteNames "l")
 
 class TACGenerator a where
-    tacGenerate :: a -> Supply String [TACLine]
+    tacGenerate :: a -> Names String String [TACLine]
 
 instance TACGenerator a => TACGenerator [a] where
     tacGenerate [] = return []
@@ -19,7 +20,7 @@ instance TACGenerator a => TACGenerator [a] where
 
 instance TACGenerator Declaration where
     tacGenerate (VarDeclaration t name expr) = do
-        newName <- supply
+        newName <- nextVariable
         return [(0, TACReturn $ TACVar newName)]
     tacGenerate (FuncDeclaration t name params stmt) = undefined
 

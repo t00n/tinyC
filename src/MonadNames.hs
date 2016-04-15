@@ -6,9 +6,7 @@
 
 module MonadNames where
 
-import Control.Monad.Supply(runSupplyT, runSupply, MonadSupply(..), Supply(..), SupplyT(..))
 import Control.Monad.Trans.Class (lift, MonadTrans(..))
-
 import Control.Monad.Identity
 import Control.Monad.State
 
