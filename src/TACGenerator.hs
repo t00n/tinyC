@@ -19,9 +19,7 @@ instance TACGenerator a => TACGenerator [a] where
     tacGenerate (x:xs) = tacGenerate xs >> tacGenerate x
 
 instance TACGenerator Declaration where
-    tacGenerate (VarDeclaration t name expr) = do
-        newName <- nextVariable
-        return [(0, TACReturn $ TACVar newName)]
+    tacGenerate (VarDeclaration t name expr) = undefined
     tacGenerate (FuncDeclaration t name params stmt) = undefined
 
 instance TACGenerator Statement where
@@ -30,20 +28,22 @@ instance TACGenerator Statement where
 instance TACGenerator Expression where
     tacGenerate expr = undefined
 
-type TACLine = (Int, TACInstruction)
+type TACLine = (Maybe TACLabel, TACInstruction)
 
-data TACInstruction = TACAssignment2 TACExpr TACExpr TACBinaryOperator TACExpr
-                     | TACAssignment1 TACExpr TACUnaryOperator TACExpr
-                     | TACAssignment0 TACExpr TACExpr
-                     | TACIf TACExpr TACRelationOperator TACExpr TACInstruction
-                     | TACGoto Int
-                     | TACCall Int
-                     | TACArrayAccess TACExpr TACExpr TACExpr
-                     | TACArrayModif TACExpr TACExpr TACExpr
-                     -- | TACAddress TACExpr TACExpr
-                     -- | TACDeRef TACExpr TACExpr
-                     -- | TACDeRefA TACExpr TACExpr
-                     | TACReturn TACExpr
+type TACLabel = String
+
+data TACInstruction = TACBinary TACVariable TACExpression TACBinaryOperator TACExpression
+                     | TACUnary TACVariable TACUnaryOperator TACExpression
+                     | TACCopy TACVariable TACExpression
+                     | TACIf TACExpression TACRelationOperator TACExpression String
+                     | TACGoto String
+                     | TACCall String
+                     | TACArrayAccess TACVariable TACVariable TACExpression
+                     | TACArrayModif TACVariable TACExpression TACVariable
+                     -- | TACAddress TACExpression TACExpression
+                     -- | TACDeRef TACExpression TACExpression
+                     -- | TACDeRefA TACExpression TACExpression
+                     | TACReturn TACExpression
     deriving (Eq, Show)
 
 data TACBinaryOperator = TACPlus 
@@ -61,8 +61,11 @@ data TACRelationOperator = TACEqual
                          | TACNotEqual
     deriving (Eq, Show)
 
-data TACExpr = TACInt Int
-             | TACChar Char
-             | TACVar String
-             | TACArray String
+data TACExpression = TACInt Int
+                   | TACChar Char
+                   | TACExpr TACVariable
+    deriving (Eq, Show)
+
+data TACVariable = TACVar String
+                 | TACArray String
     deriving (Eq, Show)
