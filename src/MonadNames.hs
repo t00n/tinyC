@@ -15,6 +15,8 @@ import Utility
 class Monad m => MonadNames s1 s2 m | m -> s1, m -> s2 where
     nextVariable :: m s1
     nextLabel :: m s2
+    popVariable :: m s1
+    popLabel :: m s2
 
 newtype NamesT s1 s2 m a = NamesT (StateT ([s1], [s2]) m a)
   deriving (Functor, Applicative, Monad, MonadTrans, MonadIO, MonadFix)
@@ -24,10 +26,16 @@ newtype Names s1 s2 a = Names (NamesT s1 s2 Identity a)
 
 instance Monad m => MonadNames s1 s2 (NamesT s1 s2 m) where
     nextVariable = NamesT $ do
+        ((v:_), _) <- get
+        return v
+    nextLabel = NamesT $ do
+        (_, (l:_)) <- get
+        return l
+    popVariable = NamesT $ do
         ((v:vs), ls) <- get
         put (vs, ls)
         return v
-    nextLabel = NamesT $ do
+    popLabel = NamesT $ do
         (vs, (l:ls)) <- get
         put (vs, ls)
         return l
