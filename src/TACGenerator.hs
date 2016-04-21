@@ -1,4 +1,4 @@
-module TACGenerator (generateTAC, TACProgram(..), TACLine(..), TACInstruction(..), TACExpression(..), TACVariable(..)) where
+module TACGenerator (generateTAC, showTACProgram, TACProgram(..), TACLine(..), TACInstruction(..), TACExpression(..), TACVariable(..)) where
 
 import Parser
 import MonadNames
@@ -7,22 +7,27 @@ import Utility
 infiniteNames :: String -> [String]
 infiniteNames s = [s ++ show i | i <- [1..]]
 
-generateTAC :: [Declaration] -> TACProgram
+generateTAC :: [Declaration] -> [TACLine]
 generateTAC xs = do
     evalNames (tacGenerate xs) (infiniteNames "t") (infiniteNames "l")
 
+showTACProgram :: TACProgram -> String
+showTACProgram [] = ""
+showTACProgram (x:xs) = (show x) ++ "\n" ++ (showTACProgram xs)
+
 class TACGenerator a where
-    tacGenerate :: a -> Names String String TACProgram
+    tacGenerate :: a -> Names String String [TACLine]
 
 instance TACGenerator a => TACGenerator [a] where
-    tacGenerate [] = return $ TACProgram []
+    tacGenerate [] = return []
     tacGenerate (x:xs) = do
-        (TACProgram rest) <- tacGenerate xs
-        (TACProgram first) <- tacGenerate x
-        return $ TACProgram $ first ++ rest
+        first <- tacGenerate x
+        rest <- tacGenerate xs
+        return $ first ++ rest
 
 instance TACGenerator Declaration where
-    tacGenerate (VarDeclaration t name Nothing) = return $ TACProgram [TACLine Nothing $ TACCopy (TACVar $ nameString name) (TACInt 0)]
+    tacGenerate (VarDeclaration t name Nothing) = return $ [TACLine Nothing $ TACCopy (TACVar $ nameString name) (TACInt 0)]
+    tacGenerate (VarDeclaration t name (Just x)) = return $ [TACLine Nothing $ TACCopy (TACVar $ nameString name) (TACInt 0)]
     tacGenerate (FuncDeclaration t name params stmt) = undefined
 
 instance TACGenerator Statement where
@@ -31,12 +36,7 @@ instance TACGenerator Statement where
 instance TACGenerator Expression where
     tacGenerate expr = undefined
 
-newtype TACProgram = TACProgram [TACLine]
-    deriving (Eq)
-
-instance Show TACProgram where
-    show (TACProgram []) = ""
-    show (TACProgram (x:xs)) = show x ++ "\n" ++ show (TACProgram xs)
+type TACProgram = [TACLine]
 
 data TACLine = TACLine (Maybe TACLabel) TACInstruction
     deriving (Eq)
