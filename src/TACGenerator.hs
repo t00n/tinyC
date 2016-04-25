@@ -41,9 +41,9 @@ instance TACGenerator Statement where
         ds <- tacGenerate ds
         ss <- tacGenerate ss
         return $ ds ++ ss
-
-instance TACGenerator Expression where
-    tacGenerate expr = undefined
+    tacGenerate (Expr e) = do
+        (_, lines) <- tacExpression e
+        return lines
 
 tacExpression :: Expression -> Names String String (TACExpression, [TACInstruction])
 tacExpression (Int i) = return (TACInt i, [])
@@ -59,13 +59,12 @@ tacExpression (UnOp op e) = do
     var <- popVariable
     let newline = TACUnary var (tacUnaryOperator op) t
     return (TACVar var, lines ++ [newline])
-tacExpression (Call n es) = undefined
---tacExpression (Call n es) = do
---    reducedES <- mapM tacExpression es
---    let params = map fst reducedES
---    let lines = concatMap snd reducedES
---    t <- popVariable
---    return (TACVar t, lines ++ [TACCall (nameString n) (params  ++ [TACVar t])])
+tacExpression (Call n es) = do
+    reducedES <- mapM tacExpression es
+    let params = map fst reducedES
+    let lines = concatMap snd reducedES
+    t <- popVariable
+    return (TACVar t, lines ++ [TACCall (nameString n) (params  ++ [TACVar t])])
 tacExpression (Length n) = undefined
 tacExpression (Var n) = return (TACVar (nameString n), [])
 
