@@ -298,10 +298,12 @@ main = hspec $ do
         it "Generates a few declarations" $ do
             let ast = scan_parse_check "int a; int b;"
             generateTAC ast `shouldBe` [TACLine Nothing $ TACCopy "a" (TACInt 0), TACLine Nothing $ TACCopy "b" (TACInt 0)]
-        it "Generates declarations with complex expressions" $ do
+        it "Generates declarations with complex binary expressions" $ do
             let ast = scan_parse_check "int a = 5; int b = (a+5)/(a-2);"
             generateTAC ast `shouldBe` [TACLine Nothing (TACCopy "a" (TACInt 5)),TACLine Nothing (TACBinary "t1" (TACVar "a") TACPlus (TACInt 5)),TACLine Nothing (TACBinary "t2" (TACVar "a") TACMinus (TACInt 2)),TACLine Nothing (TACBinary "t3" (TACVar "t1") TACDivide (TACVar "t2")),TACLine Nothing (TACCopy "b" (TACVar "t3"))]
-
+        it "Generates declarations with complex unary expressions" $ do
+            let ast = scan_parse_check "int a = 5; int b = -(a - 5);"
+            generateTAC ast `shouldBe` [TACLine Nothing (TACCopy "a" (TACInt 5)),TACLine Nothing (TACBinary "t1" (TACVar "a") TACMinus (TACInt 5)),TACLine Nothing (TACUnary "t2" TACNeg (TACVar "t1")),TACLine Nothing (TACCopy "b" (TACVar "t2"))]
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]

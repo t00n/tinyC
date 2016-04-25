@@ -42,11 +42,12 @@ tacExpression (BinOp e1 op e2) = do
     (t2, lines2) <- tacExpression e2
     var <- popVariable
     let newline = TACLine Nothing (TACBinary var t1 (tacBinaryOperator op) t2)
-    return (TACVar var, lines1 ++ lines2 ++ [newline])
-
-
-                                 
-tacExpression (UnOp op e) = undefined
+    return (TACVar var, lines1 ++ lines2 ++ [newline])           
+tacExpression (UnOp op e) = do
+    (t, lines) <- tacExpression e
+    var <- popVariable
+    let newline = TACLine Nothing (TACUnary var (tacUnaryOperator op) t)
+    return (TACVar var, lines ++ [newline])
 tacExpression (Call n es) = undefined
 tacExpression (Length n) = undefined
 tacExpression (Var n) = return (TACVar (nameString n), [])
