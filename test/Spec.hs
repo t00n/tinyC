@@ -297,13 +297,18 @@ main = hspec $ do
     describe "The generation of three-address-code" $ do
         it "Generates a few declarations" $ do
             let ast = scan_parse_check "int a; int b;"
-            generateTAC ast `shouldBe` [TACLine Nothing $ TACCopy "a" (TACInt 0), TACLine Nothing $ TACCopy "b" (TACInt 0)]
+            generateTAC ast `shouldBe` [TACDeclaration "a",TACDeclaration "b"]
         it "Generates declarations with complex binary expressions" $ do
             let ast = scan_parse_check "int a = 5; int b = (a+5)/(a-2);"
-            generateTAC ast `shouldBe` [TACLine Nothing (TACCopy "a" (TACInt 5)),TACLine Nothing (TACBinary "t1" (TACVar "a") TACPlus (TACInt 5)),TACLine Nothing (TACBinary "t2" (TACVar "a") TACMinus (TACInt 2)),TACLine Nothing (TACBinary "t3" (TACVar "t1") TACDivide (TACVar "t2")),TACLine Nothing (TACCopy "b" (TACVar "t3"))]
+            generateTAC ast `shouldBe` [TACDeclaration "a",TACCopy "a" (TACInt 5),TACDeclaration "b",TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "a") TACMinus (TACInt 2),TACBinary "t3" (TACVar "t1") TACDivide (TACVar "t2"),TACCopy "b" (TACVar "t3")]
+        it "Generates function declarations" $ do
+            let ast = scan_parse_check "int tiny() {}"
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACReturn (TACInt 0)]
+            let ast = scan_parse_check "int tiny(int a, int b) { int c = 4; }"
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACParam "a",TACParam "b",TACDeclaration "c",TACCopy "c" (TACInt 4),TACReturn (TACInt 0)]
         it "Generates declarations with complex unary expressions" $ do
             let ast = scan_parse_check "int a = 5; int b = -(a - 5);"
-            generateTAC ast `shouldBe` [TACLine Nothing (TACCopy "a" (TACInt 5)),TACLine Nothing (TACBinary "t1" (TACVar "a") TACMinus (TACInt 5)),TACLine Nothing (TACUnary "t2" TACNeg (TACVar "t1")),TACLine Nothing (TACCopy "b" (TACVar "t2"))]
+            generateTAC ast `shouldBe` [TACDeclaration "a",TACCopy "a" (TACInt 5),TACDeclaration "b",TACBinary "t1" (TACVar "a") TACMinus (TACInt 5),TACUnary "t2" TACNeg (TACVar "t1"),TACCopy "b" (TACVar "t2")]
         --it "Generates function calls" $ do
         --    let ast = scan_parse_check "int tiny(int a, int b) { int c = 1; tiny(c, 2); }"
         --    generateTAC ast `shouldBe` []

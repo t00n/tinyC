@@ -1,4 +1,4 @@
-module TACGenerator (generateTAC, TACProgram(..), TACLine(..), TACInstruction(..), TACBinaryOperator(..), TACUnaryOperator(..), TACRelationOperator(..), TACExpression(..), PrettyPrintable(..)) where
+module TACGenerator (generateTAC, TACProgram(..), TACInstruction(..), TACBinaryOperator(..), TACUnaryOperator(..), TACRelationOperator(..), TACExpression(..), PrettyPrintable(..)) where
 
 import Parser
 import MonadNames
@@ -9,12 +9,12 @@ import Data.List(intercalate)
 infiniteNames :: String -> [String]
 infiniteNames s = [s ++ show i | i <- [1..]]
 
-generateTAC :: [Declaration] -> [TACLine]
+generateTAC :: [Declaration] -> [TACInstruction]
 generateTAC xs = do
     evalNames (tacGenerate xs) (infiniteNames "t") (infiniteNames "l")
 
 class TACGenerator a where
-    tacGenerate :: a -> Names String String [TACLine]
+    tacGenerate :: a -> Names String String [TACInstruction]
 
 instance TACGenerator a => TACGenerator [a] where
     tacGenerate [] = return []
@@ -24,31 +24,40 @@ instance TACGenerator a => TACGenerator [a] where
         return $ first ++ rest
 
 instance TACGenerator Declaration where
-    tacGenerate (VarDeclaration t name Nothing) = return $ [TACLine Nothing $ TACCopy (nameString name) (TACInt 0)]
+    tacGenerate (VarDeclaration t name Nothing) = return $ [TACDeclaration (nameString name)]
     tacGenerate (VarDeclaration t name (Just x)) = do
         (t, lines) <- tacExpression x
-        return $ lines ++ [TACLine Nothing $ TACCopy (nameString name) t]
-    tacGenerate (FuncDeclaration t name params stmt) = undefined
+        return $ [TACDeclaration (nameString name)] ++ lines ++ [TACCopy (nameString name) t]
+    tacGenerate (FuncDeclaration t name params stmt) = do
+        functionBody <- tacGenerate stmt
+        params <- tacGenerate params
+        return $ [TACLabel (nameString name)] ++ params ++ functionBody ++ [TACReturn (TACInt 0)]
+
+instance TACGenerator Parameter where
+    tacGenerate (Parameter t n) = return [TACParam (nameString n)]
 
 instance TACGenerator Statement where
-    tacGenerate stmt = undefined
+    tacGenerate (Block ds ss) = do
+        ds <- tacGenerate ds
+        ss <- tacGenerate ss
+        return $ ds ++ ss
 
 instance TACGenerator Expression where
     tacGenerate expr = undefined
 
-tacExpression :: Expression -> Names String String (TACExpression, [TACLine])
+tacExpression :: Expression -> Names String String (TACExpression, [TACInstruction])
 tacExpression (Int i) = return (TACInt i, [])
 tacExpression (Char i) = return (TACChar i, [])
 tacExpression (BinOp e1 op e2) = do
     (t1, lines1) <- tacExpression e1
     (t2, lines2) <- tacExpression e2
     var <- popVariable
-    let newline = TACLine Nothing (TACBinary var t1 (tacBinaryOperator op) t2)
+    let newline = TACBinary var t1 (tacBinaryOperator op) t2
     return (TACVar var, lines1 ++ lines2 ++ [newline])           
 tacExpression (UnOp op e) = do
     (t, lines) <- tacExpression e
     var <- popVariable
-    let newline = TACLine Nothing (TACUnary var (tacUnaryOperator op) t)
+    let newline = TACUnary var (tacUnaryOperator op) t
     return (TACVar var, lines ++ [newline])
 tacExpression (Call n es) = undefined
 --tacExpression (Call n es) = do
@@ -56,7 +65,7 @@ tacExpression (Call n es) = undefined
 --    let params = map fst reducedES
 --    let lines = concatMap snd reducedES
 --    t <- popVariable
---    return (TACVar t, lines ++ [TACLine Nothing $ TACCall (nameString n) (params  ++ [TACVar t])])
+--    return (TACVar t, lines ++ [TACCall (nameString n) (params  ++ [TACVar t])])
 tacExpression (Length n) = undefined
 tacExpression (Var n) = return (TACVar (nameString n), [])
 
@@ -76,25 +85,23 @@ tacUnaryOperator :: UnaryOperator -> TACUnaryOperator
 tacUnaryOperator Not = TACNot
 tacUnaryOperator Neg = TACNeg
 
-type TACProgram = [TACLine]
+type TACProgram = [TACInstruction]
 
-data TACLine = TACLine (Maybe TACLabel) TACInstruction
-    deriving (Eq, Show)
-
-type TACLabel = String
-
-data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpression
-                     | TACUnary String TACUnaryOperator TACExpression
-                     | TACCopy String TACExpression
-                     | TACIf TACExpression TACRelationOperator TACExpression String
-                     | TACGoto String
-                     | TACCall String [TACExpression]
-                     | TACArrayAccess String String TACExpression
-                     | TACArrayModif String TACExpression String
+data TACInstruction = TACDeclaration String
+                    | TACParam String
+                    | TACBinary String TACExpression TACBinaryOperator TACExpression
+                    | TACUnary String TACUnaryOperator TACExpression
+                    | TACCopy String TACExpression
+                    | TACIf TACExpression TACRelationOperator TACExpression String
+                    | TACGoto String
+                    | TACCall String [TACExpression]
+                    | TACArrayAccess String String TACExpression
+                    | TACArrayModif String TACExpression String
                      -- | TACAddress TACExpression TACExpression
                      -- | TACDeRef TACExpression TACExpression
                      -- | TACDeRefA TACExpression TACExpression
-                     | TACReturn TACExpression
+                    | TACReturn TACExpression
+                    | TACLabel String
     deriving (Eq, Show)
 
 data TACBinaryOperator = TACPlus 
@@ -125,10 +132,6 @@ instance PrettyPrintable a => PrettyPrintable [a] where
     prettyPrint [] = ""
     prettyPrint (x:xs) = prettyPrint x ++ "\n" ++ prettyPrint xs
 
-instance PrettyPrintable TACLine where
-    prettyPrint (TACLine Nothing i) = "\t" ++ prettyPrint i
-    prettyPrint (TACLine (Just l) i) = l ++ prettyPrint i
-
 instance PrettyPrintable TACInstruction where
     prettyPrint (TACBinary var e1 op e2) = var ++ " = " ++ prettyPrint e1 ++ prettyPrint op ++ prettyPrint e2
     prettyPrint (TACUnary var op e) = var ++ " = " ++ prettyPrint op ++ prettyPrint e
@@ -139,6 +142,7 @@ instance PrettyPrintable TACInstruction where
     prettyPrint (TACArrayAccess v1 v2 e) = v1 ++ " = " ++ "v2[" ++ prettyPrint e ++ "]"
     prettyPrint (TACArrayModif v1 e v2) = v1 ++ "[" ++ prettyPrint e ++ "] = " ++ v2
     prettyPrint (TACReturn e) = "return " ++ prettyPrint e
+    prettyPrint (TACLabel l) = l ++ ":"
 
 instance PrettyPrintable TACBinaryOperator where
     prettyPrint TACPlus = "+"
