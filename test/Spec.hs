@@ -297,7 +297,10 @@ main = hspec $ do
     describe "The generation of three-address-code" $ do
         it "Generates a few declarations" $ do
             let ast = scan_parse_check "int a; int b;"
-            generateTAC ast `shouldBe` [TACLine Nothing $ TACCopy (TACVar $ "a") (TACInt 0), TACLine Nothing $ TACCopy (TACVar $ "b") (TACInt 0)]
+            generateTAC ast `shouldBe` [TACLine Nothing $ TACCopy "a" (TACInt 0), TACLine Nothing $ TACCopy "b" (TACInt 0)]
+        it "Generates declarations with complex expressions" $ do
+            let ast = scan_parse_check "int a = 5; int b = (a+5)/(a-2);"
+            generateTAC ast `shouldBe` [TACLine Nothing (TACCopy "a" (TACInt 5)),TACLine Nothing (TACBinary "t1" (TACVar "a") TACPlus (TACInt 5)),TACLine Nothing (TACBinary "t2" (TACVar "a") TACMinus (TACInt 2)),TACLine Nothing (TACBinary "t3" (TACVar "t1") TACDivide (TACVar "t2")),TACLine Nothing (TACCopy "b" (TACVar "t3"))]
 
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do
