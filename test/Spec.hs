@@ -304,6 +304,9 @@ main = hspec $ do
         it "Generates declarations with complex unary expressions" $ do
             let ast = scan_parse_check "int a = 5; int b = -(a - 5);"
             generateTAC ast `shouldBe` [TACLine Nothing (TACCopy "a" (TACInt 5)),TACLine Nothing (TACBinary "t1" (TACVar "a") TACMinus (TACInt 5)),TACLine Nothing (TACUnary "t2" TACNeg (TACVar "t1")),TACLine Nothing (TACCopy "b" (TACVar "t2"))]
+        --it "Generates function calls" $ do
+        --    let ast = scan_parse_check "int tiny(int a, int b) { int c = 1; tiny(c, 2); }"
+        --    generateTAC ast `shouldBe` []
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]

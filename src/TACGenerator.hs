@@ -4,6 +4,8 @@ import Parser
 import MonadNames
 import Utility
 
+import Data.List(intercalate)
+
 infiniteNames :: String -> [String]
 infiniteNames s = [s ++ show i | i <- [1..]]
 
@@ -49,6 +51,12 @@ tacExpression (UnOp op e) = do
     let newline = TACLine Nothing (TACUnary var (tacUnaryOperator op) t)
     return (TACVar var, lines ++ [newline])
 tacExpression (Call n es) = undefined
+--tacExpression (Call n es) = do
+--    reducedES <- mapM tacExpression es
+--    let params = map fst reducedES
+--    let lines = concatMap snd reducedES
+--    t <- popVariable
+--    return (TACVar t, lines ++ [TACLine Nothing $ TACCall (nameString n) (params  ++ [TACVar t])])
 tacExpression (Length n) = undefined
 tacExpression (Var n) = return (TACVar (nameString n), [])
 
@@ -80,7 +88,7 @@ data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpres
                      | TACCopy String TACExpression
                      | TACIf TACExpression TACRelationOperator TACExpression String
                      | TACGoto String
-                     | TACCall String
+                     | TACCall String [TACExpression]
                      | TACArrayAccess String String TACExpression
                      | TACArrayModif String TACExpression String
                      -- | TACAddress TACExpression TACExpression
@@ -127,7 +135,7 @@ instance PrettyPrintable TACInstruction where
     prettyPrint (TACCopy var e) = var ++ " = " ++ prettyPrint e
     prettyPrint (TACIf e1 op e2 l) = "if " ++ prettyPrint e1 ++ prettyPrint op ++ prettyPrint e2 ++ " goto " ++ l
     prettyPrint (TACGoto l) = "goto " ++ l
-    prettyPrint (TACCall l) = "call " ++ l
+    prettyPrint (TACCall l es) = intercalate "\n" (map (((++) "param ") . prettyPrint) es) ++ "call " ++ l
     prettyPrint (TACArrayAccess v1 v2 e) = v1 ++ " = " ++ "v2[" ++ prettyPrint e ++ "]"
     prettyPrint (TACArrayModif v1 e v2) = v1 ++ "[" ++ prettyPrint e ++ "] = " ++ v2
     prettyPrint (TACReturn e) = "return " ++ prettyPrint e
