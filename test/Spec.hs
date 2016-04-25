@@ -317,6 +317,9 @@ main = hspec $ do
         it "Generates assignments" $ do
             let ast = scan_parse_check "int tiny() { int a; a = (a + 5) * 3; }"
             generateTAC ast `shouldBe` [TACLabel "tiny",TACDeclaration "a",TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "t1") TACTimes (TACInt 3),TACCopy "a" (TACVar "t2"),TACReturn (TACInt 0)]
+        it "Generates if" $ do
+            let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 5; a = 3; } }"
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACIf (TACVar "t1") "l1",TACGoto "l2",TACLabel "l1",TACDeclaration "a",TACCopy "a" (TACInt 5),TACCopy "a" (TACInt 3),TACLabel "l2",TACReturn (TACInt 0)]
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]

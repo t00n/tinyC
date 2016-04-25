@@ -1,4 +1,4 @@
-module TACGenerator (generateTAC, TACProgram(..), TACInstruction(..), TACBinaryOperator(..), TACUnaryOperator(..), TACRelationOperator(..), TACExpression(..), PrettyPrintable(..)) where
+module TACGenerator (generateTAC, TACProgram(..), TACInstruction(..), TACBinaryOperator(..), TACUnaryOperator(..), TACExpression(..), PrettyPrintable(..)) where
 
 import Parser
 import MonadNames
@@ -37,13 +37,19 @@ instance TACGenerator Parameter where
     tacGenerate (Parameter t n) = return [TACParam (nameString n)]
 
 instance TACGenerator Statement where
+    tacGenerate (Assignment n e) = do
+        (t, lines) <- tacExpression e
+        return $ lines ++ [TACCopy (nameString n) t]
+    tacGenerate (If e stmt) = do
+        (t, lines) <- tacExpression e
+        labelYes <- popLabel
+        labelNo <- popLabel
+        stmt <- tacGenerate stmt
+        return $ [TACIf t labelYes, TACGoto labelNo, TACLabel labelYes] ++ stmt ++ [TACLabel labelNo]
     tacGenerate (Block ds ss) = do
         ds <- tacGenerate ds
         ss <- tacGenerate ss
         return $ ds ++ ss
-    tacGenerate (Assignment n e) = do
-        (t, lines) <- tacExpression e
-        return $ lines ++ [TACCopy (nameString n) t]
     tacGenerate (Expr e) = do
         (_, lines) <- tacExpression e
         return lines
@@ -76,12 +82,10 @@ tacBinaryOperator Plus = TACPlus
 tacBinaryOperator Minus = TACMinus
 tacBinaryOperator Times = TACTimes
 tacBinaryOperator Divide = TACDivide
-
-tacRelationOperator :: BinaryOperator -> TACRelationOperator
-tacRelationOperator Equal = TACEqual
-tacRelationOperator Greater = TACGreater
-tacRelationOperator Less = TACLess
-tacRelationOperator NotEqual = TACNotEqual
+tacBinaryOperator Equal = TACEqual
+tacBinaryOperator Greater = TACGreater
+tacBinaryOperator Less = TACLess
+tacBinaryOperator NotEqual = TACNotEqual
 
 tacUnaryOperator :: UnaryOperator -> TACUnaryOperator
 tacUnaryOperator Not = TACNot
@@ -94,7 +98,7 @@ data TACInstruction = TACDeclaration String
                     | TACBinary String TACExpression TACBinaryOperator TACExpression
                     | TACUnary String TACUnaryOperator TACExpression
                     | TACCopy String TACExpression
-                    | TACIf TACExpression TACRelationOperator TACExpression String
+                    | TACIf TACExpression String
                     | TACGoto String
                     | TACCall String [TACExpression]
                     | TACArrayAccess String String TACExpression
@@ -110,15 +114,13 @@ data TACBinaryOperator = TACPlus
                        | TACMinus 
                        | TACTimes 
                        | TACDivide 
+                       | TACEqual 
+                       | TACGreater 
+                       | TACLess 
+                       | TACNotEqual
     deriving (Eq, Show)
 
 data TACUnaryOperator = TACNeg | TACNot
-    deriving (Eq, Show)
-
-data TACRelationOperator = TACEqual 
-                         | TACGreater 
-                         | TACLess 
-                         | TACNotEqual
     deriving (Eq, Show)
 
 data TACExpression = TACInt Int
@@ -135,10 +137,12 @@ instance PrettyPrintable a => PrettyPrintable [a] where
     prettyPrint (x:xs) = prettyPrint x ++ "\n" ++ prettyPrint xs
 
 instance PrettyPrintable TACInstruction where
+    prettyPrint (TACDeclaration var) = "declare " ++ var
+    prettyPrint (TACParam var) = "arg " ++ var
     prettyPrint (TACBinary var e1 op e2) = var ++ " = " ++ prettyPrint e1 ++ prettyPrint op ++ prettyPrint e2
     prettyPrint (TACUnary var op e) = var ++ " = " ++ prettyPrint op ++ prettyPrint e
     prettyPrint (TACCopy var e) = var ++ " = " ++ prettyPrint e
-    prettyPrint (TACIf e1 op e2 l) = "if " ++ prettyPrint e1 ++ prettyPrint op ++ prettyPrint e2 ++ " goto " ++ l
+    prettyPrint (TACIf e l) = "if " ++ prettyPrint e ++ " goto " ++ l
     prettyPrint (TACGoto l) = "goto " ++ l
     prettyPrint (TACCall l es) = intercalate "\n" (map (((++) "param ") . prettyPrint) es) ++ "call " ++ l
     prettyPrint (TACArrayAccess v1 v2 e) = v1 ++ " = " ++ "v2[" ++ prettyPrint e ++ "]"
@@ -151,16 +155,14 @@ instance PrettyPrintable TACBinaryOperator where
     prettyPrint TACMinus = "-"
     prettyPrint TACTimes = "*"
     prettyPrint TACDivide = "/"
-
-instance PrettyPrintable TACUnaryOperator where
-    prettyPrint TACNeg = "-"
-    prettyPrint TACNot = "!"
-
-instance PrettyPrintable TACRelationOperator where
     prettyPrint TACEqual = "=="
     prettyPrint TACGreater = ">"
     prettyPrint TACLess = "<"
     prettyPrint TACNotEqual = "!="
+
+instance PrettyPrintable TACUnaryOperator where
+    prettyPrint TACNeg = "-"
+    prettyPrint TACNot = "!"
 
 instance PrettyPrintable TACExpression where
     prettyPrint (TACInt i) = show i
