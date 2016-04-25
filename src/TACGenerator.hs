@@ -1,4 +1,4 @@
-module TACGenerator (generateTAC, showTACProgram, TACProgram(..), TACLine(..), TACInstruction(..), TACExpression(..)) where
+module TACGenerator (generateTAC, TACProgram(..), TACLine(..), TACInstruction(..), TACBinaryOperator(..), TACUnaryOperator(..), TACRelationOperator(..), TACExpression(..), PrettyPrintable(..)) where
 
 import Parser
 import MonadNames
@@ -10,10 +10,6 @@ infiniteNames s = [s ++ show i | i <- [1..]]
 generateTAC :: [Declaration] -> [TACLine]
 generateTAC xs = do
     evalNames (tacGenerate xs) (infiniteNames "t") (infiniteNames "l")
-
-showTACProgram :: TACProgram -> String
-showTACProgram [] = ""
-showTACProgram (x:xs) = (show x) ++ "\n" ++ (showTACProgram xs)
 
 class TACGenerator a where
     tacGenerate :: a -> Names String String [TACLine]
@@ -111,3 +107,47 @@ data TACExpression = TACInt Int
                    | TACChar Char
                    | TACVar String
     deriving (Eq, Show)
+
+
+class PrettyPrintable a where
+    prettyPrint :: a -> String
+
+instance PrettyPrintable a => PrettyPrintable [a] where
+    prettyPrint [] = ""
+    prettyPrint (x:xs) = prettyPrint x ++ "\n" ++ prettyPrint xs
+
+instance PrettyPrintable TACLine where
+    prettyPrint (TACLine Nothing i) = "\t" ++ prettyPrint i
+    prettyPrint (TACLine (Just l) i) = l ++ prettyPrint i
+
+instance PrettyPrintable TACInstruction where
+    prettyPrint (TACBinary var e1 op e2) = var ++ " = " ++ prettyPrint e1 ++ prettyPrint op ++ prettyPrint e2
+    prettyPrint (TACUnary var op e) = var ++ " = " ++ prettyPrint op ++ prettyPrint e
+    prettyPrint (TACCopy var e) = var ++ " = " ++ prettyPrint e
+    prettyPrint (TACIf e1 op e2 l) = "if " ++ prettyPrint e1 ++ prettyPrint op ++ prettyPrint e2 ++ " goto " ++ l
+    prettyPrint (TACGoto l) = "goto " ++ l
+    prettyPrint (TACCall l) = "call " ++ l
+    prettyPrint (TACArrayAccess v1 v2 e) = v1 ++ " = " ++ "v2[" ++ prettyPrint e ++ "]"
+    prettyPrint (TACArrayModif v1 e v2) = v1 ++ "[" ++ prettyPrint e ++ "] = " ++ v2
+    prettyPrint (TACReturn e) = "return " ++ prettyPrint e
+
+instance PrettyPrintable TACBinaryOperator where
+    prettyPrint TACPlus = "+"
+    prettyPrint TACMinus = "-"
+    prettyPrint TACTimes = "*"
+    prettyPrint TACDivide = "/"
+
+instance PrettyPrintable TACUnaryOperator where
+    prettyPrint TACNeg = "-"
+    prettyPrint TACNot = "!"
+
+instance PrettyPrintable TACRelationOperator where
+    prettyPrint TACEqual = "=="
+    prettyPrint TACGreater = ">"
+    prettyPrint TACLess = "<"
+    prettyPrint TACNotEqual = "!="
+
+instance PrettyPrintable TACExpression where
+    prettyPrint (TACInt i) = show i
+    prettyPrint (TACChar c) = show c
+    prettyPrint (TACVar s) = s 
