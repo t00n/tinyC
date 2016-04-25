@@ -41,6 +41,9 @@ instance TACGenerator Statement where
         ds <- tacGenerate ds
         ss <- tacGenerate ss
         return $ ds ++ ss
+    tacGenerate (Assignment n e) = do
+        (t, lines) <- tacExpression e
+        return $ lines ++ [TACCopy (nameString n) t]
     tacGenerate (Expr e) = do
         (_, lines) <- tacExpression e
         return lines
