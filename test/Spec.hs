@@ -249,6 +249,9 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError NotAnArrayError "a")
             let ast = scan_and_parse "int a[5]; int tiny() { length a; }"
             checkSemantics ast `shouldBe` Right ()
+        it "Checks that arrays are declared with constant/literals size" $ do
+            let ast = scan_and_parse "int a = 5; int b[a];"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotConstantSizeArrayError, errorVariable = "NameSubscription \"b\" (Var (Name \"a\"))"})
         it "Checks that only scalar expressions are used in binary and unary operations" $ do
             let ast = scan_and_parse "int a[5]; int tiny() { a + 5; }"
             checkSemantics ast `shouldBe` Left (SemanticError NotAScalarError "Var (Name \"a\")")

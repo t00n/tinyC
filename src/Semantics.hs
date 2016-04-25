@@ -4,6 +4,7 @@ import Control.Monad (void, foldM)
 import Control.Monad.State (runState, State(..))
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, fromJust)
+import Data.Char (ord)
 
 import Parser
 import Utility
@@ -14,7 +15,8 @@ data Scalarity = Scalar | Array
 
 data Info = VarInfo {
     infoType :: Type,
-    infoScalarity :: Scalarity
+    infoScalarity :: Scalarity,
+    infoSize :: Int
 }         | FuncInfo {
     infoType :: Type,
     infoParams :: [Info]
@@ -67,6 +69,7 @@ data ErrorType = NotDeclaredError
                | NotAScalarError
                | NotSameScalarityError
                | NameExistsWarning
+               | NotConstantSizeArrayError
     deriving (Eq, Show)
 
 data SemanticError = SemanticError {
@@ -79,7 +82,7 @@ scalarityError Scalar = NotAScalarError
 scalarityError Array = NotAnArrayError
 
 infoError :: Info -> ErrorType
-infoError (VarInfo _ k) = scalarityError k
+infoError (VarInfo _ k _) = scalarityError k
 infoError (FuncInfo _ _) = NotAFunctionError
 
 -- Check functions
@@ -90,10 +93,15 @@ instance Checkable a => Checkable [a] where
     check = flip $ foldM $ flip check
 
 instance Checkable Declaration where
-    check x st = let paramToInfo (Parameter t n) = VarInfo t (nameScalarity n) 
+    check x st = let paramToInfo (Parameter t (Name _)) = VarInfo t Scalar 1
+                     paramToInfo (Parameter t (NameSubscription _ (Int i))) = VarInfo t Array i
+                     paramToInfo (Parameter t (NameSubscription _ (Char c))) = VarInfo t Array (ord c)
                      paramToSymbol p@(Parameter _ n) = (n, paramToInfo p) in
         case x of
-            VarDeclaration t n _ -> declareName n (VarInfo t (nameScalarity n)) st
+            VarDeclaration t n@(Name _) _ -> declareName n (VarInfo t Scalar 1) st
+            VarDeclaration t n@(NameSubscription _ (Int i)) _ -> declareName n (VarInfo t Array i) st
+            VarDeclaration t n@(NameSubscription _ (Char c)) _ -> declareName n (VarInfo t Array (ord c)) st
+            VarDeclaration _ n _ -> Left $ SemanticError NotConstantSizeArrayError (show n)
             FuncDeclaration t n params stmt -> declareName n (FuncInfo t (map paramToInfo params)) st >>= declareNames (map paramToSymbol params) . emptySymbolTable . Just >>= check stmt
 
 instance Checkable Statement where
@@ -152,7 +160,7 @@ checkNameIsFunction name st =
     let n = nameString name
         info = unsafeGetSymbolInfo n st in
     case info of
-        (VarInfo _ _) -> Left (SemanticError NotAFunctionError n)
+        (VarInfo _ _ _) -> Left (SemanticError NotAFunctionError n)
         (FuncInfo _ _) -> Right st
 
 getNameScalarity :: Name -> SymbolTable -> Either SemanticError Scalarity
