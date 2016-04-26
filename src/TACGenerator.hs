@@ -68,6 +68,9 @@ instance TACGenerator Statement where
         ds <- tacGenerate ds
         ss <- tacGenerate ss
         return $ ds ++ ss
+    tacGenerate (Write e) = do
+        (t, lines) <- tacExpression e
+        return $ lines ++ [TACWrite t]
     tacGenerate (Expr e) = do
         (_, lines) <- tacExpression e
         return lines
@@ -126,6 +129,8 @@ data TACInstruction = TACDeclaration String
                      -- | TACDeRefA TACExpression TACExpression
                     | TACReturn TACExpression
                     | TACLabel String
+                    | TACWrite TACExpression
+                    | TACRead String
     deriving (Eq, Show)
 
 data TACBinaryOperator = TACPlus 
@@ -167,6 +172,7 @@ instance PrettyPrintable TACInstruction where
     prettyPrint (TACArrayModif v1 e v2) = v1 ++ "[" ++ prettyPrint e ++ "] = " ++ v2
     prettyPrint (TACReturn e) = "return " ++ prettyPrint e
     prettyPrint (TACLabel l) = l ++ ":"
+    prettyPrint (TACWrite v) = "write " ++ prettyPrint v
 
 instance PrettyPrintable TACBinaryOperator where
     prettyPrint TACPlus = "+"
