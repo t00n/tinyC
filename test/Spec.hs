@@ -12,9 +12,10 @@ import MonadNames
 
 scan_and_parse = parse . alexScanTokens
 
-scan_parse_check xs = let ast = scan_and_parse xs in
-    if checkSemantics ast == Right () then ast
-    else error "lolol"
+scan_parse_check xs = let ast = scan_and_parse xs 
+                          check = checkSemantics ast in
+    if check == Right () then ast
+    else error $ show check
 
 testTokens s r = do
     it ("Tokenizes " ++ s) $ do
@@ -323,6 +324,9 @@ main = hspec $ do
         it "Generates if else" $ do
             let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 5; } else { int b = 5; } }"
             generateTAC ast `shouldBe` [TACLabel "tiny",TACBinary "t1" (TACInt 1) TACGreater (TACInt 2),TACIf (TACVar "t1") "l1",TACGoto "l2",TACLabel "l1",TACDeclaration "a",TACCopy "a" (TACInt 5),TACGoto "l3",TACLabel "l2",TACDeclaration "b",TACCopy "b" (TACInt 5),TACLabel "l3",TACReturn (TACInt 0)]
+        it "Generates several if else" $ do
+            let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 1; } else if (2 > 3) { int b = 2; } else { int c = 3; } }"
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACBinary "t1" (TACInt 1) TACGreater (TACInt 2),TACIf (TACVar "t1") "l1",TACGoto "l2",TACLabel "l1",TACDeclaration "a",TACCopy "a" (TACInt 1),TACGoto "l3",TACLabel "l2",TACBinary "t2" (TACInt 2) TACGreater (TACInt 3),TACIf (TACVar "t2") "l4",TACGoto "l5",TACLabel "l4",TACDeclaration "b",TACCopy "b" (TACInt 2),TACGoto "l6",TACLabel "l5",TACDeclaration "c",TACCopy "c" (TACInt 3),TACLabel "l6",TACLabel "l3",TACReturn (TACInt 0)]
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]
