@@ -1,7 +1,6 @@
 module Semantics (checkSemantics, symbolTable, SemanticError(..), ErrorType(..), SymbolTable(..)) where
 
 import Control.Monad (void, foldM)
-import Control.Monad.State (runState, State(..))
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, fromJust)
 import Data.Char (ord)
@@ -70,6 +69,8 @@ data ErrorType = NotDeclaredError
                | NotSameScalarityError
                | NameExistsWarning
                | NotConstantSizeArrayError
+               | NoTinyFunctionError
+               | SeveralTinyFunctionError
     deriving (Eq, Show)
 
 data SemanticError = SemanticError {
@@ -216,6 +217,15 @@ getExpressionScalarity expr st =
         (Var name) -> getNameScalarity name st
         _ -> Right Scalar
 
+entryPointExists :: Program -> SymbolTable -> Either SemanticError SymbolTable
+entryPointExists ds st = 
+    let isEntryPoint (FuncDeclaration IntType (Name "tiny") [] _) = True
+        isEntryPoint _ = False
+        funcs = filter (isEntryPoint) ds in
+    if length funcs == 0 then Left $ SemanticError NoTinyFunctionError "" else
+    if length funcs > 1 then Left $ SemanticError SeveralTinyFunctionError "" else
+    Right st
+
 -- Helpers
 nameInScope :: Name -> SymbolTable -> Bool
 nameInScope n = (||) <$> nameInBlock n <*> variableInParent n
@@ -237,7 +247,7 @@ declareNames xs = flip (foldl (\acc x -> acc >>= (uncurry declareName) x )) xs .
 -- API
 
 runCheck :: Program -> Either SemanticError SymbolTable
-runCheck = flip check (emptySymbolTable Nothing)
+runCheck = (>>=) <$> flip entryPointExists (emptySymbolTable Nothing) <*> check
 
 checkSemantics :: Program -> Either SemanticError ()
 checkSemantics = void . runCheck

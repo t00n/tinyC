@@ -234,18 +234,18 @@ main = hspec $ do
             let ast = scan_and_parse "int tiny() { tiny(); }"
             checkSemantics ast `shouldBe` Right ()
         it "Checks that parameters of a function are declared and variables in the scope" $ do
-            let ast = scan_and_parse "int tiny(int a, char c) { a + 5; }"
+            let ast = scan_and_parse "int tiny() { int a; a + 5; }"
             checkSemantics ast `shouldBe` Right ()
-            let ast = scan_and_parse "int tiny(int a) { int a; }"
+            let ast = scan_and_parse "int tiny() { int a; int a; }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NameExistsError, errorVariable = "a"})
         it "Checks the arguments of a function call" $ do
-            let ast = scan_and_parse "int a = 5; int tiny(int a, int b) { tiny(a, 5); }"
+            let ast = scan_and_parse "int a = 5; int f(int a, int b) {} int tiny() { f(a, 5); }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NameExistsWarning, errorVariable = "a"})
-            let ast = scan_and_parse "int tiny(int a, int b) { tiny(a, c); }"
+            let ast = scan_and_parse "int f(int a1, int b) {} int tiny() { int a; f(a, c); }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotDeclaredError, errorVariable = "c"})
-            let ast = scan_and_parse "int a[5]; int tiny(int b) { tiny(a); }"
+            let ast = scan_and_parse "int a[5]; int f(int b) {} int tiny() { f(a); }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"a\")"})
-            let ast = scan_and_parse "int a; int tiny(int b[5]) { tiny(a); }"
+            let ast = scan_and_parse "int a; int f(int b[5]) {} int tiny() { f(a); }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAnArrayError, errorVariable = "Var (Name \"a\")"})
         it "Checks that variables are declared before use in a length expression and that the variable is an array" $ do
             let ast = scan_and_parse "int tiny() { length a; }"
@@ -255,7 +255,7 @@ main = hspec $ do
             let ast = scan_and_parse "int a[5]; int tiny() { length a; }"
             checkSemantics ast `shouldBe` Right ()
         it "Checks that arrays are declared with constant/literals size" $ do
-            let ast = scan_and_parse "int a = 5; int b[a];"
+            let ast = scan_and_parse "int a = 5; int b[a]; int tiny() {}"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotConstantSizeArrayError, errorVariable = "NameSubscription \"b\" (Var (Name \"a\"))"})
         it "Checks that only scalar expressions are used in binary and unary operations" $ do
             let ast = scan_and_parse "int a[5]; int tiny() { a + 5; }"
@@ -299,31 +299,36 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"a\")"})
             let ast = scan_and_parse "int a[5]; int tiny() { if (a) {} else if (a) {} }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"a\")"})
+        it "Checks that one and only one entry point exists" $ do
+            let ast = scan_and_parse "int a;"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NoTinyFunctionError, errorVariable = ""})
+            let ast = scan_and_parse "int tiny() {} int tiny() {}"
+            checkSemantics ast `shouldBe`  Left (SemanticError {errorType = SeveralTinyFunctionError, errorVariable = ""})
     describe "The generation of three-address-code" $ do
         it "Generates a few declarations" $ do
-            let ast = scan_parse_check "int a; int b;"
-            generateTAC ast `shouldBe` [TACDeclaration (TACVar "a"),TACDeclaration (TACVar "b")]
+            let ast = scan_parse_check "int a; int b; int tiny() {}"
+            generateTAC ast `shouldBe` [TACDeclaration (TACVar "a"),TACDeclaration (TACVar "b"),TACLabel "tiny",TACReturn (TACInt 0)]
         it "Generates declarations with complex binary expressions" $ do
-            let ast = scan_parse_check "int a = 5; int b = (a+5)/(a-2);"
-            generateTAC ast `shouldBe` [TACDeclaration (TACVar "a"),TACCopy "a" (TACInt 5),TACDeclaration (TACVar "b"),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "a") TACMinus (TACInt 2),TACBinary "t3" (TACVar "t1") TACDivide (TACVar "t2"),TACCopy "b" (TACVar "t3")]
+            let ast = scan_parse_check "int a = 5; int b = (a+5)/(a-2); int tiny() {}"
+            generateTAC ast `shouldBe` [TACDeclaration (TACVar "a"),TACCopy "a" (TACInt 5),TACDeclaration (TACVar "b"),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "a") TACMinus (TACInt 2),TACBinary "t3" (TACVar "t1") TACDivide (TACVar "t2"),TACCopy "b" (TACVar "t3"),TACLabel "tiny",TACReturn (TACInt 0)]
         it "Generates function declarations" $ do
             let ast = scan_parse_check "int tiny() {}"
             generateTAC ast `shouldBe` [TACLabel "tiny",TACReturn (TACInt 0)]
-            let ast = scan_parse_check "int tiny(int a, int b) { int c = 4; }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACParam "a",TACParam "b",TACDeclaration (TACVar "c"),TACCopy "c" (TACInt 4),TACReturn (TACInt 0)]
+            let ast = scan_parse_check "int f(int a, int b) {int c = 4;} int tiny() { }"
+            generateTAC ast `shouldBe` [TACLabel "f",TACParam "a",TACParam "b",TACDeclaration (TACVar "c"),TACCopy "c" (TACInt 4),TACReturn (TACInt 0),TACLabel "tiny",TACReturn (TACInt 0)]
         it "Generates declarations with complex unary expressions" $ do
-            let ast = scan_parse_check "int a = 5; int b = -(a - 5);"
-            generateTAC ast `shouldBe` [TACDeclaration (TACVar "a"),TACCopy "a" (TACInt 5),TACDeclaration (TACVar "b"),TACBinary "t1" (TACVar "a") TACMinus (TACInt 5),TACUnary "t2" TACNeg (TACVar "t1"),TACCopy "b" (TACVar "t2")]
+            let ast = scan_parse_check "int a = 5; int b = -(a - 5); int tiny() {}"
+            generateTAC ast `shouldBe` [TACDeclaration (TACVar "a"),TACCopy "a" (TACInt 5),TACDeclaration (TACVar "b"),TACBinary "t1" (TACVar "a") TACMinus (TACInt 5),TACUnary "t2" TACNeg (TACVar "t1"),TACCopy "b" (TACVar "t2"),TACLabel "tiny",TACReturn (TACInt 0)]
         it "Generates function calls" $ do
-            let ast = scan_parse_check "int tiny(int a, int b) { int c = 1; tiny(c, 2); }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACParam "a",TACParam "b",TACDeclaration (TACVar "c"),TACCopy "c" (TACInt 1),TACCall "tiny" [TACVar "c",TACInt 2,TACVar "t1"],TACReturn (TACInt 0)]
-            let ast = scan_parse_check "int tiny(int a, int b) { int c = tiny(2 + 3, 1); }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACParam "a",TACParam "b",TACDeclaration (TACVar "c"),TACBinary "t1" (TACInt 2) TACPlus (TACInt 3),TACCall "tiny" [TACVar "t1",TACInt 1,TACVar "t2"],TACCopy "c" (TACVar "t2"),TACReturn (TACInt 0)]
+            let ast = scan_parse_check "int f(int a, int b) { int c = 1; f(c, 2); } int tiny() {}"
+            generateTAC ast `shouldBe` [TACLabel "f",TACParam "a",TACParam "b",TACDeclaration (TACVar "c"),TACCopy "c" (TACInt 1),TACCall "f" [TACVar "c",TACInt 2,TACVar "t1"],TACReturn (TACInt 0),TACLabel "tiny",TACReturn (TACInt 0)]
+            let ast = scan_parse_check "int f(int a, int b) { int c = f(2 + 3, 1); } int tiny() {}"
+            generateTAC ast `shouldBe`  [TACLabel "f",TACParam "a",TACParam "b",TACDeclaration (TACVar "c"),TACBinary "t1" (TACInt 2) TACPlus (TACInt 3),TACCall "f" [TACVar "t1",TACInt 1,TACVar "t2"],TACCopy "c" (TACVar "t2"),TACReturn (TACInt 0),TACLabel "tiny",TACReturn (TACInt 0)]
         it "Generates assignments" $ do
             let ast = scan_parse_check "int tiny() { int a; a = (a + 5) * 3; }"
             generateTAC ast `shouldBe` [TACLabel "tiny",TACDeclaration (TACVar "a"),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "t1") TACTimes (TACInt 3),TACCopy "a" (TACVar "t2"),TACReturn (TACInt 0)]
-            let ast = scan_parse_check "int a[5]; int b = a[2];"
-            generateTAC ast `shouldBe` [TACDeclaration (TACArray "a" (TACInt 5)),TACDeclaration (TACVar "b"),TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACCopy "b" (TACVar "t1")]
+            let ast = scan_parse_check "int a[5]; int b = a[2]; int tiny() {}"
+            generateTAC ast `shouldBe` [TACDeclaration (TACArray "a" (TACInt 5)),TACDeclaration (TACVar "b"),TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACCopy "b" (TACVar "t1"),TACLabel "tiny",TACReturn (TACInt 0)]
             let ast = scan_parse_check "int a[5]; int tiny() { a[2] = 5; }"
             generateTAC ast `shouldBe` [TACDeclaration (TACArray "a" (TACInt 5)),TACLabel "tiny",TACArrayModif (TACArray "a" (TACInt 2)) (TACInt 5),TACReturn (TACInt 0)]
             let ast = scan_parse_check "int a[5]; int b[5]; int tiny() { a[2] = b[3]; }"
