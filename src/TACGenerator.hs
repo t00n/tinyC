@@ -45,7 +45,15 @@ instance TACGenerator Statement where
         labelYes <- popLabel
         labelNo <- popLabel
         stmt <- tacGenerate stmt
-        return $ [TACIf t labelYes, TACGoto labelNo, TACLabel labelYes] ++ stmt ++ [TACLabel labelNo]
+        return $ lines ++ [TACIf t labelYes, TACGoto labelNo, TACLabel labelYes] ++ stmt ++ [TACLabel labelNo]
+    tacGenerate (IfElse e s1 s2) = do
+        (t, lines) <- tacExpression e
+        labelYes <- popLabel
+        labelNo <- popLabel
+        labelEnd <- popLabel
+        s1 <- tacGenerate s1
+        s2 <- tacGenerate s2
+        return $ lines ++ [TACIf t labelYes, TACGoto labelNo, TACLabel labelYes] ++ s1 ++ [TACGoto labelEnd, TACLabel labelNo] ++ s2 ++ [TACLabel labelEnd]
     tacGenerate (Block ds ss) = do
         ds <- tacGenerate ds
         ss <- tacGenerate ss
