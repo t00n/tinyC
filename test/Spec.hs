@@ -330,6 +330,11 @@ main = hspec $ do
         it "Generates a while" $ do
             let ast = scan_parse_check "int tiny() { int a = 2; while ( a > 1) { a = a - 1; } }"
             generateTAC ast `shouldBe` [TACLabel "tiny",TACDeclaration "a",TACCopy "a" (TACInt 2),TACLabel "l1",TACBinary "t1" (TACVar "a") TACGreater (TACInt 1),TACIf (TACVar "t1") "l3",TACGoto "l2",TACLabel "l3",TACBinary "t2" (TACVar "a") TACMinus (TACInt 1),TACCopy "a" (TACVar "t2"),TACGoto "l1",TACLabel "l2",TACReturn (TACInt 0)]
+        it "Generates a return" $ do
+            let ast = scan_parse_check "int tiny() { int a = 2; return a; }"
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACDeclaration "a",TACCopy "a" (TACInt 2),TACReturn (TACVar "a"),TACReturn (TACInt 0)]
+            let ast = scan_parse_check "int tiny() { return 3 + 4 / 5; }"
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACBinary "t1" (TACInt 4) TACDivide (TACInt 5),TACBinary "t2" (TACInt 3) TACPlus (TACVar "t1"),TACReturn (TACVar "t2"),TACReturn (TACInt 0)]
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]
