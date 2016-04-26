@@ -40,9 +40,13 @@ instance TACGenerator Parameter where
     tacGenerate (Parameter t n) = return [TACParam (nameString n)]
 
 instance TACGenerator Statement where
-    tacGenerate (Assignment n e) = do
+    tacGenerate (Assignment (Name n) e) = do
         (t, lines) <- tacExpression e
-        return $ lines ++ [TACCopy (nameString n) t]
+        return $ lines ++ [TACCopy n t]
+    tacGenerate (Assignment (NameSubscription n i) e) = do
+        (t1, lines1) <- tacExpression i
+        (t2, lines2) <- tacExpression e
+        return $ lines1 ++ lines2 ++ [TACArrayModif (TACArray n t1) t2]
     tacGenerate (If e stmt) = do
         (t, lines) <- tacExpression e
         labelYes <- popLabel
@@ -102,7 +106,8 @@ tacExpression (Length n) = undefined
 tacExpression (Var (Name n)) = return (TACVar n, [])
 tacExpression (Var (NameSubscription n e)) = do
     (t, lines) <- tacExpression e
-    return (TACArray n t, lines)
+    newvar <- popVariable
+    return (TACVar newvar, [TACArrayAccess newvar (TACArray n t)] ++ lines)
 
 tacBinaryOperator :: BinaryOperator -> TACBinaryOperator
 tacBinaryOperator Plus = TACPlus
@@ -125,14 +130,14 @@ data TACInstruction = TACDeclaration TACExpression
                     | TACBinary String TACExpression TACBinaryOperator TACExpression
                     | TACUnary String TACUnaryOperator TACExpression
                     | TACCopy String TACExpression
-                    | TACIf TACExpression String
-                    | TACGoto String
-                    | TACCall String [TACExpression]
-                    | TACArrayAccess TACExpression TACExpression
+                    | TACArrayAccess String TACExpression
                     | TACArrayModif TACExpression TACExpression
                      -- | TACAddress TACExpression TACExpression
                      -- | TACDeRef TACExpression TACExpression
                      -- | TACDeRefA TACExpression TACExpression
+                    | TACIf TACExpression String
+                    | TACGoto String
+                    | TACCall String [TACExpression]
                     | TACReturn TACExpression
                     | TACLabel String
                     | TACWrite TACExpression
@@ -172,11 +177,11 @@ instance PrettyPrintable TACInstruction where
     prettyPrint (TACBinary var e1 op e2) = var ++ " = " ++ prettyPrint e1 ++ prettyPrint op ++ prettyPrint e2
     prettyPrint (TACUnary var op e) = var ++ " = " ++ prettyPrint op ++ prettyPrint e
     prettyPrint (TACCopy var e) = var ++ " = " ++ prettyPrint e
+    prettyPrint (TACArrayAccess e1 e2) = e1 ++ " = " ++ prettyPrint e2
+    prettyPrint (TACArrayModif e1 e2) = prettyPrint e1 ++ " = " ++ prettyPrint e2
     prettyPrint (TACIf e l) = "if " ++ prettyPrint e ++ " goto " ++ l
     prettyPrint (TACGoto l) = "goto " ++ l
     prettyPrint (TACCall l es) = intercalate "\n" (map (((++) "param ") . prettyPrint) es) ++ "call " ++ l
-    prettyPrint (TACArrayAccess e1 e2) = prettyPrint e1 ++ " = " ++ prettyPrint e2
-    prettyPrint (TACArrayModif e1 e2) = prettyPrint e1 ++ " = " ++ prettyPrint e2
     prettyPrint (TACReturn e) = "return " ++ prettyPrint e
     prettyPrint (TACLabel l) = l ++ ":"
     prettyPrint (TACWrite v) = "write " ++ prettyPrint v

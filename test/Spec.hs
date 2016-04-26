@@ -319,7 +319,11 @@ main = hspec $ do
             let ast = scan_parse_check "int tiny() { int a; a = (a + 5) * 3; }"
             generateTAC ast `shouldBe` [TACLabel "tiny",TACDeclaration (TACVar "a"),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "t1") TACTimes (TACInt 3),TACCopy "a" (TACVar "t2"),TACReturn (TACInt 0)]
             let ast = scan_parse_check "int a[5]; int b = a[2];"
-            putStrLn $ prettyPrint $ generateTAC ast
+            generateTAC ast `shouldBe` [TACDeclaration (TACArray "a" (TACInt 5)),TACDeclaration (TACVar "b"),TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACCopy "b" (TACVar "t1")]
+            let ast = scan_parse_check "int a[5]; int tiny() { a[2] = 5; }"
+            generateTAC ast `shouldBe` [TACDeclaration (TACArray "a" (TACInt 5)),TACLabel "tiny",TACArrayModif (TACArray "a" (TACInt 2)) (TACInt 5),TACReturn (TACInt 0)]
+            let ast = scan_parse_check "int a[5]; int b[5]; int tiny() { a[2] = b[3]; }"
+            generateTAC ast `shouldBe` [TACDeclaration (TACArray "a" (TACInt 5)),TACDeclaration (TACArray "b" (TACInt 5)),TACLabel "tiny",TACArrayAccess "t1" (TACArray "b" (TACInt 3)),TACArrayModif (TACArray "a" (TACInt 2)) (TACVar "t1"),TACReturn (TACInt 0)]
         it "Generates if" $ do
             let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 5; a = 3; } }"
             generateTAC ast `shouldBe` [TACLabel "tiny",TACBinary "t1" (TACInt 1) TACGreater (TACInt 2),TACIf (TACVar "t1") "l1",TACGoto "l2",TACLabel "l1",TACDeclaration (TACVar "a"),TACCopy "a" (TACInt 5),TACCopy "a" (TACInt 3),TACLabel "l2",TACReturn (TACInt 0)]
