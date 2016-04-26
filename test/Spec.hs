@@ -203,6 +203,10 @@ main = hspec $ do
             checkSemantics ast `shouldBe`  Left (SemanticError {errorType = NotAScalarError, errorVariable = "Var (Name \"a\")"})
             let ast = scan_and_parse "int a[5]; int tiny() { read a; }"
             checkSemantics ast `shouldBe`  Left (SemanticError {errorType = NotAScalarError, errorVariable = "a"})
+            let ast = scan_and_parse "int a; int tiny() { read a[5]; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAnArrayError, errorVariable = "NameSubscription \"a\" (Int 5)"})
+            let ast = scan_and_parse "int a[5]; int tiny() { read a[2]; }"
+            checkSemantics ast `shouldBe` Right ()
         it "Checks that variables are declared before use in expression" $ do
             let ast = scan_and_parse "int tiny() { a; }"
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "a")

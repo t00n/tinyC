@@ -132,7 +132,7 @@ instance Checkable Expression where
             Length n -> checkNameDeclared n st >>= checkNameIsScalarity n Array
             Var name -> checkNameDeclared name st >>
                 case name of
-                    (NameSubscription n e) -> checkNameIsScalarity name Array st >>= check e >>= checkExpressionIsScalar e
+                    (NameSubscription n e) -> checkNameIsArray name st >>= check e >>= checkExpressionIsScalar e
                     _ -> return st
             _ -> Right st
 
@@ -151,9 +151,13 @@ checkNameDeclared name st =
 
 checkNameIsScalarity :: Name -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
 checkNameIsScalarity name kind st = 
-    let n = nameString name in
-        if unsafeSymbolIsScalarity n kind st then Right st
-        else Left (SemanticError (scalarityError kind) n)
+    case getNameScalarity name st of
+        Right x -> if x == kind then Right st else Left $ SemanticError (scalarityError kind) (nameString name)
+        Left x -> Left x
+
+checkNameIsArray :: Name -> SymbolTable -> Either SemanticError SymbolTable
+checkNameIsArray name st = let res = unsafeSymbolIsScalarity (nameString name) Array st in
+    if res then Right st else Left $ SemanticError NotAnArrayError (nameString name)
 
 checkNameIsFunction :: Name -> SymbolTable -> Either SemanticError SymbolTable
 checkNameIsFunction name st = 
