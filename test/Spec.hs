@@ -344,6 +344,11 @@ main = hspec $ do
         it "Generates a write" $ do
             let ast = scan_parse_check "int tiny() { int a = 2; write a; }"
             generateTAC ast `shouldBe` [TACLabel "tiny",TACDeclaration (TACVar "a"),TACCopy "a" (TACInt 2),TACWrite (TACVar "a"),TACReturn (TACInt 0)]
+        it "Generates reads" $ do
+            let ast = scan_parse_check "int tiny() { int a; read a; }"
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACDeclaration (TACVar "a"),TACRead (TACVar "a"),TACReturn (TACInt 0)]
+            --let ast = scan_parse_check "int tiny() { int a[5]; read a[2]; }"
+            --putStrLn $ prettyPrint $ generateTAC ast
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]
