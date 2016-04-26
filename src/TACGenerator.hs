@@ -81,7 +81,7 @@ instance TACGenerator Statement where
     tacGenerate (Read (Name n)) = return [TACRead (TACVar n)]
     tacGenerate (Read (NameSubscription n e)) = do
         (t, lines) <- tacExpression e
-        return $ lines ++ [TACRead t]
+        return $ lines ++ [TACRead (TACArray n t)]
     tacGenerate (Expr e) = do
         (_, lines) <- tacExpression e
         return lines
