@@ -185,7 +185,7 @@ instance PrettyPrintable TACInstruction where
     prettyPrint (TACArrayModif e1 e2) = prettyPrint e1 ++ " = " ++ prettyPrint e2
     prettyPrint (TACIf e l) = "if " ++ prettyPrint e ++ " goto " ++ l
     prettyPrint (TACGoto l) = "goto " ++ l
-    prettyPrint (TACCall l es) = intercalate "\n" (map (((++) "param ") . prettyPrint) es) ++ "call " ++ l
+    prettyPrint (TACCall l es) = intercalate "\n" (map (((++) "param ") . prettyPrint) es) ++ "\ncall " ++ l
     prettyPrint (TACReturn e) = "return " ++ prettyPrint e
     prettyPrint (TACLabel l) = l ++ ":"
     prettyPrint (TACWrite v) = "write " ++ prettyPrint v
