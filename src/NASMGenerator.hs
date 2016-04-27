@@ -69,6 +69,10 @@ data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | JGE Label
                      | JL Label
                      | JLE Label
+                     | CMP1 Register Register
+                     | CMP2 Register Address
+                     | CMP3 Address Register
+                     | CMP4 Register Constant
 
 data RegisterSize = LSB | MSB | WORD | DWORD
 
