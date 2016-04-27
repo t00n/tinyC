@@ -1,4 +1,4 @@
-module NASMGenerator (gasGenerate, NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
+module NASMGenerator (nasmGenerate, NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
 
 import Data.Set (Set, member, empty, insert, delete)
 import Control.Monad.State
@@ -6,8 +6,21 @@ import Control.Monad.State
 
 import TACGenerator
 
+generateNASM :: TACProgram -> [NASMInstruction]
+generateNASM p = evalState (nasmGenerate p) empty
+
 class NASMGenerator a where
-    gasGenerate :: a -> State RegisterState NASMInstruction
+    nasmGenerate :: a -> State RegisterState [NASMInstruction]
+
+instance NASMGenerator a => NASMGenerator [a] where
+    nasmGenerate [] = return []
+    nasmGenerate (x:xs) = do
+        first <- nasmGenerate x
+        rest <- nasmGenerate xs
+        return $ first ++ rest
+
+instance NASMGenerator TACInstruction where
+    nasmGenerate = undefined
 
 type RegisterState = Set RegisterName
 
