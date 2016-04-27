@@ -10,12 +10,12 @@ data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | MOV3 Address Register
                      | MOV4 Register Int
                      | MOV5 AddressSize Address Constant
-                     | PUSH1 RegisterName
+                     | PUSH1 RegisterName -- Only 32-bit register
                      | PUSH2 Address
-                     | PUSH3 Constant
-                     | POP1 RegisterName
+                     | PUSH3 Constant -- 32-bit constant
+                     | POP1 RegisterName -- Only 32-bit register
                      | POP2 Address
-                     | LEA RegisterName Address
+                     | LEA RegisterName Address -- Only 32-bit register
                      | ADD1 RegisterSize RegisterName RegisterName
                      | ADD2 Register Address
                      | ADD3 Address Register
@@ -30,11 +30,11 @@ data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | INC2 Address
                      | DEC1 Register
                      | DEC2 Address
-                     | IMUL1 RegisterName RegisterName
-                     | IMUL2 RegisterName Address
-                     | IMUL3 RegisterName RegisterName Constant
-                     | IMUL4 RegisterName Address Constant
-                     | IDIV1 RegisterName
+                     | IMUL1 RegisterName RegisterName -- Only 32-bit register
+                     | IMUL2 RegisterName Address -- Only 32-bit register
+                     | IMUL3 RegisterName RegisterName Constant -- Only 32-bit register
+                     | IMUL4 RegisterName Address Constant -- Only 32-bit register
+                     | IDIV1 RegisterName -- Only 32-bit register
                      | IDIV2 Address
                      | AND1 RegisterSize RegisterName RegisterName
                      | AND2 Register Address
@@ -51,6 +51,16 @@ data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | XOR3 Address Register
                      | XOR4 Register Constant
                      | XOR5 Address Constant
+                     | NOT1 Register
+                     | NOT2 Address
+                     | SHL1 Register Constant -- Constant must be a byte
+                     | SHL2 Address Constant -- Constant must be a byte
+                     | SHL3 Register Register -- Second Register must be CL
+                     | SHL4 Address Register -- Second Register must be CL
+                     | SHR1 Register Constant -- Constant must be a byte
+                     | SHR2 Address Constant -- Constant must be a byte
+                     | SHR3 Register Register -- Second Register must be CL
+                     | SHR4 Address Register -- Second Register must be CL
 
 data RegisterSize = LSB | MSB | WORD | DWORD
 
