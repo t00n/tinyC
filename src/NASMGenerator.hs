@@ -61,6 +61,14 @@ data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | SHR2 Address Constant -- Constant must be a byte
                      | SHR3 Register Register -- Second Register must be CL
                      | SHR4 Address Register -- Second Register must be CL
+                     | JMP Label
+                     | JE Label
+                     | JNE Label
+                     | JZ Label
+                     | JG Label
+                     | JGE Label
+                     | JL Label
+                     | JLE Label
 
 data RegisterSize = LSB | MSB | WORD | DWORD
 
@@ -73,6 +81,8 @@ type Constant = Int
 type Multiplier = Int
 
 type Offset = Int
+
+type Label = String
 
 data AddressSize = BYTEADDRESS | WORDADDRESS | DWORDADDRESS
 
