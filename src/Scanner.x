@@ -10,39 +10,46 @@ $word = [$alpha$digit\_]
 tokens :- 
     $white+         ; -- spaces etc
     \/\/.*          ; -- comments
-    int             { \p s -> INT }
-    if              { \p s -> IF }
-    else            { \p s -> ELSE }
-    !=              { \p s -> NEQUAL }
-    return          { \p s -> RETURN }
-    \(              { \p s -> LPAR }
-    \)              { \p s -> RPAR }
-    \{              { \p s -> LBRACE }
-    \}              { \p s -> RBRACE }
-    \[              { \p s -> LBRACK }
-    \]              { \p s -> RBRACK }
-    =               { \p s -> ASSIGN }
-    \;              { \p s -> SEMICOLON }
-    \,              { \p s -> COMMA }
-    \+              { \p s -> PLUS }
-    \-              { \p s -> MINUS }
-    \*              { \p s -> TIMES }
-    \/              { \p s -> DIVIDE }
-    ==              { \p s -> EQUAL }
-    char            { \p s -> CHAR }
-    write           { \p s -> WRITE }
-    read            { \p s -> READ }
-    >               { \p s -> GREATER }
-    \<              { \p s -> LESS }
-    !               { \p s -> NOT }
-    length          { \p s -> LENGTH }
-    while           { \p s -> WHILE }
-    $digit+         { \p s -> NUMBER (read s) }
-    $alpha[$word]*  { \p s -> NAME s }
-    \'.\'           { \p s -> QCHAR (s !! 1) }
-    \".*"           { \p s -> QSTRING $ take ((length s) - 2) (drop 1 s) }
+    int             { tokenWrapper (\s -> INT) }
+    if              { tokenWrapper (\s -> IF) }
+    else            { tokenWrapper (\s -> ELSE) }
+    !=              { tokenWrapper (\s -> NEQUAL) }
+    return          { tokenWrapper (\s -> RETURN) }
+    \(              { tokenWrapper (\s -> LPAR) }
+    \)              { tokenWrapper (\s -> RPAR) }
+    \{              { tokenWrapper (\s -> LBRACE) }
+    \}              { tokenWrapper (\s -> RBRACE) }
+    \[              { tokenWrapper (\s -> LBRACK) }
+    \]              { tokenWrapper (\s -> RBRACK) }
+    =               { tokenWrapper (\s -> ASSIGN) }
+    \;              { tokenWrapper (\s -> SEMICOLON) }
+    \,              { tokenWrapper (\s -> COMMA) }
+    \+              { tokenWrapper (\s -> PLUS) }
+    \-              { tokenWrapper (\s -> MINUS) }
+    \*              { tokenWrapper (\s -> TIMES) }
+    \/              { tokenWrapper (\s -> DIVIDE) }
+    ==              { tokenWrapper (\s -> EQUAL) }
+    char            { tokenWrapper (\s -> CHAR) }
+    write           { tokenWrapper (\s -> WRITE) }
+    read            { tokenWrapper (\s -> READ) }
+    >               { tokenWrapper (\s -> GREATER) }
+    \<              { tokenWrapper (\s -> LESS) }
+    !               { tokenWrapper (\s -> NOT) }
+    length          { tokenWrapper (\s -> LENGTH) }
+    while           { tokenWrapper (\s -> WHILE) }
+    $digit+         { tokenWrapper (\s -> NUMBER (read s)) }
+    $alpha[$word]*  { tokenWrapper (\s -> NAME s) }
+    \'.\'           { tokenWrapper (\s -> QCHAR (s !! 1)) }
+    \".*"           { tokenWrapper (\s -> QSTRING $ (init . tail) s) }
 
 {
+tokenWrapper :: (String -> Token) -> (AlexPosn -> String -> TokenWrapper)
+tokenWrapper f = \(AlexPn p1 p2 p3) s -> TokenWrapper (f s) (p1, p2, p3)
+
+data TokenWrapper = TokenWrapper Token (Int, Int, Int)
+    deriving (Eq, Show)
+
+
 data Token = INT | IF | ELSE | NEQUAL
            | RETURN | LPAR | RPAR | LBRACE
            | RBRACE | LBRACK | RBRACK | ASSIGN
@@ -51,5 +58,38 @@ data Token = INT | IF | ELSE | NEQUAL
            | WRITE | READ | GREATER | LESS
            | NOT | LENGTH | WHILE
            | NAME String | NUMBER Int | QCHAR Char | QSTRING String
-           deriving (Eq, Show)
+           deriving (Eq)
+
+instance Show Token where
+    show INT = "int"
+    show IF = "if"
+    show ELSE = "else"
+    show NEQUAL = "!="
+    show RETURN = "return"
+    show LPAR = "("
+    show RPAR = ")"
+    show LBRACE = "{"
+    show RBRACE = "}"
+    show LBRACK = "["
+    show RBRACK = "]"
+    show ASSIGN = "="
+    show SEMICOLON = ";"
+    show COMMA = ","
+    show PLUS = "+"
+    show MINUS = "-"
+    show TIMES = "*"
+    show DIVIDE = "/"
+    show EQUAL = "=="
+    show CHAR = "char"
+    show WRITE = "write"
+    show READ = "read"
+    show GREATER = ">"
+    show LESS = "<"
+    show NOT = "!"
+    show LENGTH = "length"
+    show WHILE = "while"
+    show (NAME s) = s
+    show (NUMBER i) = show i
+    show (QCHAR c) = show c
+    show (QSTRING s) = s
 }

@@ -1,45 +1,46 @@
 {
 module Parser (parse, Program, Declaration(..), Parameter(..), Statement(..), Expression(..), Type(..), BinaryOperator(..), UnaryOperator(..), Name(..), nameString) where
-import Scanner (Token(..))
+import Scanner
 import Data.Maybe
+import Text.Printf (printf)
 }
 
 %name parse
-%tokentype { Token }
+%tokentype { TokenWrapper }
 %error { parseError }
 
 %token
-    int             { INT }
-    if              { IF }
-    else            { ELSE }
-    '!='            { NEQUAL }
-    return          { RETURN }
-    '('             { LPAR }
-    ')'             { RPAR }
-    '{'             { LBRACE }
-    '}'             { RBRACE }
-    '['             { LBRACK }
-    ']'             { RBRACK }
-    '='             { ASSIGN }
-    ';'             { SEMICOLON }
-    ','             { COMMA }
-    '+'             { PLUS }
-    '-'             { MINUS }
-    '*'             { TIMES }
-    '/'             { DIVIDE }
-    '=='            { EQUAL }
-    char            { CHAR }
-    write           { WRITE }
-    read            { READ }
-    '>'             { GREATER }
-    '<'             { LESS }
-    '!'             { NOT }
-    length          { LENGTH }
-    while           { WHILE }
-    number          { NUMBER $$ }
-    name            { NAME $$ }
-    qchar           { QCHAR $$ }
-    qstring         { QSTRING $$ }
+    int             { TokenWrapper (INT) (_, _, _) }
+    if              { TokenWrapper (IF) (_, _, _) }
+    else            { TokenWrapper (ELSE) (_, _, _) }
+    '!='            { TokenWrapper (NEQUAL) (_, _, _) }
+    return          { TokenWrapper (RETURN) (_, _, _) }
+    '('             { TokenWrapper (LPAR) (_, _, _) }
+    ')'             { TokenWrapper (RPAR) (_, _, _) }
+    '{'             { TokenWrapper (LBRACE) (_, _, _) }
+    '}'             { TokenWrapper (RBRACE) (_, _, _) }
+    '['             { TokenWrapper (LBRACK) (_, _, _) }
+    ']'             { TokenWrapper (RBRACK) (_, _, _) }
+    '='             { TokenWrapper (ASSIGN) (_, _, _) }
+    ';'             { TokenWrapper (SEMICOLON) (_, _, _) }
+    ','             { TokenWrapper (COMMA) (_, _, _) }
+    '+'             { TokenWrapper (PLUS) (_, _, _) }
+    '-'             { TokenWrapper (MINUS) (_, _, _) }
+    '*'             { TokenWrapper (TIMES) (_, _, _) }
+    '/'             { TokenWrapper (DIVIDE) (_, _, _) }
+    '=='            { TokenWrapper (EQUAL) (_, _, _) }
+    char            { TokenWrapper (CHAR) (_, _, _) }
+    write           { TokenWrapper (WRITE) (_, _, _) }
+    read            { TokenWrapper (READ) (_, _, _) }
+    '>'             { TokenWrapper (GREATER) (_, _, _) }
+    '<'             { TokenWrapper (LESS) (_, _, _) }
+    '!'             { TokenWrapper (NOT) (_, _, _) }
+    length          { TokenWrapper (LENGTH) (_, _, _) }
+    while           { TokenWrapper (WHILE) (_, _, _) }
+    number          { TokenWrapper (NUMBER $$) (_, _, _) }
+    name            { TokenWrapper (NAME $$) (_, _, _) }
+    qchar           { TokenWrapper (QCHAR $$) (_, _, _) }
+    qstring         { TokenWrapper (QSTRING $$) (_, _, _) }
 
 %left ','
 %right '='
@@ -145,8 +146,9 @@ var : name                                        { Name $1 }
 
 {
 
-parseError :: [Token] -> a
-parseError _ = error "Parse error"
+parseError :: [TokenWrapper] -> a
+parseError [] = error ""
+parseError ((TokenWrapper token (o, l, c)):_) = error $ printf "Parse error at line %d column %d : \"%s\"" l c (show token)
 
 type Program = [Declaration]
 
