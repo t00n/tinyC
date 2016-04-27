@@ -33,11 +33,8 @@ instance TACGenerator Declaration where
         return $ lines ++ [TACDeclaration (TACArray n t)]
     tacGenerate (FuncDeclaration t name params stmt) = do
         functionBody <- tacGenerate stmt
-        params <- tacGenerate params
-        return $ [TACLabel (nameString name)] ++ params ++ functionBody ++ [TACReturn (TACInt 0)]
-
-instance TACGenerator Parameter where
-    tacGenerate (Parameter t n) = return [TACParam (nameString n)]
+        let newparams = map (\(Parameter t n) -> (nameString n)) params
+        return $ [TACFunction (nameString name) newparams] ++ functionBody ++ [TACReturn (TACInt 0)]
 
 instance TACGenerator Statement where
     tacGenerate (Assignment (Name n) e) = do
@@ -130,7 +127,7 @@ tacUnaryOperator Neg = TACNeg
 type TACProgram = [TACInstruction]
 
 data TACInstruction = TACDeclaration TACExpression
-                    | TACParam String
+                    | TACFunction String [String]
                     | TACBinary String TACExpression TACBinaryOperator TACExpression
                     | TACUnary String TACUnaryOperator TACExpression
                     | TACCopy String TACExpression
@@ -177,7 +174,7 @@ instance TACPrint a => TACPrint [a] where
 
 instance TACPrint TACInstruction where
     tacPrint (TACDeclaration var) = "declare " ++ tacPrint var
-    tacPrint (TACParam var) = "arg " ++ var
+    tacPrint (TACFunction f params) = f ++ ":\n" ++ intercalate "\n" (map ((++) "arg ") params)
     tacPrint (TACBinary var e1 op e2) = var ++ " = " ++ tacPrint e1 ++ tacPrint op ++ tacPrint e2
     tacPrint (TACUnary var op e) = var ++ " = " ++ tacPrint op ++ tacPrint e
     tacPrint (TACCopy var e) = var ++ " = " ++ tacPrint e
