@@ -21,6 +21,7 @@ library
                      , TACGenerator
                      , MonadNames
                      , Utility
+                     , NASMGenerator
   build-depends:       base >= 4.7 && < 5
                      , array
                      , containers
