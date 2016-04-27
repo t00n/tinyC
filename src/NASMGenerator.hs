@@ -1,9 +1,15 @@
-module NASMGenerator (gasGenerate, NASMInstruction(..)) where
+module NASMGenerator (gasGenerate, NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
+
+import Data.Set (Set, member, empty, insert, delete)
+import Control.Monad.State
+
 
 import TACGenerator
 
 class NASMGenerator a where
-    gasGenerate :: a -> NASMInstruction
+    gasGenerate :: a -> State RegisterState NASMInstruction
+
+type RegisterState = Set RegisterName
 
 data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | MOV2 Register Address
@@ -34,6 +40,7 @@ data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | IMUL2 RegisterName Address -- Only 32-bit register
                      | IMUL3 RegisterName RegisterName Constant -- Only 32-bit register
                      | IMUL4 RegisterName Address Constant -- Only 32-bit register
+                     -- divide the contents of EDX:EAX by the contents of the parameter. Place the quotient in EAX and the remainder in EDX.
                      | IDIV1 RegisterName -- Only 32-bit register
                      | IDIV2 Address
                      | AND1 RegisterSize RegisterName RegisterName
@@ -53,12 +60,12 @@ data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | XOR5 Address Constant
                      | NOT1 Register
                      | NOT2 Address
-                     | SHL1 Register Constant -- Constant must be a byte
-                     | SHL2 Address Constant -- Constant must be a byte
+                     | SHL1 Register Constant -- Constant must be 8-bit value
+                     | SHL2 Address Constant -- Constant must be 8-bit value
                      | SHL3 Register Register -- Second Register must be CL
                      | SHL4 Address Register -- Second Register must be CL
-                     | SHR1 Register Constant -- Constant must be a byte
-                     | SHR2 Address Constant -- Constant must be a byte
+                     | SHR1 Register Constant -- Constant must be 8-bit value
+                     | SHR2 Address Constant -- Constant must be 8-bit value
                      | SHR3 Register Register -- Second Register must be CL
                      | SHR4 Address Register -- Second Register must be CL
                      | JMP Label
@@ -75,12 +82,24 @@ data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | CMP4 Register Constant
                      | CALL Label
                      | RET
+    deriving (Eq, Show)
 
 data RegisterSize = LSB | MSB | WORD | DWORD
+    deriving (Eq, Show)
 
 data RegisterName = A | B | C | D | SI | DI | SP | BP
+    deriving (Eq, Show, Ord)
 
 data Register = Register RegisterName RegisterSize
+    deriving (Eq, Show)
+
+data AddressSize = BYTEADDRESS | WORDADDRESS | DWORDADDRESS
+    deriving (Eq, Show)
+
+data Address = Address Register Multiplier Offset
+             | AddressBase Register Register Multiplier Offset
+             | AddressLabel String Offset
+    deriving (Eq, Show)
 
 type Constant = Int
 
@@ -89,8 +108,3 @@ type Multiplier = Int
 type Offset = Int
 
 type Label = String
-
-data AddressSize = BYTEADDRESS | WORDADDRESS | DWORDADDRESS
-
-data Address = Address Register Multiplier Offset
-             | AddressBase Register Register Multiplier Offset
