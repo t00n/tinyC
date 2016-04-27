@@ -30,6 +30,12 @@ data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | INC2 Address
                      | DEC1 Register
                      | DEC2 Address
+                     | IMUL1 RegisterName RegisterName
+                     | IMUL2 RegisterName Address
+                     | IMUL3 RegisterName RegisterName Constant
+                     | IMUL4 RegisterName Address Constant
+                     | IDIV1 RegisterName
+                     | IDIV2 Address
 
 data RegisterSize = LSB | MSB | WORD | DWORD
 
