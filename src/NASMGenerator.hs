@@ -36,6 +36,21 @@ data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | IMUL4 RegisterName Address Constant
                      | IDIV1 RegisterName
                      | IDIV2 Address
+                     | AND1 RegisterSize RegisterName RegisterName
+                     | AND2 Register Address
+                     | AND3 Address Register
+                     | AND4 Register Constant
+                     | AND5 Address Constant
+                     | OR1 RegisterSize RegisterName RegisterName
+                     | OR2 Register Address
+                     | OR3 Address Register
+                     | OR4 Register Constant
+                     | OR5 Address Constant
+                     | XOR1 RegisterSize RegisterName RegisterName
+                     | XOR2 Register Address
+                     | XOR3 Address Register
+                     | XOR4 Register Constant
+                     | XOR5 Address Constant
 
 data RegisterSize = LSB | MSB | WORD | DWORD
 
