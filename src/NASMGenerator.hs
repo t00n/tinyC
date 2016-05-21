@@ -11,8 +11,9 @@ generateNASM p = (nasmDataGenerate p, evalState (nasmCodeGenerate p) empty)
 
 nasmDataGenerate :: TACProgram -> [NASMData]
 nasmDataGenerate [] = []
--- nasmDataGenerate (x:xs) = d ++ nasmDataGenerate xs
---     where d (TACDeclaration (TACVar n)) = NASMData n DWORDADDRESS 
+nasmDataGenerate (x:xs) = d x : nasmDataGenerate xs
+    where d (TACDeclaration (TACVar n)) = NASMData n DWORDADDRESS [0]
+          d (TACDeclaration (TACArray n (TACInt size))) = NASMData n DWORDADDRESS (take size (repeat 0))
 
 class NASMCodeGenerator a where
     nasmCodeGenerate :: a -> State RegisterState [NASMInstruction]
