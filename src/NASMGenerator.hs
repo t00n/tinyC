@@ -1,4 +1,4 @@
-module NASMGenerator (nasmGenerate, NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
+module NASMGenerator (generateNASM, NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
 
 import Data.Set (Set, member, empty, insert, delete)
 import Control.Monad.State
@@ -6,23 +6,30 @@ import Control.Monad.State
 
 import TACGenerator
 
-generateNASM :: TACProgram -> [NASMInstruction]
-generateNASM p = evalState (nasmGenerate p) empty
+generateNASM :: TACProgram -> ([NASMData], [NASMInstruction])
+generateNASM p = (nasmDataGenerate p, evalState (nasmCodeGenerate p) empty)
 
-class NASMGenerator a where
-    nasmGenerate :: a -> State RegisterState [NASMInstruction]
+nasmDataGenerate :: TACProgram -> [NASMData]
+nasmDataGenerate [] = []
+-- nasmDataGenerate (x:xs) = d ++ nasmDataGenerate xs
+--     where d (TACDeclaration (TACVar n)) = NASMData n DWORDADDRESS 
 
-instance NASMGenerator a => NASMGenerator [a] where
-    nasmGenerate [] = return []
-    nasmGenerate (x:xs) = do
-        first <- nasmGenerate x
-        rest <- nasmGenerate xs
+class NASMCodeGenerator a where
+    nasmCodeGenerate :: a -> State RegisterState [NASMInstruction]
+
+instance NASMCodeGenerator a => NASMCodeGenerator [a] where
+    nasmCodeGenerate [] = return []
+    nasmCodeGenerate (x:xs) = do
+        first <- nasmCodeGenerate x
+        rest <- nasmCodeGenerate xs
         return $ first ++ rest
 
-instance NASMGenerator TACInstruction where
-    nasmGenerate = undefined
+instance NASMCodeGenerator TACInstruction where
+    nasmCodeGenerate = undefined
 
 type RegisterState = Set RegisterName
+
+data NASMData = NASMData Label AddressSize [Int]
 
 data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | MOV2 Register Address
