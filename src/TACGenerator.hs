@@ -83,6 +83,35 @@ instance TACGenerator Statement where
         (_, lines) <- tacExpression e
         return lines
 
+tacRelExpression :: Expression -> Names String String (TACExpression, [TACInstruction])
+tacRelExpression ex@(BinOp e1 op e2) = 
+    let isRelOp Equal = True
+        isRelOp NotEqual = True
+        isRelOp Greater = True
+        isRelOp Less = True
+        isRelOp _ = False
+    in
+    case isRelOp op of
+        False -> do
+            (t, lines) <- tacExpression ex
+            return (TACExpr t TACNotEqual (TACInt 0), lines)
+        True -> do
+            (t1, lines1) <- tacExpression e1
+            (t2, lines2) <- tacExpression e2
+            return (TACExpr t1 (tacBinaryOperator op) t2, lines1 ++ lines2)
+tacRelExpression (Int i) = return (TACExpr (TACInt i) TACNotEqual (TACInt 0), [])
+tacRelExpression (Char c) = return (TACExpr (TACChar c) TACNotEqual (TACInt 0), [])
+tacRelExpression (UnOp op e) = 
+    case op of
+        Neg -> tacRelExpression e
+        Not -> do
+            (t, lines) <- tacExpression e
+            return (TACExpr t TACEqual (TACInt 0), lines)
+tacRelExpression (Var v) = do
+    (t, lines) <- tacExpression (Var v)
+    return (TACExpr t TACNotEqual (TACInt 0), lines)
+tacRelExpression e = tacExpression e
+
 tacExpression :: Expression -> Names String String (TACExpression, [TACInstruction])
 tacExpression (Int i) = return (TACInt i, [])
 tacExpression (Char i) = return (TACChar i, [])
@@ -162,6 +191,7 @@ data TACExpression = TACInt Int
                    | TACChar Char
                    | TACVar String
                    | TACArray String TACExpression
+                   | TACExpr TACExpression TACBinaryOperator TACExpression
     deriving (Eq, Show)
 
 
