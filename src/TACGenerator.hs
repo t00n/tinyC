@@ -45,13 +45,13 @@ instance TACGenerator Statement where
         (t2, lines2) <- tacExpression e
         return $ lines1 ++ lines2 ++ [TACArrayModif (TACArray n t1) t2]
     tacGenerate (If e stmt) = do
-        (t, lines) <- tacExpression e
+        (t, lines) <- tacRelExpression e
         labelYes <- popLabel
         labelNo <- popLabel
         stmt <- tacGenerate stmt
         return $ lines ++ [TACIf t labelYes, TACGoto labelNo, TACLabel labelYes] ++ stmt ++ [TACLabel labelNo]
     tacGenerate (IfElse e s1 s2) = do
-        (t, lines) <- tacExpression e
+        (t, lines) <- tacRelExpression e
         labelYes <- popLabel
         labelNo <- popLabel
         labelEnd <- popLabel
@@ -59,7 +59,7 @@ instance TACGenerator Statement where
         s2 <- tacGenerate s2
         return $ lines ++ [TACIf t labelYes, TACGoto labelNo, TACLabel labelYes] ++ s1 ++ [TACGoto labelEnd, TACLabel labelNo] ++ s2 ++ [TACLabel labelEnd]
     tacGenerate (While e s) = do
-        (t, lines) <- tacExpression e
+        (t, lines) <- tacRelExpression e
         labelBeg <- popLabel
         labelEnd <- popLabel
         labelYes <- popLabel
@@ -237,3 +237,4 @@ instance TACPrint TACExpression where
     tacPrint (TACChar c) = show c
     tacPrint (TACVar s) = s 
     tacPrint (TACArray s e) = s ++ "[" ++ tacPrint e ++ "]"
+    tacPrint (TACExpr e1 op e2) = (tacPrint e1) ++ (tacPrint op) ++ (tacPrint e2)
