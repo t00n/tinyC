@@ -34,7 +34,11 @@ instance TACGenerator Declaration where
     tacGenerate (FuncDeclaration t name params stmt) = do
         functionBody <- tacGenerate stmt
         let newparams = map (\(Parameter t n) -> (nameString n)) params
-        return $ [TACFunction (nameString name) newparams] ++ functionBody ++ [TACReturn (TACInt 0)]
+        let ret = if functionBody == [] then [TACReturn Nothing] 
+            else case last functionBody of
+                (TACReturn _) -> []
+                _ -> [TACReturn Nothing]
+        return $ [TACFunction (nameString name) newparams] ++ functionBody ++ ret
 
 instance TACGenerator Statement where
     tacGenerate (Assignment (Name n) e) = do
@@ -67,7 +71,7 @@ instance TACGenerator Statement where
         return $ [TACLabel labelBeg] ++ lines ++ [TACIf t labelYes, TACGoto labelEnd, TACLabel labelYes] ++ s ++ [TACGoto labelBeg, TACLabel labelEnd]
     tacGenerate (Return e) = do
         (t, lines) <- tacExpression e
-        return $ lines ++ [TACReturn t]
+        return $ lines ++ [TACReturn $ Just t]
     tacGenerate (Block ds ss) = do
         ds <- tacGenerate ds
         ss <- tacGenerate ss
@@ -169,7 +173,7 @@ data TACInstruction = TACDeclaration TACExpression
                     | TACIf TACExpression String
                     | TACGoto String
                     | TACCall String [TACExpression]
-                    | TACReturn TACExpression
+                    | TACReturn (Maybe TACExpression)
                     | TACLabel String
                     | TACWrite TACExpression
                     | TACRead TACExpression
@@ -214,7 +218,8 @@ instance TACPrint TACInstruction where
     tacPrint (TACIf e l) = "if " ++ tacPrint e ++ " goto " ++ l
     tacPrint (TACGoto l) = "goto " ++ l
     tacPrint (TACCall l es) = intercalate "\n" (map (((++) "param ") . tacPrint) es) ++ "\ncall " ++ l
-    tacPrint (TACReturn e) = "return " ++ tacPrint e
+    tacPrint (TACReturn Nothing) = "return"
+    tacPrint (TACReturn (Just e)) = "return " ++ tacPrint e
     tacPrint (TACLabel l) = l ++ ":"
     tacPrint (TACWrite v) = "write " ++ tacPrint v
     tacPrint (TACRead e) = "read " ++ tacPrint e
