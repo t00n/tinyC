@@ -9,6 +9,7 @@ import Parser
 import Semantics
 import TACGenerator
 import MonadNames
+import NASMGenerator
 
 scan_and_parse = parse . alexScanTokens
 
@@ -16,6 +17,8 @@ scan_parse_check xs = let ast = scan_and_parse xs
                           check = checkSemantics ast in
     if check == Right () then ast
     else error $ show check
+
+scan_to_tac = generateTAC . scan_parse_check
 
 testTokens s r = do
     it ("Tokenizes " ++ s) $ do
@@ -366,3 +369,7 @@ main = hspec $ do
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]
+    describe "Generate NASM code" $ do
+        it "Generates data" $ do
+            let tac = scan_to_tac "int a; int b = 2; char c = 'a'; int tiny() {}"
+            generateNASM tac `shouldBe` ([NASMData "a" DWORDADDRESS [0],NASMData "b" DWORDADDRESS [2],NASMData "c" BYTEADDRESS [97]],[])

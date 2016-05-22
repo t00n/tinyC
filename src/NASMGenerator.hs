@@ -1,7 +1,8 @@
-module NASMGenerator (generateNASM, NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
+module NASMGenerator (generateNASM, NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
 
 import Data.Set (Set, member, empty, insert, delete)
 import Control.Monad.State
+import Data.Char (ord)
 
 
 import TACGenerator
@@ -10,10 +11,14 @@ generateNASM :: TACProgram -> ([NASMData], [NASMInstruction])
 generateNASM p = (nasmDataGenerate p, evalState (nasmCodeGenerate p) empty)
 
 nasmDataGenerate :: TACProgram -> [NASMData]
-nasmDataGenerate [] = []
-nasmDataGenerate (x:xs) = d x : nasmDataGenerate xs
-    where d (TACDeclaration (TACVar n)) = NASMData n DWORDADDRESS [0]
-          d (TACDeclaration (TACArray n (TACInt size))) = NASMData n DWORDADDRESS (take size (repeat 0))
+nasmDataGenerate = (map decl) . (filter datadecl)
+    where datadecl (TACDeclaration _) = True
+          datadecl (TACDeclarationValue _ _) = True
+          datadecl _ = False
+          decl (TACDeclaration (TACVar n)) = NASMData n DWORDADDRESS [0]
+          decl (TACDeclaration (TACArray n (TACInt size))) = NASMData n DWORDADDRESS (take size (repeat 0))
+          decl (TACDeclarationValue (TACVar n) (TACInt i)) = NASMData n DWORDADDRESS [i]
+          decl (TACDeclarationValue (TACVar n) (TACChar c)) = NASMData n BYTEADDRESS [ord c]
 
 class NASMCodeGenerator a where
     nasmCodeGenerate :: a -> State RegisterState [NASMInstruction]
@@ -26,11 +31,12 @@ instance NASMCodeGenerator a => NASMCodeGenerator [a] where
         return $ first ++ rest
 
 instance NASMCodeGenerator TACInstruction where
-    nasmCodeGenerate = undefined
+    nasmCodeGenerate inst = return $ []
 
 type RegisterState = Set RegisterName
 
 data NASMData = NASMData Label AddressSize [Int]
+    deriving(Eq, Show)
 
 data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | MOV2 Register Address
