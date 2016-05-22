@@ -27,7 +27,7 @@ instance TACGenerator Declaration where
     tacGenerate (VarDeclaration t (Name n) Nothing) = return $ [TACDeclaration (TACVar n)]
     tacGenerate (VarDeclaration t (Name n) (Just x)) = do
         (t, lines) <- tacExpression x
-        return $ [TACDeclaration (TACVar n)] ++ lines ++ [TACCopy n t]
+        return $ lines ++ [TACDeclarationValue (TACVar n) t]
     tacGenerate (VarDeclaration t (NameSubscription n e) Nothing) = do
         (t, lines) <- tacExpression e
         return $ lines ++ [TACDeclaration (TACArray n t)]
@@ -156,6 +156,7 @@ tacUnaryOperator Neg = TACNeg
 type TACProgram = [TACInstruction]
 
 data TACInstruction = TACDeclaration TACExpression
+                    | TACDeclarationValue TACExpression TACExpression
                     | TACFunction String [String]
                     | TACBinary String TACExpression TACBinaryOperator TACExpression
                     | TACUnary String TACUnaryOperator TACExpression
