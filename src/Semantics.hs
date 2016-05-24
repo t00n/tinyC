@@ -1,6 +1,10 @@
+{-# LANGUAGE DeriveAnyClass #-}
+
 module Semantics (checkSemantics, symbolTable, SemanticError(..), ErrorType(..), SymbolTable(..)) where
 
-import Control.Monad (void, foldM)
+import Control.Monad.Trans.Except (ExceptT(..), runExceptT, throwE)
+import Control.Monad.State (StateT(..), get, put, modify, runStateT)
+import Control.Monad.IO.Class (liftIO)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, fromJust)
 import Data.Char (ord)
@@ -61,6 +65,8 @@ nameScalarity (Name _) = Scalar
 nameScalarity (NameSubscription _ _) = Array
 
 -- Errors data types
+type ESSS = ExceptT SemanticError (StateT SymbolTable IO)
+
 data ErrorType = NotDeclaredError 
                | NotAFunctionError 
                | NameExistsError 
@@ -88,143 +94,170 @@ infoError (FuncInfo _ _) = NotAFunctionError
 
 -- Check functions
 class Checkable a where
-    check :: a -> SymbolTable -> Either SemanticError SymbolTable
+    check :: a -> ESSS a
 
 instance Checkable a => Checkable [a] where
-    check = flip $ foldM $ flip check
+    check = mapM check
 
 instance Checkable Declaration where
-    check x st = let paramToInfo (Parameter t (Name _)) = VarInfo t Scalar 1
-                     paramToInfo (Parameter t (NameSubscription _ (Int i))) = VarInfo t Array i
-                     paramToInfo (Parameter t (NameSubscription _ (Char c))) = VarInfo t Array (ord c)
-                     paramToSymbol p@(Parameter _ n) = (n, paramToInfo p) in
+    check x = let paramToInfo (Parameter t (Name _)) = VarInfo t Scalar 1
+                  paramToInfo (Parameter t (NameSubscription _ (Int i))) = VarInfo t Array i
+                  paramToInfo (Parameter t (NameSubscription _ (Char c))) = VarInfo t Array (ord c)
+                  paramToSymbol p@(Parameter _ n) = (n, paramToInfo p) in
         case x of
-            VarDeclaration t n@(Name _) _ -> declareName n (VarInfo t Scalar 1) st
-            VarDeclaration t n@(NameSubscription _ (Int i)) _ -> declareName n (VarInfo t Array i) st
-            VarDeclaration t n@(NameSubscription _ (Char c)) _ -> declareName n (VarInfo t Array (ord c)) st
-            VarDeclaration _ n _ -> Left $ SemanticError NotConstantSizeArrayError (show n)
-            FuncDeclaration t n params stmt -> declareName n (FuncInfo t (map paramToInfo params)) st >>= declareNames (map paramToSymbol params) . emptySymbolTable . Just >>= check stmt
+            VarDeclaration t n@(Name _) _ -> declareName n (VarInfo t Scalar 1) >> return x
+            VarDeclaration t n@(NameSubscription _ (Int i)) _ -> declareName n (VarInfo t Array i) >> return x
+            VarDeclaration t n@(NameSubscription _ (Char c)) _ -> declareName n (VarInfo t Array (ord c)) >> return x
+            VarDeclaration _ n _ -> throwE (SemanticError NotConstantSizeArrayError (show n)) >> return x
+            FuncDeclaration t n params stmt -> do
+                declareName n (FuncInfo t (map paramToInfo params))
+                st <- get
+                put $ emptySymbolTable $ Just st
+                declareNames (map paramToSymbol params) >> check stmt >> return x
 
 instance Checkable Statement where
-    check stmt st = 
+    check stmt = 
         case stmt of
-            Assignment v e -> checkNameDeclared v st >>= check e >>= checkAssignment v e
-            If e stmt1 -> check e st >>= checkExpressionIsScalar e >>= check stmt1
-            IfElse e stmt1 stmt2 -> check e st >>= checkExpressionIsScalar e >>= check stmt1 >>= check stmt2
-            While e stmt1 -> check e st >>= checkExpressionIsScalar e >>= check stmt1
-            Return e -> check e st >>= checkExpressionIsScalar e
-            Block decl stmts -> check decl st >>= check stmts
-            Write e -> check e st >>= checkExpressionIsScalar e
-            Read v -> checkNameDeclared v st >>= checkNameIsScalarity v Scalar
-            Expr e -> check e st
+            Assignment v e -> checkNameDeclared v >> check e >> checkAssignment v e >> return stmt
+            If e stmt1 -> check e >> checkExpressionIsScalar e >> check stmt1 >> return stmt
+            IfElse e stmt1 stmt2 -> check e >> checkExpressionIsScalar e >> check stmt1 >> check stmt2 >> return stmt
+            While e stmt1 -> check e >> checkExpressionIsScalar e >> check stmt1 >> return stmt
+            Return e -> check e >> checkExpressionIsScalar e >> return stmt
+            Block decl stmts -> check decl >> check stmts >> return stmt
+            Write e -> check e >> checkExpressionIsScalar e >> return stmt
+            Read v -> checkNameDeclared v >> checkNameIsScalarity v Scalar >> return stmt
+            Expr e -> check e >> return stmt
 
 instance Checkable Expression where
-    check expr st = 
+    check expr = 
         case expr of 
-            BinOp e1 _ e2 -> check e1 st 
-                        >>= check e2 
-                        >>= checkExpressionIsScalar e1 
-                        >>= checkExpressionIsScalar e2
-            UnOp _ e -> check e st >>= checkExpressionIsScalar e
-            Call n args -> checkNameDeclared n st 
-                        >>= checkNameIsFunction n
-                        >>= check args
-                        >>= checkArguments args n
-            Length n -> checkNameDeclared n st >>= checkNameIsScalarity n Array
-            Var name -> checkNameDeclared name st >>
+            BinOp e1 _ e2 -> check e1
+                        >> check e2 
+                        >> checkExpressionIsScalar e1 
+                        >> checkExpressionIsScalar e2
+                        >> return expr
+            UnOp _ e -> check e >> checkExpressionIsScalar e
+                        >> return expr
+            Call n args -> checkNameDeclared n
+                        >> checkNameIsFunction n
+                        >> check args
+                        >> checkArguments args n
+                        >> return expr
+            Length n -> checkNameDeclared n >> checkNameIsScalarity n Array
+                        >> return expr
+            Var name -> checkNameDeclared name >>
                 case name of
-                    (NameSubscription n e) -> checkNameIsArray name st >>= check e >>= checkExpressionIsScalar e
-                    _ -> return st
-            _ -> Right st
+                    (NameSubscription n e) -> checkNameIsArray name >> check e >> checkExpressionIsScalar e >> return expr
+                    _ -> return expr
+            _ -> return expr
 
-checkNameNotDeclared :: Name -> SymbolTable -> Either SemanticError SymbolTable
-checkNameNotDeclared n st = 
+checkNameNotDeclared :: Name -> ESSS ()
+checkNameNotDeclared n = do
+    st <- get
     if nameInBlock n st
-        then Left (SemanticError NameExistsError (nameString n))
+        then throwE (SemanticError NameExistsError (nameString n))
     else if nameInScope n st
-        then Left (SemanticError NameExistsWarning (nameString n))
-    else Right st
+        then throwE (SemanticError NameExistsWarning (nameString n))
+    else return ()
 
-checkNameDeclared :: Name -> SymbolTable -> Either SemanticError SymbolTable
-checkNameDeclared name st = 
-    if nameInScope name st then Right st 
-    else Left (SemanticError NotDeclaredError (nameString name))
+checkNameDeclared :: Name -> ESSS ()
+checkNameDeclared name = do
+    st <- get
+    if not (nameInScope name st) then throwE (SemanticError NotDeclaredError (nameString name))
+    else return ()
 
-checkNameIsScalarity :: Name -> Scalarity -> SymbolTable -> Either SemanticError SymbolTable
-checkNameIsScalarity name kind st = 
-    case getNameScalarity name st of
-        Right x -> if x == kind then Right st else Left $ SemanticError (scalarityError kind) (nameString name)
-        Left x -> Left x
+checkNameIsScalarity :: Name -> Scalarity -> ESSS ()
+checkNameIsScalarity name kind = do
+    s <- getNameScalarity name
+    if s /= kind then throwE (SemanticError (scalarityError kind) (nameString name))
+    else return ()
 
-checkNameIsArray :: Name -> SymbolTable -> Either SemanticError SymbolTable
-checkNameIsArray name st = let res = unsafeSymbolIsScalarity (nameString name) Array st in
-    if res then Right st else Left $ SemanticError NotAnArrayError (nameString name)
+checkNameIsArray :: Name -> ESSS ()
+checkNameIsArray name = do
+    st <- get
+    let res = unsafeSymbolIsScalarity (nameString name) Array st 
+    if not res then throwE (SemanticError NotAnArrayError (nameString name))
+    else return ()
 
-checkNameIsFunction :: Name -> SymbolTable -> Either SemanticError SymbolTable
-checkNameIsFunction name st = 
+checkNameIsFunction :: Name -> ESSS ()
+checkNameIsFunction name = do
+    st <- get
     let n = nameString name
-        info = unsafeGetSymbolInfo n st in
+    let info = unsafeGetSymbolInfo n st 
     case info of
-        (VarInfo _ _ _) -> Left (SemanticError NotAFunctionError n)
-        (FuncInfo _ _) -> Right st
+        (VarInfo _ _ _) -> throwE (SemanticError NotAFunctionError n)
+        (FuncInfo _ _) -> return ()
 
-getNameScalarity :: Name -> SymbolTable -> Either SemanticError Scalarity
-getNameScalarity name st = 
-    let s = unsafeSymbolScalarity (nameString name) st in
+getNameScalarity :: Name -> ESSS Scalarity
+getNameScalarity name = do
+    st <- get
+    let s = unsafeSymbolScalarity (nameString name) st
     case name of
-        (Name _) -> Right $ if s == Scalar then Scalar else Array
-        (NameSubscription _ _) -> if s == Scalar then Left $ SemanticError NotAnArrayError (show name) else Right Scalar
+        (Name _) -> return s
+        (NameSubscription _ _) -> 
+            if s == Scalar then throwE (SemanticError NotAnArrayError (show name)) >> return Scalar
+            else return Scalar
 
-checkExpressionIsScalar :: Expression -> SymbolTable -> Either SemanticError SymbolTable
-checkExpressionIsScalar expr st = 
-    if expressionIsScalar expr st
-        then Right st
-    else
-        Left $ SemanticError NotAScalarError $ show expr
+checkExpressionIsScalar :: Expression -> ESSS ()
+checkExpressionIsScalar expr = do
+    st <- get
+    s <- expressionIsScalar expr
+    if not s
+        then throwE (SemanticError NotAScalarError $ show expr)
+    else return ()
 
-checkAssignment :: Name -> Expression -> SymbolTable -> Either SemanticError SymbolTable
-checkAssignment name expr st = do
-    s1 <- getNameScalarity name st
-    s2 <- getExpressionScalarity expr st
+checkAssignment :: Name -> Expression -> ESSS ()
+checkAssignment name expr = do
+    s1 <- getNameScalarity name
+    s2 <- getExpressionScalarity expr
     if s1 /= s2
-        then Left $ SemanticError NotSameScalarityError (show name ++ " " ++ show expr)
+        then throwE (SemanticError NotSameScalarityError (show name ++ " " ++ show expr))
     else
-        Right st
+        return ()
 
-checkArguments :: [Expression] -> Name -> SymbolTable -> Either SemanticError SymbolTable
-checkArguments args func st = 
+checkArgument :: Expression -> Info -> ESSS ()
+checkArgument arg param = do
+    st <- get
+    s <- expressionIsScalar arg
+    if s && infoScalarity param /= Scalar
+        then throwE (SemanticError NotAnArrayError $ show arg)
+    else if (not s) && infoScalarity param /= Array
+        then throwE (SemanticError NotAScalarError $ show arg)
+    else return ()
+
+checkArguments :: [Expression] -> Name -> ESSS ()
+checkArguments args func = do
+    st <- get
     let funcName = nameString func
-        params = (infoParams ... unsafeGetSymbolInfo) funcName st 
-        comp arg param = 
-            if expressionIsScalar arg st && infoScalarity param /= Scalar
-                then Left $ SemanticError NotAnArrayError $ show arg
-            else if (not $ expressionIsScalar arg st) && infoScalarity param /= Array
-                then Left $ SemanticError NotAScalarError $ show arg
-            else Right st in
-    foldl (>>) (Right st) $ zipWith comp args params
+    let params = (infoParams ... unsafeGetSymbolInfo) funcName st 
+    foldl (>>) (return ()) $ zipWith checkArgument args params
 
-getExpressionScalarity :: Expression -> SymbolTable -> Either SemanticError Scalarity
-getExpressionScalarity expr st = 
+getExpressionScalarity :: Expression -> ESSS Scalarity
+getExpressionScalarity expr = do
+    st <- get
     case expr of 
         (BinOp e1 _ e2) -> do
-            s1 <- getExpressionScalarity e1 st
-            s2 <- getExpressionScalarity e2 st
+            s1 <- getExpressionScalarity e1
+            s2 <- getExpressionScalarity e2
             if s1 /= s2
-                then Left $ SemanticError NotSameScalarityError (show e1 ++ " " ++ show e2)
+                then throwE (SemanticError NotSameScalarityError (show e1 ++ " " ++ show e2)) >> return s1
             else
-                Right s1
-        (UnOp _ e) -> getExpressionScalarity e st
-        (Var name) -> getNameScalarity name st
-        _ -> Right Scalar
+                return s1
+        (UnOp _ e) -> getExpressionScalarity e
+        (Var name) -> getNameScalarity name
+        _ -> return Scalar
 
-entryPointExists :: Program -> SymbolTable -> Either SemanticError SymbolTable
-entryPointExists ds st = 
+entryPointExists :: Program -> ESSS Program
+entryPointExists ds = 
     let isEntryPoint (FuncDeclaration IntType (Name "tiny") [] _) = True
         isEntryPoint _ = False
-        funcs = filter (isEntryPoint) ds in
-    if length funcs == 0 then Left $ SemanticError NoTinyFunctionError "" else
-    if length funcs > 1 then Left $ SemanticError SeveralTinyFunctionError "" else
-    Right st
+        funcs = filter (isEntryPoint) ds
+    in
+    do
+        st <- get
+        if length funcs == 0 then throwE (SemanticError NoTinyFunctionError "") >> return ds
+        else if length funcs > 1 then throwE (SemanticError SeveralTinyFunctionError "") >> return ds
+        else return ds
 
 -- Helpers
 nameInScope :: Name -> SymbolTable -> Bool
@@ -235,22 +268,25 @@ nameInScope n = (||) <$> nameInBlock n <*> variableInParent n
 nameInBlock :: Name -> SymbolTable -> Bool
 nameInBlock n st = Map.member (nameString n) (symbols st)
 
-expressionIsScalar :: Expression -> SymbolTable -> Bool
-expressionIsScalar = ((==) (Right Scalar)) ... getExpressionScalarity
+expressionIsScalar :: Expression -> ESSS Bool
+expressionIsScalar e = getExpressionScalarity e >>= (return . ((==) (Scalar)))
 
-declareName :: Name -> Info -> SymbolTable -> Either SemanticError SymbolTable
-declareName name info st = checkNameNotDeclared name st >>= return . insertSymbol (nameString name) info
+declareName :: Name -> Info -> ESSS ()
+declareName name info = do
+    st <- get
+    checkNameNotDeclared name 
+    modify $ insertSymbol (nameString name) info
 
-declareNames :: [(Name, Info)] -> SymbolTable -> Either SemanticError SymbolTable
-declareNames xs = flip (foldl (\acc x -> acc >>= (uncurry declareName) x )) xs . return
+declareNames :: [(Name, Info)] -> ESSS ()
+declareNames = foldl (\acc x -> acc >> (uncurry declareName) x ) (return ())
 
 -- API
 
-runCheck :: Program -> Either SemanticError SymbolTable
-runCheck = (>>=) <$> flip entryPointExists (emptySymbolTable Nothing) <*> check
+run ::Program -> IO (Either SemanticError Program, SymbolTable)
+run prog = runStateT (runExceptT (entryPointExists prog >>= check)) (emptySymbolTable Nothing)
 
-checkSemantics :: Program -> Either SemanticError ()
-checkSemantics = void . runCheck
+checkSemantics :: Program -> IO (Either SemanticError Program)
+checkSemantics = ((<$>) fst) . run
 
-symbolTable :: Program -> Either SemanticError SymbolTable
-symbolTable = runCheck
+symbolTable :: Program -> IO SymbolTable
+symbolTable = ((<$>) snd) . run
