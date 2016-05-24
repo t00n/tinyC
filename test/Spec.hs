@@ -3,6 +3,8 @@ import Test.QuickCheck
 import Control.Exception (evaluate, ErrorCall(..))
 import System.IO
 
+import qualified Data.Tree as T
+import qualified Data.Map as M
 
 import Scanner
 import Parser
@@ -10,6 +12,7 @@ import Semantics
 import TACGenerator
 import MonadNames
 import NASMGenerator
+import qualified SymbolTable as ST
 
 scan_and_parse = parse . alexScanTokens
 
@@ -174,6 +177,10 @@ main = hspec $ do
         it "Throws an parse error" $ do
             let ast = scan_and_parse "int tiny() { read x }"
             evaluate ast `shouldThrow` errorCall "Parse error at line 1 column 21 : \"}\""
+    describe "Symbol table construction" $ do
+        it "Constructs a one-level symbol table" $ do
+            let ast = scan_and_parse "char a; int b = 5; int c[5]; char f() {} int g(int a) {}"
+            ST.constructST ast `shouldBe` Right (T.Node (M.fromList [("a",ST.VarInfo CharType ST.Scalar 1),("b",ST.VarInfo IntType ST.Scalar 1),("c",ST.VarInfo IntType ST.Array 5),("f",ST.FuncInfo CharType []),("g",ST.FuncInfo IntType [ST.VarInfo IntType ST.Scalar 1])]) [])
     describe "Semantics" $ do
         it "Checks that variables with same name are declared only once on a certain scope level" $ do
             let ast = scan_and_parse "int tiny() { int a; int a; }"

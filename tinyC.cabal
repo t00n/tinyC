@@ -22,6 +22,8 @@ library
                      , MonadNames
                      , Utility
                      , NASMGenerator
+                     , SymbolTable
+                     , SemanticError
   build-depends:       base >= 4.7 && < 5
                      , array
                      , containers

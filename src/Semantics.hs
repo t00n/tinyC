@@ -11,6 +11,7 @@ import Data.Char (ord)
 
 import Parser
 import Utility
+import SemanticError
 
 -- Symbols data types
 data Scalarity = Scalar | Array
@@ -66,23 +67,6 @@ nameScalarity (NameSubscription _ _) = Array
 
 -- Errors data types
 type ESSS = ExceptT SemanticError (StateT SymbolTable IO)
-
-data ErrorType = NotDeclaredError 
-               | NotAFunctionError 
-               | NameExistsError 
-               | NotAnArrayError 
-               | NotAScalarError
-               | NotSameScalarityError
-               | NameExistsWarning
-               | NotConstantSizeArrayError
-               | NoTinyFunctionError
-               | SeveralTinyFunctionError
-    deriving (Eq, Show)
-
-data SemanticError = SemanticError {
-    errorType :: ErrorType,
-    errorVariable :: String
-} deriving (Eq, Show)
 
 scalarityError :: Scalarity -> ErrorType
 scalarityError Scalar = NotAScalarError
