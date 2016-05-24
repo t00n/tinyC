@@ -8,14 +8,14 @@ import Control.Monad (foldM)
 import SemanticError
 import Parser
 
-addChild :: a -> T.Tree a -> T.Tree a
-addChild e tree = 
-    let child = T.Node e []
-    in T.Node (T.rootLabel tree) (child:T.subForest tree)
+-- Tree
+addChild :: T.Tree a -> T.Tree a -> T.Tree a
+addChild child tree = T.Node (T.rootLabel tree) (child:T.subForest tree)
 
-emptyST :: SymbolTable
-emptyST = T.Node (M.empty) []
+addChildren :: [T.Tree a] -> T.Tree a -> T.Tree a
+addChildren = flip (foldr addChild)
 
+-- Symbols
 data SymbolScalarity = Scalar | Array
     deriving (Eq, Show)
 
@@ -32,7 +32,11 @@ data SymbolInfo = VarInfo {
 
 type Symbols = M.Map String SymbolInfo
 
+-- Symbol Table
 type SymbolTable = T.Tree Symbols
+
+emptyST :: SymbolTable
+emptyST = T.Node M.empty []
 
 symbols :: SymbolTable -> Symbols
 symbols = T.rootLabel
@@ -40,6 +44,7 @@ symbols = T.rootLabel
 children :: SymbolTable -> [SymbolTable]
 children = T.subForest
 
+-- Declaration data
 nameToString :: Name -> String
 nameToString (Name s) = s
 nameToString (NameSubscription s _) = s
@@ -53,36 +58,44 @@ nameToSize (Name _) = 1
 nameToSize (NameSubscription _ (Int i)) = i
 nameToSize (NameSubscription _ (Char c)) = ord c
 
+declName :: Declaration -> String
+declName (VarDeclaration _ n _) = nameToString n
+declName (FuncDeclaration _ n _ _) = nameToString n
+
+-- Parameter data
 paramToInfo :: Parameter -> SymbolInfo
 paramToInfo (Parameter t n) = VarInfo t (nameToScalarity n) (nameToSize n)
 
 paramToSymbol :: Parameter -> (String, SymbolInfo)
 paramToSymbol p@(Parameter t n) = (nameToString n, paramToInfo p)
 
-declare :: Declaration -> Symbols -> Either SemanticError Symbols
-declare decl st = 
-    let declToInfo (VarDeclaration t n _) = VarInfo t (nameToScalarity n) (nameToSize n)
-        declToInfo (FuncDeclaration t n ps _) = FuncInfo t (map paramToInfo ps)
-        declName (VarDeclaration _ n _) = nameToString n
-        declName (FuncDeclaration _ n _ _) = nameToString n
+-- Declarations
+addSymbol :: Declaration -> SymbolTable -> SymbolTable
+addSymbol d st = 
+    let declInfo (VarDeclaration t n _) = VarInfo t (nameToScalarity n) (nameToSize n)
+        declInfo (FuncDeclaration t n ps _) = FuncInfo t (map paramToInfo ps)
     in
-    do 
-        if M.member (declName decl) st
-            then Left $ SemanticError NameExistsError (declName decl)
-        else
-            Right $ M.insert (declName decl) (declToInfo decl) st
+    T.Node (M.insert (declName d) (declInfo d) (symbols st)) (children st)
 
+declare :: Declaration -> SymbolTable -> Either SemanticError SymbolTable
+declare decl st = do 
+    if M.member (declName decl) (symbols st)
+        then Left $ SemanticError NameExistsError (declName decl)
+    else
+        Right $ addSymbol decl st
+
+-- SymbolTable construction
 constructSubST :: [Declaration] -> SymbolTable -> Either SemanticError SymbolTable
 constructSubST ds st = 
     let funcdecl (FuncDeclaration _ _ _ _) = True
         funcdecl _ = False
-        subdecl (FuncDeclaration _ _ ps (Block subds _)) = constructSubST subds (T.Node (M.fromList $ map paramToSymbol ps) [])
-        ss = symbols st
+        paramsToST ps = T.Node (M.fromList (map paramToSymbol ps)) []
+        subdecl (FuncDeclaration _ _ ps (Block subds _)) = constructSubST subds (paramsToST ps)
     in
     do
-    symbols <- foldM (flip declare) ss ds
+    st <- foldM (flip declare) st ds
     subds <- ((mapM subdecl) . (filter funcdecl)) ds
-    Right (T.Node symbols subds)
+    Right (addChildren subds st)
 
 constructST :: [Declaration] -> Either SemanticError SymbolTable
-constructST = flip constructSubST (T.Node M.empty [])
+constructST = flip constructSubST emptyST
