@@ -181,6 +181,11 @@ main = hspec $ do
         it "Constructs a one-level symbol table" $ do
             let ast = scan_and_parse "char a; int b = 5; int c[5]; char f() {} int g(int a) {}"
             ST.constructST ast `shouldBe` Right (T.Node (M.fromList [("a",ST.VarInfo CharType ST.Scalar 1),("b",ST.VarInfo IntType ST.Scalar 1),("c",ST.VarInfo IntType ST.Array 5),("f",ST.FuncInfo CharType []),("g",ST.FuncInfo IntType [ST.VarInfo IntType ST.Scalar 1])]) [])
+        it "Fails to construct a symbol table when a name exists" $ do
+            let ast = scan_and_parse "char a; int a[5];"
+            ST.constructST ast `shouldBe` Left (SemanticError {errorType = NameExistsError, errorVariable = "a"})
+            let ast = scan_and_parse "int a; char a() {}"
+            ST.constructST ast `shouldBe` Left (SemanticError {errorType = NameExistsError, errorVariable = "a"})
     describe "Semantics" $ do
         it "Checks that variables with same name are declared only once on a certain scope level" $ do
             let ast = scan_and_parse "int tiny() { int a; int a; }"
