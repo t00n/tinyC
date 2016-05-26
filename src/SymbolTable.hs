@@ -93,11 +93,22 @@ root = Z.toTree . Z.root
 zipper :: SymbolTable -> SymbolTableZipper
 zipper = Z.fromTree
 
-parent :: SymbolTableZipper -> Maybe SymbolTableZipper
-parent = Z.parent
-
 memberST :: String -> SymbolTableZipper -> Bool
 memberST s stz = (M.member s . rootLabel . Z.tree) stz
+
+nameInScope :: String -> SymbolTableZipper -> Bool
+nameInScope s = (||) <$> memberST s <*> nameInParent s
+
+nameInParent :: String -> SymbolTableZipper -> Bool
+nameInParent s st = 
+    let p = parent st
+    in
+    if p /= Nothing
+        then
+            if memberST s (fromJust p)
+                then True
+            else nameInParent s (fromJust p)
+    else False
 
 -- Declaration data
 nameToScalarity :: Name -> SymbolScalarity

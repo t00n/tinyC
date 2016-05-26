@@ -4,7 +4,6 @@ module Semantics (checkSemantics, symbolTable, SemanticError(..), ErrorType(..),
 
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT, throwE)
 import Control.Monad.State (State(..), get, put, modify, runState)
-import qualified Data.Map.Strict as Map
 import Data.Maybe (isJust, fromJust)
 import Data.Char (ord)
 import Debug.Trace (traceShow)
@@ -35,12 +34,14 @@ instance Checkable [Declaration] where
         let isFuncDecl (FuncDeclaration _ _ _ _) = True
             isFuncDecl _ = False
             checkFunc (FuncDeclaration t n ps stmt) = do
-                check stmt >> check ps
+                newstmt <- check stmt
+                newps <- check ps
+                return $ FuncDeclaration t n newps newstmt
 
         in
         do
             mapM check ds
-            mapM checkFunc (filter (isFuncDecl) ds)
+            mapM (\x -> if isFuncDecl x then checkFunc x else return x) ds
             return ds
 
 consumeST :: SymbolTableZipper -> SymbolTableZipper
@@ -101,47 +102,37 @@ instance Checkable Parameter where
 checkNameNotDeclared :: Name -> ESSS ()
 checkNameNotDeclared n = do
     st <- get
-    if nameInParent n st
+    if nameInParent (nameToString n) st
         then throwE (SemanticError NameExistsWarning (nameToString n))
     else return ()
 
 checkNameDeclared :: Name -> ESSS ()
-checkNameDeclared name = do
+checkNameDeclared n = do
     st <- get
-    if not (nameInScope name st) then throwE (SemanticError NotDeclaredError (nameToString name))
+    if not (nameInScope (nameToString n) st) then throwE (SemanticError NotDeclaredError (nameToString n))
     else return ()
 
 checkNameIsScalarity :: Name -> SymbolScalarity -> ESSS ()
-checkNameIsScalarity name kind = do
-    s <- getNameScalarity name
-    if s /= kind then throwE (SemanticError (scalarityError kind) (nameToString name))
+checkNameIsScalarity n kind = do
+    s <- getNameScalarity n
+    if s /= kind then throwE (SemanticError (scalarityError kind) (nameToString n))
     else return ()
 
 checkNameIsArray :: Name -> ESSS ()
-checkNameIsArray name = do
+checkNameIsArray n = do
     st <- get
-    let res = unsafeSymbolIsScalarity (nameToString name) Array st 
-    if not res then throwE (SemanticError NotAnArrayError (nameToString name))
+    let res = unsafeSymbolIsScalarity (nameToString n) Array st 
+    if not res then throwE (SemanticError NotAnArrayError (nameToString n))
     else return ()
 
 checkNameIsFunction :: Name -> ESSS ()
-checkNameIsFunction name = do
+checkNameIsFunction n = do
     st <- get
-    let n = nameToString name
-    let info = unsafeGetSymbolInfo n st 
+    let s = nameToString n
+    let info = unsafeGetSymbolInfo s st 
     case info of
-        (VarInfo _ _ _) -> throwE (SemanticError NotAFunctionError n)
+        (VarInfo _ _ _) -> throwE (SemanticError NotAFunctionError s)
         (FuncInfo _ _) -> return ()
-
-getNameScalarity :: Name -> ESSS SymbolScalarity
-getNameScalarity name = do
-    st <- get
-    let s = unsafeSymbolScalarity (nameToString name) st
-    case name of
-        (Name _) -> return s
-        (NameSubscription _ _) -> 
-            if s == Scalar then throwE (SemanticError NotAnArrayError (show name)) >> return Scalar
-            else return Scalar
 
 checkExpressionIsScalar :: Expression -> ESSS ()
 checkExpressionIsScalar expr = do
@@ -177,6 +168,31 @@ checkArguments args func = do
     let params = (infoParams ... unsafeGetSymbolInfo) funcName st 
     foldl (>>) (return ()) $ zipWith checkArgument args params
 
+entryPointExists :: Program -> ESSS Program
+entryPointExists ds = 
+    let isEntryPoint (FuncDeclaration IntType (Name "tiny") [] _) = True
+        isEntryPoint _ = False
+        funcs = filter (isEntryPoint) ds
+    in
+    do
+        st <- get
+        if length funcs == 0 then throwE (SemanticError NoTinyFunctionError "")
+        else return ds
+
+-- Helpers
+expressionIsScalar :: Expression -> ESSS Bool
+expressionIsScalar e = getExpressionScalarity e >>= (return . ((==) (Scalar)))
+
+getNameScalarity :: Name -> ESSS SymbolScalarity
+getNameScalarity n = do
+    st <- get
+    let s = unsafeSymbolScalarity (nameToString n) st
+    case n of
+        (Name _) -> return s
+        (NameSubscription _ _) -> 
+            if s == Scalar then throwE (SemanticError NotAnArrayError (show n))
+            else return Scalar
+            
 getExpressionScalarity :: Expression -> ESSS SymbolScalarity
 getExpressionScalarity expr = do
     st <- get
@@ -191,35 +207,6 @@ getExpressionScalarity expr = do
         (UnOp _ e) -> getExpressionScalarity e
         (Var name) -> getNameScalarity name
         _ -> return Scalar
-
-entryPointExists :: Program -> ESSS Program
-entryPointExists ds = 
-    let isEntryPoint (FuncDeclaration IntType (Name "tiny") [] _) = True
-        isEntryPoint _ = False
-        funcs = filter (isEntryPoint) ds
-    in
-    do
-        st <- get
-        if length funcs == 0 then throwE (SemanticError NoTinyFunctionError "")
-        else return ds
-
--- Helpers
-nameInScope :: Name -> SymbolTableZipper -> Bool
-nameInScope n = (||) <$> memberST (nameToString n) <*> nameInParent n
-
-nameInParent :: Name -> SymbolTableZipper -> Bool
-nameInParent n st = 
-    let p = parent st
-    in
-    if p /= Nothing
-        then
-            if memberST (nameToString n) (fromJust p)
-                then True
-            else nameInParent n (fromJust p)
-    else False
-
-expressionIsScalar :: Expression -> ESSS Bool
-expressionIsScalar e = getExpressionScalarity e >>= (return . ((==) (Scalar)))
 
 -- API
 
