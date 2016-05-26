@@ -17,6 +17,20 @@ addChild child tree = Node (rootLabel tree) (child:subForest tree)
 addChildren :: [Tree a] -> Tree a -> Tree a
 addChildren = flip (foldr addChild)
 
+nextDF :: Eq a => TreePos Full a -> Maybe (TreePos Full a)
+nextDF treePos = 
+    let left = firstChild treePos
+        right p = 
+            if next p /= Nothing 
+                then next p
+            else if parent p /= Nothing
+                then right ((fromJust . parent) p)
+            else Nothing
+    in
+    if left /= Nothing
+        then left
+    else right treePos
+
 -- Symbols
 data SymbolScalarity = Scalar | Array
     deriving (Eq, Show)
