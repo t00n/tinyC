@@ -7,9 +7,8 @@ data ErrorType = NotDeclaredError
                | NotAScalarError
                | NotSameScalarityError
                | NameExistsWarning
-               | NotConstantSizeArrayError
+               | NotConstantError
                | NoTinyFunctionError
-               | SeveralTinyFunctionError
     deriving (Eq, Show)
 
 data SemanticError = SemanticError {

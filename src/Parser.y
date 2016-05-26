@@ -1,5 +1,5 @@
 {
-module Parser (parse, Program, Declaration(..), Parameter(..), Statement(..), Expression(..), Type(..), BinaryOperator(..), UnaryOperator(..), Name(..), nameString) where
+module Parser (parse, Program, Declaration(..), Parameter(..), Statement(..), Expression(..), Type(..), BinaryOperator(..), UnaryOperator(..), Name(..), nameToString) where
 import Scanner
 import Data.Maybe
 import Text.Printf (printf)
@@ -192,7 +192,7 @@ data Name = Name String
           | NameSubscription String Expression
     deriving (Eq, Show)
 
-nameString :: Name -> String
-nameString (Name s) = s
-nameString (NameSubscription s _) = s
+nameToString :: Name -> String
+nameToString (Name s) = s
+nameToString (NameSubscription s _) = s
 }

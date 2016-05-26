@@ -33,12 +33,12 @@ instance TACGenerator Declaration where
         return $ lines ++ [TACDeclaration (TACArray n t)]
     tacGenerate (FuncDeclaration t name params stmt) = do
         functionBody <- tacGenerate stmt
-        let newparams = map (\(Parameter t n) -> (nameString n)) params
+        let newparams = map (\(Parameter t n) -> (nameToString n)) params
         let ret = if functionBody == [] then [TACReturn Nothing] 
             else case last functionBody of
                 (TACReturn _) -> []
                 _ -> [TACReturn Nothing]
-        return $ [TACFunction (nameString name) newparams] ++ functionBody ++ ret
+        return $ [TACFunction (nameToString name) newparams] ++ functionBody ++ ret
 
 instance TACGenerator Statement where
     tacGenerate (Assignment (Name n) e) = do
@@ -135,7 +135,7 @@ tacExpression (Call n es) = do
     let params = map fst reducedES
     let lines = concatMap snd reducedES
     t <- popVariable
-    return (TACVar t, lines ++ [TACCall (nameString n) (params  ++ [TACVar t])])
+    return (TACVar t, lines ++ [TACCall (nameToString n) (params  ++ [TACVar t])])
 tacExpression (Length n) = undefined
 tacExpression (Var (Name n)) = return (TACVar n, [])
 tacExpression (Var (NameSubscription n e)) = do
