@@ -1,4 +1,4 @@
-module NASMGenerator (generateNASM, generateNASMData, generateNASMText, NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
+module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
 
 import Data.Set (Set, member, empty, insert, delete)
 import Control.Monad.State
@@ -7,23 +7,21 @@ import Data.Char (ord)
 
 import TACGenerator
 
-generateNASM :: TACProgram -> ([NASMData], [NASMInstruction])
-generateNASM p = (nasmDataGenerate p, evalState (nasmCodeGenerate p) empty)
+nasmGenerate :: TACProgram -> ([NASMData], [NASMInstruction])
+nasmGenerate p = (nasmGenerateData p, nasmGenerateText p)
 
-generateNASMData :: TACProgram -> [NASMData]
-generateNASMData = nasmDataGenerate
+nasmGenerateText :: TACProgram -> [NASMInstruction]
+nasmGenerateText p = evalState (nasmCodeGenerate p) empty
 
-generateNASMText :: TACProgram -> [NASMInstruction]
-generateNASMText p = evalState (nasmCodeGenerate p) empty
-
-nasmDataGenerate :: TACProgram -> [NASMData]
-nasmDataGenerate = (map decl) . (filter datadecl)
+nasmGenerateData :: TACProgram -> [NASMData]
+nasmGenerateData = (map decl) . (filter datadecl)
     where datadecl (TACCopy _ _) = True
           datadecl (TACArrayDecl _ _) = True
           datadecl _ = False
           decl (TACCopy s (TACInt i)) = NASMData s DWORDADDRESS [i]
           decl (TACCopy s (TACChar c)) = NASMData s BYTEADDRESS [ord c]
           decl (TACArrayDecl s xs) = NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)
+          
 class NASMCodeGenerator a where
     nasmCodeGenerate :: a -> State RegisterState [NASMInstruction]
 

@@ -391,4 +391,4 @@ main = hspec $ do
     describe "Generate NASM code" $ do
         it "Generates data" $ do
             tac <- scan_to_tac "int a; int b = 2; char c = 'a'; int v[5]; int tiny() {}"
-            generateNASMData tac `shouldBe` [NASMData "a" DWORDADDRESS [0],NASMData "b" DWORDADDRESS [2],NASMData "c" BYTEADDRESS [97],NASMData "v" DWORDADDRESS [0,0,0,0,0]]
+            nasmGenerateData tac `shouldBe` [NASMData "a" DWORDADDRESS [0],NASMData "b" DWORDADDRESS [2],NASMData "c" BYTEADDRESS [97],NASMData "v" DWORDADDRESS [0,0,0,0,0]]
