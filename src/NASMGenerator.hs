@@ -12,14 +12,12 @@ generateNASM p = (nasmDataGenerate p, evalState (nasmCodeGenerate p) empty)
 
 nasmDataGenerate :: TACProgram -> [NASMData]
 nasmDataGenerate = (map decl) . (filter datadecl)
-    where datadecl (TACDeclaration _) = True
-          datadecl (TACDeclarationValue _ _) = True
+    where datadecl (TACCopy _ _) = True
+          datadecl (TACArrayDecl _ _) = True
           datadecl _ = False
-          decl (TACDeclaration (TACVar n)) = NASMData n DWORDADDRESS [0]
-          decl (TACDeclaration (TACArray n (TACInt size))) = NASMData n DWORDADDRESS (take size (repeat 0))
-          decl (TACDeclarationValue (TACVar n) (TACInt i)) = NASMData n DWORDADDRESS [i]
-          decl (TACDeclarationValue (TACVar n) (TACChar c)) = NASMData n BYTEADDRESS [ord c]
-
+          decl (TACCopy s (TACInt i)) = NASMData s DWORDADDRESS [i]
+          decl (TACCopy s (TACChar c)) = NASMData s BYTEADDRESS [ord c]
+          decl (TACArrayDecl s xs) = NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)
 class NASMCodeGenerator a where
     nasmCodeGenerate :: a -> State RegisterState [NASMInstruction]
 

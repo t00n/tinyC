@@ -2,6 +2,7 @@ module TACGenerator (generateTAC, TACProgram(..), TACInstruction(..), TACBinaryO
 
 import Control.Monad.Trans.State (StateT(..), evalStateT)
 import Control.Monad.Trans (lift)
+import Data.Char (chr, ord)
 
 import Parser
 import MonadNames
@@ -30,21 +31,28 @@ instance TACGenerator a => TACGenerator [a] where
         return $ first ++ rest
 
 instance TACGenerator Declaration where
-    tacGenerate (VarDeclaration t (Name n) Nothing) = return $ [TACDeclaration (TACVar n)]
-    tacGenerate (VarDeclaration t (Name n) (Just x)) = do
-        (t, lines) <- tacExpression x
-        return $ lines ++ [TACDeclarationValue (TACVar n) t]
-    tacGenerate (VarDeclaration t (NameSubscription n e) Nothing) = do
+    tacGenerate (VarDeclaration IntType (Name n) Nothing) = return $ [TACCopy n (TACInt 0)]
+    tacGenerate (VarDeclaration CharType (Name n) Nothing) = return $ [TACCopy n (TACChar (chr 0))]
+    tacGenerate (VarDeclaration IntType (Name n) (Just (Int x))) = return $ [TACCopy n (TACInt x)]
+    tacGenerate (VarDeclaration CharType (Name n) (Just (Char c))) = return $ [TACCopy n (TACChar c)]
+    tacGenerate (VarDeclaration _ (Name n) (Just e)) = do
         (t, lines) <- tacExpression e
-        return $ lines ++ [TACDeclaration (TACArray n t)]
+        return $ lines ++ [TACCopy n t]
+    tacGenerate (VarDeclaration IntType (NameSubscription n e) _) = 
+        let size (Int i) = i
+            size (Char c) = ord c
+        in return $ [TACArrayDecl n (replicate (size e) (TACInt 0))]
+    tacGenerate (VarDeclaration CharType (NameSubscription n e) _) = 
+        let size (Int i) = i
+            size (Char c) = ord c
+        in return $ [TACArrayDecl n (replicate (size e) (TACChar (chr 0)))]
     tacGenerate (FuncDeclaration t name params stmt) = do
         functionBody <- tacGenerate stmt
-        let newparams = map (\(Parameter t n) -> (nameToString n)) params
         let ret = if functionBody == [] then [TACReturn Nothing] 
             else case last functionBody of
                 (TACReturn _) -> []
                 _ -> [TACReturn Nothing]
-        return $ [TACFunction (nameToString name) newparams] ++ functionBody ++ ret
+        return $ TACLabel (nameToString name) : functionBody ++ ret
 
 instance TACGenerator Statement where
     tacGenerate (Assignment (Name n) e) = do
@@ -165,12 +173,10 @@ tacUnaryOperator Neg = TACNeg
 
 type TACProgram = [TACInstruction]
 
-data TACInstruction = TACDeclaration TACExpression
-                    | TACDeclarationValue TACExpression TACExpression
-                    | TACFunction String [String]
-                    | TACBinary String TACExpression TACBinaryOperator TACExpression
+data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpression
                     | TACUnary String TACUnaryOperator TACExpression
                     | TACCopy String TACExpression
+                    | TACArrayDecl String [TACExpression]
                     | TACArrayAccess String TACExpression
                     | TACArrayModif TACExpression TACExpression
                      -- | TACAddress TACExpression TACExpression
@@ -214,11 +220,10 @@ instance TACPrint a => TACPrint [a] where
     tacPrint (x:xs) = tacPrint x ++ "\n" ++ tacPrint xs
 
 instance TACPrint TACInstruction where
-    tacPrint (TACDeclaration var) = "declare " ++ tacPrint var
-    tacPrint (TACFunction f params) = f ++ ":\n" ++ intercalate "\n" (map ((++) "arg ") params)
     tacPrint (TACBinary var e1 op e2) = var ++ " = " ++ tacPrint e1 ++ tacPrint op ++ tacPrint e2
     tacPrint (TACUnary var op e) = var ++ " = " ++ tacPrint op ++ tacPrint e
     tacPrint (TACCopy var e) = var ++ " = " ++ tacPrint e
+    tacPrint (TACArrayDecl s xs) = s ++ " = { " ++ concatMap (\x -> tacPrint x ++ " ") xs ++ " }"
     tacPrint (TACArrayAccess e1 e2) = e1 ++ " = " ++ tacPrint e2
     tacPrint (TACArrayModif e1 e2) = tacPrint e1 ++ " = " ++ tacPrint e2
     tacPrint (TACIf e l) = "if " ++ tacPrint e ++ " goto " ++ l

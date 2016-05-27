@@ -332,59 +332,59 @@ main = hspec $ do
     describe "The generation of three-address-code" $ do
         it "Generates a few declarations" $ do
             let ast = scan_parse_check "int a; int b; int tiny() {}"
-            generateTAC ast `shouldBe` [TACDeclaration (TACVar "a"),TACDeclaration (TACVar "b"),TACFunction "tiny" [],TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACCopy "a" (TACInt 0),TACCopy "b" (TACInt 0),TACLabel "tiny",TACReturn Nothing]
         it "Generates declarations with complex binary expressions" $ do
             let ast = scan_parse_check "int a = 5; int b = (a+5)/(a-2); int tiny() {}"
-            generateTAC ast `shouldBe` [TACDeclarationValue (TACVar "a") (TACInt 5),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "a") TACMinus (TACInt 2),TACBinary "t3" (TACVar "t1") TACDivide (TACVar "t2"),TACDeclarationValue (TACVar "b") (TACVar "t3"),TACFunction "tiny" [],TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACCopy "a" (TACInt 5),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "a") TACMinus (TACInt 2),TACBinary "t3" (TACVar "t1") TACDivide (TACVar "t2"),TACCopy "b" (TACVar "t3"),TACLabel "tiny",TACReturn Nothing]
         it "Generates function declarations" $ do
             let ast = scan_parse_check "int tiny() {}"
-            generateTAC ast `shouldBe` [TACFunction "tiny" [],TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACReturn Nothing]
             let ast = scan_parse_check "int f(int a, int b) {int c = 4;} int tiny() { }"
-            generateTAC ast `shouldBe` [TACFunction "f" ["a","b"],TACDeclarationValue (TACVar "c") (TACInt 4),TACReturn Nothing,TACFunction "tiny" [],TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACLabel "f",TACCopy "c" (TACInt 4),TACReturn Nothing,TACLabel "tiny",TACReturn Nothing]
         it "Generates declarations with complex unary expressions" $ do
             let ast = scan_parse_check "int a = 5; int b = -(a - 5); int tiny() {}"
-            generateTAC ast `shouldBe` [TACDeclarationValue (TACVar "a") (TACInt 5),TACBinary "t1" (TACVar "a") TACMinus (TACInt 5),TACUnary "t2" TACNeg (TACVar "t1"),TACDeclarationValue (TACVar "b") (TACVar "t2"),TACFunction "tiny" [],TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACCopy "a" (TACInt 5),TACBinary "t1" (TACVar "a") TACMinus (TACInt 5),TACUnary "t2" TACNeg (TACVar "t1"),TACCopy "b" (TACVar "t2"),TACLabel "tiny",TACReturn Nothing]
         it "Generates function calls" $ do
             let ast = scan_parse_check "int f(int a, int b) { int c = 1; f(c, 2); } int tiny() {}"
-            generateTAC ast `shouldBe` [TACFunction "f" ["a","b"],TACDeclarationValue (TACVar "c") (TACInt 1),TACCall "f" [TACVar "c",TACInt 2,TACVar "t1"],TACReturn Nothing,TACFunction "tiny" [],TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACLabel "f",TACCopy "c" (TACInt 1),TACCall "f" [TACVar "c",TACInt 2,TACVar "t1"],TACReturn Nothing,TACLabel "tiny",TACReturn Nothing]
             let ast = scan_parse_check "int f(int a, int b) { int c = f(2 + 3, 1); } int tiny() {}"
-            generateTAC ast `shouldBe`  [TACFunction "f" ["a","b"],TACBinary "t1" (TACInt 2) TACPlus (TACInt 3),TACCall "f" [TACVar "t1",TACInt 1,TACVar "t2"],TACDeclarationValue (TACVar "c") (TACVar "t2"),TACReturn Nothing,TACFunction "tiny" [],TACReturn Nothing]
+            generateTAC ast `shouldBe`  [TACLabel "f",TACBinary "t1" (TACInt 2) TACPlus (TACInt 3),TACCall "f" [TACVar "t1",TACInt 1,TACVar "t2"],TACCopy "c" (TACVar "t2"),TACReturn Nothing,TACLabel "tiny",TACReturn Nothing]
         it "Generates assignments" $ do
             let ast = scan_parse_check "int tiny() { int a; a = (a + 5) * 3; }"
-            generateTAC ast `shouldBe` [TACFunction "tiny" [],TACDeclaration (TACVar "a"),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "t1") TACTimes (TACInt 3),TACCopy "a" (TACVar "t2"),TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACCopy "a" (TACInt 0),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "t1") TACTimes (TACInt 3),TACCopy "a" (TACVar "t2"),TACReturn Nothing]
             let ast = scan_parse_check "int a[5]; int b = a[2]; int tiny() {}"
-            generateTAC ast `shouldBe` [TACDeclaration (TACArray "a" (TACInt 5)),TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACDeclarationValue (TACVar "b") (TACVar "t1"),TACFunction "tiny" [],TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACArrayDecl "a" [TACInt 0, TACInt 0, TACInt 0, TACInt 0, TACInt 0],TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACCopy "b" (TACVar "t1"),TACLabel "tiny",TACReturn Nothing]
             let ast = scan_parse_check "int a[5]; int tiny() { a[2] = 5; }"
-            generateTAC ast `shouldBe` [TACDeclaration (TACArray "a" (TACInt 5)),TACFunction "tiny" [],TACArrayModif (TACArray "a" (TACInt 2)) (TACInt 5),TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACArrayDecl "a" [TACInt 0, TACInt 0, TACInt 0, TACInt 0, TACInt 0],TACLabel "tiny",TACArrayModif (TACArray "a" (TACInt 2)) (TACInt 5),TACReturn Nothing]
             let ast = scan_parse_check "int a[5]; int b[5]; int tiny() { a[2] = b[3]; }"
-            generateTAC ast `shouldBe` [TACDeclaration (TACArray "a" (TACInt 5)),TACDeclaration (TACArray "b" (TACInt 5)),TACFunction "tiny" [],TACArrayAccess "t1" (TACArray "b" (TACInt 3)),TACArrayModif (TACArray "a" (TACInt 2)) (TACVar "t1"),TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayDecl "b" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACLabel "tiny",TACArrayAccess "t1" (TACArray "b" (TACInt 3)),TACArrayModif (TACArray "a" (TACInt 2)) (TACVar "t1"),TACReturn Nothing]
         it "Generates if" $ do
             let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 5; a = 3; } }"
-            generateTAC ast `shouldBe` [TACFunction "tiny" [],TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACDeclarationValue (TACVar "a") (TACInt 5),TACCopy "a" (TACInt 3),TACLabel "l2",TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 5),TACCopy "a" (TACInt 3),TACLabel "l2",TACReturn Nothing]
         it "Generates if else" $ do
             let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 5; } else { int b = 5; } }"
-            generateTAC ast `shouldBe` [TACFunction "tiny" [],TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACDeclarationValue (TACVar "a") (TACInt 5),TACGoto "l3",TACLabel "l2",TACDeclarationValue (TACVar "b") (TACInt 5),TACLabel "l3",TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 5),TACGoto "l3",TACLabel "l2",TACCopy "b" (TACInt 5),TACLabel "l3",TACReturn Nothing]
         it "Generates several if else" $ do
             let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 1; } else if (2 > 3) { int b = 2; } else { int c = 3; } }"
-            generateTAC ast `shouldBe` [TACFunction "tiny" [],TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACDeclarationValue (TACVar "a") (TACInt 1),TACGoto "l3",TACLabel "l2",TACIf (TACExpr (TACInt 2) TACGreater (TACInt 3)) "l4",TACGoto "l5",TACLabel "l4",TACDeclarationValue (TACVar "b") (TACInt 2),TACGoto "l6",TACLabel "l5",TACDeclarationValue (TACVar "c") (TACInt 3),TACLabel "l6",TACLabel "l3",TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 1),TACGoto "l3",TACLabel "l2",TACIf (TACExpr (TACInt 2) TACGreater (TACInt 3)) "l4",TACGoto "l5",TACLabel "l4",TACCopy "b" (TACInt 2),TACGoto "l6",TACLabel "l5",TACCopy "c" (TACInt 3),TACLabel "l6",TACLabel "l3",TACReturn Nothing]
         it "Generates a while" $ do
             let ast = scan_parse_check "int tiny() { int a = 2; while ( a > 1) { a = a - 1; } }"
-            generateTAC ast `shouldBe` [TACFunction "tiny" [],TACDeclarationValue (TACVar "a") (TACInt 2),TACLabel "l1",TACIf (TACExpr (TACVar "a") TACGreater (TACInt 1)) "l3",TACGoto "l2",TACLabel "l3",TACBinary "t1" (TACVar "a") TACMinus (TACInt 1),TACCopy "a" (TACVar "t1"),TACGoto "l1",TACLabel "l2",TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACCopy "a" (TACInt 2),TACLabel "l1",TACIf (TACExpr (TACVar "a") TACGreater (TACInt 1)) "l3",TACGoto "l2",TACLabel "l3",TACBinary "t1" (TACVar "a") TACMinus (TACInt 1),TACCopy "a" (TACVar "t1"),TACGoto "l1",TACLabel "l2",TACReturn Nothing]
         it "Generates a return" $ do
             let ast = scan_parse_check "int tiny() { int a = 2; return a; }"
-            generateTAC ast `shouldBe` [TACFunction "tiny" [],TACDeclarationValue (TACVar "a") (TACInt 2),TACReturn (Just $ TACVar "a")]
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACCopy "a" (TACInt 2),TACReturn (Just $ TACVar "a")]
             let ast = scan_parse_check "int tiny() { return 3 + 4 / 5; }"
-            generateTAC ast `shouldBe` [TACFunction "tiny" [],TACBinary "t1" (TACInt 4) TACDivide (TACInt 5),TACBinary "t2" (TACInt 3) TACPlus (TACVar "t1"),TACReturn (Just $ TACVar "t2")]
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACBinary "t1" (TACInt 4) TACDivide (TACInt 5),TACBinary "t2" (TACInt 3) TACPlus (TACVar "t1"),TACReturn (Just $ TACVar "t2")]
         it "Generates a write" $ do
             let ast = scan_parse_check "int tiny() { int a = 2; write a; }"
-            generateTAC ast `shouldBe` [TACFunction "tiny" [],TACDeclarationValue (TACVar "a") (TACInt 2),TACWrite (TACVar "a"),TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACCopy "a" (TACInt 2),TACWrite (TACVar "a"),TACReturn Nothing]
             let ast = scan_parse_check "int tiny() { int a[5]; write a[2]; }"
-            generateTAC ast `shouldBe` [TACFunction "tiny" [],TACDeclaration (TACArray "a" (TACInt 5)),TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACWrite (TACVar "t1"),TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACArrayDecl "a" [TACInt 0, TACInt 0, TACInt 0, TACInt 0, TACInt 0],TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACWrite (TACVar "t1"),TACReturn Nothing]
         it "Generates reads" $ do
             let ast = scan_parse_check "int tiny() { int a; read a; }"
-            generateTAC ast `shouldBe` [TACFunction "tiny" [],TACDeclaration (TACVar "a"),TACRead (TACVar "a"),TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACCopy "a" (TACInt 0),TACRead (TACVar "a"),TACReturn Nothing]
             let ast = scan_parse_check "int tiny() { int a[5]; read a[2]; }"
-            generateTAC ast `shouldBe` [TACFunction "tiny" [],TACDeclaration (TACArray "a" (TACInt 5)),TACRead (TACArray "a" (TACInt 2)),TACReturn Nothing]
+            generateTAC ast `shouldBe` [TACLabel "tiny",TACArrayDecl "a" [TACInt 0, TACInt 0, TACInt 0, TACInt 0, TACInt 0],TACRead (TACArray "a" (TACInt 2)),TACReturn Nothing]
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]
