@@ -16,26 +16,31 @@ nasmGenerate p = (,) <$> nasmGenerateData p <*> nasmGenerateText p
 nasmGenerateText :: TACProgram -> SymbolTable -> [NASMInstruction]
 nasmGenerateText p = evalState (evalStateT (nasmCodeGenerate p) empty)
 
-nasmGenerateData :: TACProgram -> SymbolTable -> [NASMData]
-nasmGenerateData ds st = snd $ foldr f (0, []) ds
+foldLevel :: Int -> Bool -> TACProgram -> (TACInstruction -> a) -> SymbolTable -> [a]
+foldLevel level foldData ds func st = snd $ foldr f (0, []) ds
     where datadecl (TACCopy _ _) = True
           datadecl (TACArrayDecl _ _) = True
           datadecl _ = False
-          decl (TACCopy s (TACInt i)) = NASMData s DWORDADDRESS [i]
-          decl (TACCopy s (TACChar c)) = NASMData s BYTEADDRESS [ord c]
-          decl (TACArrayDecl s xs) = NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)
           beginFunc (TACLabel s) = symbolIsFunction s st
           beginFunc _ = False
           endFunc (TACReturn _) = True
           endFunc _ = False
-          f tacInst (level, nasmData) = 
-            if level == 0 && datadecl tacInst
-                then (level, decl tacInst:nasmData)
-            else if beginFunc tacInst
-                then (level+1, nasmData)
-            else if endFunc tacInst
-                then (level-1, nasmData)
-            else (level, nasmData)
+          f tacInst (l, nasmData) = 
+              if l == level && datadecl tacInst == foldData
+                  then (l, func tacInst:nasmData)
+              else if beginFunc tacInst
+                  then (l+1, nasmData)
+              else if endFunc tacInst
+                  then (l-1, nasmData)
+              else (l, nasmData)
+
+
+nasmGenerateData :: TACProgram -> SymbolTable -> [NASMData]
+nasmGenerateData ds = foldLevel 0 True ds decl
+    where 
+          decl (TACCopy s (TACInt i)) = NASMData s DWORDADDRESS [i]
+          decl (TACCopy s (TACChar c)) = NASMData s BYTEADDRESS [ord c]
+          decl (TACArrayDecl s xs) = NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)
 
 class NASMCodeGenerator a where
     nasmCodeGenerate :: a -> SRSS [NASMInstruction]
