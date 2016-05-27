@@ -1,4 +1,4 @@
-module NASMGenerator (generateNASM, NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
+module NASMGenerator (generateNASM, generateNASMData, generateNASMText, NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
 
 import Data.Set (Set, member, empty, insert, delete)
 import Control.Monad.State
@@ -9,6 +9,12 @@ import TACGenerator
 
 generateNASM :: TACProgram -> ([NASMData], [NASMInstruction])
 generateNASM p = (nasmDataGenerate p, evalState (nasmCodeGenerate p) empty)
+
+generateNASMData :: TACProgram -> [NASMData]
+generateNASMData = nasmDataGenerate
+
+generateNASMText :: TACProgram -> [NASMInstruction]
+generateNASMText p = evalState (nasmCodeGenerate p) empty
 
 nasmDataGenerate :: TACProgram -> [NASMData]
 nasmDataGenerate = (map decl) . (filter datadecl)
