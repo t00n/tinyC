@@ -13,6 +13,7 @@ import TACGenerator
 import MonadNames
 import NASMGenerator
 import SymbolTable
+import SemanticError
 
 scan_and_parse = parse . alexScanTokens
 
@@ -181,7 +182,7 @@ main = hspec $ do
     describe "Symbol table construction" $ do
         it "Constructs a one-level symbol table" $ do
             let ast = scan_and_parse "char a; int b = 5; int c[5];"
-            fmap root (constructST ast) `shouldBe` Right (T.Node (M.fromList [("a",VarInfo CharType Scalar 1),("b",VarInfo IntType Scalar 1),("c",VarInfo IntType Array 5)]) [])
+            fmap root (constructST ast) `shouldBe` Right (zipper (T.Node (M.fromList [("a",VarInfo CharType Scalar 1),("b",VarInfo IntType Scalar 1),("c",VarInfo IntType Array 5)]) []))
         it "Fails to construct a symbol table when a name exists" $ do
             let ast = scan_and_parse "char a; int a[5];"
             fmap root (constructST ast) `shouldBe` Left (SemanticError {errorType = NameExistsError, errorVariable = "a"})
@@ -189,7 +190,7 @@ main = hspec $ do
             fmap root (constructST ast) `shouldBe` Left (SemanticError {errorType = NameExistsError, errorVariable = "a"})
         it "Constructs a two-level symbol table" $ do
             let ast = scan_and_parse "char a; int b = 5; int c[5]; char f() {} int g(int a) {}"
-            fmap root (constructST ast) `shouldBe` Right (T.Node (M.fromList [("a",VarInfo CharType Scalar 1),("b",VarInfo IntType Scalar 1),("c",VarInfo IntType Array 5),("f",FuncInfo CharType []),("g",FuncInfo IntType [VarInfo IntType Scalar 1])]) [T.Node (M.fromList []) [],T.Node (M.fromList [("a",VarInfo IntType Scalar 1)]) []])
+            fmap root (constructST ast) `shouldBe` Right (zipper (T.Node (M.fromList [("a",VarInfo CharType Scalar 1),("b",VarInfo IntType Scalar 1),("c",VarInfo IntType Array 5),("f",FuncInfo CharType []),("g",FuncInfo IntType [VarInfo IntType Scalar 1])]) [T.Node (M.fromList []) [],T.Node (M.fromList [("a",VarInfo IntType Scalar 1)]) []]))
     describe "Semantics" $ do
         it "Checks that variables with same name are declared only once on a certain scope level" $ do
             let ast = scan_and_parse "int tiny() { int a; int a; }"

@@ -11,7 +11,7 @@ import SymbolTable
 
 import Data.List(intercalate)
 
-type SSNSS = StateT SymbolTableZipper (Names String String)
+type SSNSS = StateT SymbolTable (Names String String)
 
 infiniteNames :: String -> [String]
 infiniteNames s = [s ++ show i | i <- [1..]]

@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveAnyClass, FlexibleInstances #-}
 
-module Semantics (checkSemantics, symbolTable, SemanticError(..), ErrorType(..), SymbolTableZipper(..)) where
+module Semantics (checkSemantics, symbolTable) where
 
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT, throwE)
 import Control.Monad.State (State(..), get, put, modify, runState)
@@ -14,7 +14,7 @@ import SemanticError
 import SymbolTable
 
 -- Symbols data types
-type ESSS = ExceptT SemanticError (State SymbolTableZipper)
+type ESSS = ExceptT SemanticError (State SymbolTable)
 
 -- Check functions
 class Checkable a where
@@ -44,7 +44,7 @@ instance Checkable [Declaration] where
             mapM (\x -> if isFuncDecl x then checkFunc x else return x) ds
             return ds
 
-consumeST :: SymbolTableZipper -> SymbolTableZipper
+consumeST :: SymbolTable -> SymbolTable
 consumeST st = 
     let next = nextDF st
     in
@@ -210,7 +210,7 @@ getExpressionScalarity expr = do
 
 -- API
 
-run ::Program -> (Either SemanticError Program, SymbolTableZipper)
+run ::Program -> (Either SemanticError Program, SymbolTable)
 run prog = (runState . runExceptT) (do
     st <- ExceptT $ return $ constructST prog
     put st

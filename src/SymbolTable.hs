@@ -50,25 +50,25 @@ data SymbolInfo = VarInfo {
 
 type Symbols = M.Map String SymbolInfo
 
-getSymbolInfo :: String -> SymbolTableZipper -> Maybe SymbolInfo
+getSymbolInfo :: String -> SymbolTable -> Maybe SymbolInfo
 getSymbolInfo s st = let res = M.lookup s ((rootLabel . Z.tree) st) in 
                          if res == Nothing then Z.parent st >>= getSymbolInfo s
                          else res
 
-unsafeGetSymbolInfo :: String -> SymbolTableZipper -> SymbolInfo
+unsafeGetSymbolInfo :: String -> SymbolTable -> SymbolInfo
 unsafeGetSymbolInfo s st = let info = getSymbolInfo s st in
     fromMaybe (error ("Symbol " ++ s ++ " is not in symbol table " ++ show st)) info
 
-unsafeSymbolType :: String -> SymbolTableZipper -> Type
+unsafeSymbolType :: String -> SymbolTable -> Type
 unsafeSymbolType = infoType ... unsafeGetSymbolInfo
 
-unsafeSymbolScalarity :: String -> SymbolTableZipper -> SymbolScalarity
+unsafeSymbolScalarity :: String -> SymbolTable -> SymbolScalarity
 unsafeSymbolScalarity = infoScalarity ... unsafeGetSymbolInfo
 
-unsafeSymbolIsScalarity :: String -> SymbolScalarity -> SymbolTableZipper -> Bool
+unsafeSymbolIsScalarity :: String -> SymbolScalarity -> SymbolTable -> Bool
 unsafeSymbolIsScalarity s k st = (unsafeSymbolScalarity s st) == k
 
-unsafeSymbolIsType :: String -> Type -> SymbolTableZipper -> Bool
+unsafeSymbolIsType :: String -> Type -> SymbolTable -> Bool
 unsafeSymbolIsType s t st = (unsafeSymbolType s st) == t
 
 nameScalarity :: Name -> SymbolScalarity
@@ -81,25 +81,24 @@ scalarityError Scalar = NotAScalarError
 scalarityError Array = NotAnArrayError
 
 -- Symbol Table
-type SymbolTable = Tree Symbols
-type SymbolTableZipper = TreePos Full Symbols
+type SymbolTable = TreePos Full Symbols
 
-emptyST :: SymbolTable
+emptyST :: Tree Symbols
 emptyST = Node M.empty []
 
-root :: SymbolTableZipper -> SymbolTable
-root = Z.toTree . Z.root
+root :: SymbolTable -> SymbolTable
+root = Z.root
 
-zipper :: SymbolTable -> SymbolTableZipper
+zipper :: Tree Symbols -> SymbolTable
 zipper = Z.fromTree
 
-memberST :: String -> SymbolTableZipper -> Bool
+memberST :: String -> SymbolTable -> Bool
 memberST s stz = (M.member s . rootLabel . Z.tree) stz
 
-nameInScope :: String -> SymbolTableZipper -> Bool
+nameInScope :: String -> SymbolTable -> Bool
 nameInScope s = (||) <$> memberST s <*> nameInParent s
 
-nameInParent :: String -> SymbolTableZipper -> Bool
+nameInParent :: String -> SymbolTable -> Bool
 nameInParent s st = 
     let p = parent st
     in
@@ -140,7 +139,7 @@ paramToSymbol p@(Parameter t n) = do
     Right (nameToString n, info)
 
 -- Declarations
-addSymbol :: Declaration -> SymbolTable -> Either SemanticError SymbolTable
+addSymbol :: Declaration -> Tree Symbols -> Either SemanticError (Tree Symbols)
 addSymbol d st = 
     let declInfo (VarDeclaration t n _) = 
             do
@@ -155,14 +154,14 @@ addSymbol d st =
     info <- declInfo d
     Right $ Node (M.insert (declName d) info (rootLabel st)) (subForest st)
 
-declare :: Declaration -> SymbolTable -> Either SemanticError SymbolTable
+declare :: Declaration -> Tree Symbols -> Either SemanticError (Tree Symbols)
 declare decl st = do 
     if M.member (declName decl) (rootLabel st)
         then Left $ SemanticError NameExistsError (declName decl)
     else
         addSymbol decl st
 
-constructBlock :: Statement -> Either SemanticError SymbolTable
+constructBlock :: Statement -> Either SemanticError (Tree Symbols)
 constructBlock (Block ds stmts) = 
     let isBlock (Block _ _) = True
         isBlock (If _ _) = True
@@ -182,8 +181,8 @@ constructBlock (IfElse _ stmt1 stmt2) = do
 constructBlock (While _ stmt) = constructBlock stmt
 constructBlock _ = return emptyST
 
--- SymbolTableZipper construction
-constructSubST :: [Declaration] -> Either SemanticError SymbolTable
+-- SymbolTable construction
+constructSubST :: [Declaration] -> Either SemanticError (Tree Symbols)
 constructSubST ds = 
     let isFuncDecl (FuncDeclaration _ _ _ _) = True
         isFuncDecl _ = False
@@ -196,5 +195,5 @@ constructSubST ds =
     subds <- ((mapM subdecl) . (filter isFuncDecl)) ds
     Right (addChildren subds st)
 
-constructST :: [Declaration] -> Either SemanticError SymbolTableZipper
+constructST :: [Declaration] -> Either SemanticError SymbolTable
 constructST ds = constructSubST ds >>= (return . fromTree)
