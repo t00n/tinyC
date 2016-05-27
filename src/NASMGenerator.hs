@@ -17,13 +17,25 @@ nasmGenerateText :: TACProgram -> SymbolTable -> [NASMInstruction]
 nasmGenerateText p = evalState (evalStateT (nasmCodeGenerate p) empty)
 
 nasmGenerateData :: TACProgram -> SymbolTable -> [NASMData]
-nasmGenerateData ds st = ((map decl) . (filter datadecl)) ds
+nasmGenerateData ds st = snd $ foldr f (0, []) ds
     where datadecl (TACCopy _ _) = True
           datadecl (TACArrayDecl _ _) = True
           datadecl _ = False
           decl (TACCopy s (TACInt i)) = NASMData s DWORDADDRESS [i]
           decl (TACCopy s (TACChar c)) = NASMData s BYTEADDRESS [ord c]
           decl (TACArrayDecl s xs) = NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)
+          beginFunc (TACLabel s) = symbolIsFunction s st
+          beginFunc _ = False
+          endFunc (TACReturn _) = True
+          endFunc _ = False
+          f tacInst (level, nasmData) = 
+            if level == 0 && datadecl tacInst
+                then (level, decl tacInst:nasmData)
+            else if beginFunc tacInst
+                then (level+1, nasmData)
+            else if endFunc tacInst
+                then (level-1, nasmData)
+            else (level, nasmData)
 
 class NASMCodeGenerator a where
     nasmCodeGenerate :: a -> SRSS [NASMInstruction]

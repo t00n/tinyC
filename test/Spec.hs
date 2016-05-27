@@ -395,3 +395,7 @@ main = hspec $ do
             let st = symbolTable ast
             let tac = generateTAC ast
             nasmGenerateData tac st `shouldBe` [NASMData "a" DWORDADDRESS [0],NASMData "b" DWORDADDRESS [2],NASMData "c" BYTEADDRESS [97],NASMData "v" DWORDADDRESS [0,0,0,0,0]]
+            let ast = scan_and_parse "int a; int tiny() { int b; } int c;"
+            let st = symbolTable ast
+            let tac = generateTAC ast
+            nasmGenerateData tac st `shouldBe` [NASMData "a" DWORDADDRESS [0],NASMData "c" DWORDADDRESS [0]]

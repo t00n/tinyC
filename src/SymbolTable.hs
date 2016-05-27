@@ -109,6 +109,14 @@ nameInParent s st =
             else nameInParent s (fromJust p)
     else False
 
+symbolIsFunction :: String -> SymbolTable -> Bool
+symbolIsFunction s st = 
+    let info = unsafeGetSymbolInfo s st
+    in
+    case info of
+        FuncInfo _ _ -> True
+        _ -> False
+
 -- Declaration data
 nameToScalarity :: Name -> SymbolScalarity
 nameToScalarity (Name _) = Scalar
