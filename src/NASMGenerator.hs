@@ -6,6 +6,9 @@ import Data.Char (ord)
 
 
 import TACGenerator
+import SymbolTable
+
+type SRSS = StateT RegisterState (State SymbolTable)
 
 nasmGenerate :: TACProgram -> ([NASMData], [NASMInstruction])
 nasmGenerate p = (nasmGenerateData p, nasmGenerateText p)
@@ -21,7 +24,7 @@ nasmGenerateData = (map decl) . (filter datadecl)
           decl (TACCopy s (TACInt i)) = NASMData s DWORDADDRESS [i]
           decl (TACCopy s (TACChar c)) = NASMData s BYTEADDRESS [ord c]
           decl (TACArrayDecl s xs) = NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)
-          
+
 class NASMCodeGenerator a where
     nasmCodeGenerate :: a -> State RegisterState [NASMInstruction]
 
