@@ -10,14 +10,14 @@ import SymbolTable
 
 type SRSS = StateT RegisterState (State SymbolTable)
 
-nasmGenerate :: TACProgram -> ([NASMData], [NASMInstruction])
-nasmGenerate p = (nasmGenerateData p, nasmGenerateText p)
+nasmGenerate :: TACProgram -> SymbolTable -> ([NASMData], [NASMInstruction])
+nasmGenerate p = (,) <$> nasmGenerateData p <*> nasmGenerateText p
 
-nasmGenerateText :: TACProgram -> [NASMInstruction]
-nasmGenerateText p = evalState (nasmCodeGenerate p) empty
+nasmGenerateText :: TACProgram -> SymbolTable -> [NASMInstruction]
+nasmGenerateText p = evalState (evalStateT (nasmCodeGenerate p) empty)
 
-nasmGenerateData :: TACProgram -> [NASMData]
-nasmGenerateData = (map decl) . (filter datadecl)
+nasmGenerateData :: TACProgram -> SymbolTable -> [NASMData]
+nasmGenerateData ds st = ((map decl) . (filter datadecl)) ds
     where datadecl (TACCopy _ _) = True
           datadecl (TACArrayDecl _ _) = True
           datadecl _ = False
@@ -26,7 +26,7 @@ nasmGenerateData = (map decl) . (filter datadecl)
           decl (TACArrayDecl s xs) = NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)
 
 class NASMCodeGenerator a where
-    nasmCodeGenerate :: a -> State RegisterState [NASMInstruction]
+    nasmCodeGenerate :: a -> SRSS [NASMInstruction]
 
 instance NASMCodeGenerator a => NASMCodeGenerator [a] where
     nasmCodeGenerate [] = return []

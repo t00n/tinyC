@@ -390,5 +390,7 @@ main = hspec $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]
     describe "Generate NASM code" $ do
         it "Generates data" $ do
-            tac <- scan_to_tac "int a; int b = 2; char c = 'a'; int v[5]; int tiny() {}"
-            nasmGenerateData tac `shouldBe` [NASMData "a" DWORDADDRESS [0],NASMData "b" DWORDADDRESS [2],NASMData "c" BYTEADDRESS [97],NASMData "v" DWORDADDRESS [0,0,0,0,0]]
+            let ast = scan_and_parse "int a; int b = 2; char c = 'a'; int v[5]; int tiny() {}"
+            let st = symbolTable ast
+            let tac = generateTAC ast
+            nasmGenerateData tac st `shouldBe` [NASMData "a" DWORDADDRESS [0],NASMData "b" DWORDADDRESS [2],NASMData "c" BYTEADDRESS [97],NASMData "v" DWORDADDRESS [0,0,0,0,0]]
