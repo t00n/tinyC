@@ -14,6 +14,7 @@ import MonadNames
 import NASMGenerator
 import SymbolTable
 import SemanticError
+import NASMOptimization
 
 scan_and_parse = parse . alexScanTokens
 
@@ -405,3 +406,8 @@ main = hspec $ do
             let st = symbolTable ast
             let tac = generateTAC ast
             nasmGenerateText tac st `shouldBe` [LABEL "tiny",CALL "_exit"]
+        it "Tests live variable analysis" $ do
+            let ast = scan_and_parse "int tiny() { int a = 5; int b = 1 + a; } int f() {}"
+            let st = symbolTable ast
+            let tac = generateTAC ast
+            constructLabelKey tac `shouldBe` M.fromList [(TACLabel "f",5),(TACLabel "tiny",0)]

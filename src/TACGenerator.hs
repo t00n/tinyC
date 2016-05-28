@@ -189,7 +189,7 @@ data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpres
                     | TACLabel String
                     | TACWrite TACExpression
                     | TACRead TACExpression
-    deriving (Eq, Show)
+    deriving (Eq, Show, Ord)
 
 data TACBinaryOperator = TACPlus 
                        | TACMinus 
@@ -199,17 +199,17 @@ data TACBinaryOperator = TACPlus
                        | TACGreater 
                        | TACLess 
                        | TACNotEqual
-    deriving (Eq, Show)
+    deriving (Eq, Show, Ord)
 
 data TACUnaryOperator = TACNeg | TACNot
-    deriving (Eq, Show)
+    deriving (Eq, Show, Ord)
 
 data TACExpression = TACInt Int
                    | TACChar Char
                    | TACVar String
                    | TACArray String TACExpression
                    | TACExpr TACExpression TACBinaryOperator TACExpression
-    deriving (Eq, Show)
+    deriving (Eq, Show, Ord)
 
 
 class TACPrint a where
