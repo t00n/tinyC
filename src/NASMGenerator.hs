@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
 
-module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, nasmShow, NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
+module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, nasmShow, nasmGetTopLevelData, nasmGetText, NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
 
 import Data.Set (Set, member, empty, insert, delete)
 import Control.Monad.State
@@ -30,7 +30,7 @@ sortTopLevel foldData ds st = snd (foldl f (0, []) ds)
     where datadecl (TACCopy _ _) = True
           datadecl (TACArrayDecl _ _) = True
           datadecl _ = False
-          beginFunc (TACLabel s) = symbolIsFunction s st
+          beginFunc (TACLabel s) = nameInScope s st && symbolIsFunction s st
           beginFunc _ = False
           endFunc (TACReturn _) = True
           endFunc _ = False
@@ -43,6 +43,11 @@ sortTopLevel foldData ds st = snd (foldl f (0, []) ds)
                   then (newlevel, acc ++ [tacInst])
               else (newlevel, acc)
 
+nasmGetTopLevelData :: TACProgram -> SymbolTable -> [TACInstruction]
+nasmGetTopLevelData = sortTopLevel True
+
+nasmGetText :: TACProgram -> SymbolTable -> [TACInstruction]
+nasmGetText = sortTopLevel False
 
 nasmGenerateStaticData :: TACProgram -> SRSS [NASMData]
 nasmGenerateStaticData ds = do
