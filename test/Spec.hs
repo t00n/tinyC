@@ -410,4 +410,8 @@ main = hspec $ do
             let ast = scan_and_parse "int tiny() { int a = 5; int b = 1 + a; } int f() {}"
             let st = symbolTable ast
             let tac = generateTAC ast
-            constructLabelKey tac `shouldBe` M.fromList [(TACLabel "f",5),(TACLabel "tiny",0)]
+            constructLabelKey tac `shouldBe` M.fromList [("f",5),("tiny",0)]
+            let ast = scan_and_parse "int tiny() { int a = 5; if (a) { int b = 1 + a; } else { int c = 3; } } int f() { int a = 3 + 4; }"
+            let st = symbolTable ast
+            let tac = generateTAC ast
+            controlFlowGraph tac `shouldBe` emptyGraph

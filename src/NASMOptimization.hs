@@ -1,19 +1,45 @@
 module NASMOptimization where
 
-import Data.Graph
-import Data.Map (fromList, Map(..))
+import Data.Set (Set(..), insert, empty)
+import Data.Map (fromList, Map(..), (!))
 import Debug.Trace (traceShow)
 
 import TACGenerator
 
+data Graph a = Graph (Set (Node a)) (Set Edge)
+    deriving (Eq, Show)
 
-constructLabelKey :: [TACInstruction] -> Map TACInstruction Int
+type Node a = (Int, a)
+
+type Edge = (Int, Int)
+
+addNode :: Ord a => Node a -> Graph a -> Graph a
+addNode x (Graph nodes edges) = Graph (insert x nodes) edges
+
+addEdge :: Ord a => Int -> Int -> Graph a -> Graph a
+addEdge p c (Graph nodes edges) = Graph nodes (insert (p, c) edges)
+
+emptyGraph :: Graph a
+emptyGraph = Graph empty empty
+
+
+constructLabelKey :: [TACInstruction] -> Map String Int
 constructLabelKey is = 
     let isLabel (TACLabel _, _) = True
         isLabel (_, _) = False
-    in fromList $ filter isLabel (zip is [0..])
+    in fromList $ map (\(TACLabel x, i) -> (x, i)) $ filter isLabel (zip is [0..])
 
-controlFlowGraph :: [TACInstruction] -> Graph
-controlFlowGraph is = 
-    let labelKeys = constructLabelKey is
-    in traceShow labelKeys undefined
+controlFlowGraph2 :: [TACInstruction] -> Int -> Map String Int -> Graph TACInstruction -> Graph TACInstruction
+controlFlowGraph2 [] _ _ g = g
+controlFlowGraph2 (x:xs) i labels g =
+    let graphplusnode = addNode (i, x) g
+        graphplusedges = case x of
+                        TACIf _ s -> ((addEdge i (labels ! s)) . (addEdge i (i+1))) graphplusnode
+                        TACGoto s -> addEdge i (labels ! s) graphplusnode
+                        TACCall s _ -> addEdge i (labels ! s) graphplusnode
+                        TACReturn _ -> graphplusnode
+                        _ -> addEdge i (i+1) graphplusnode
+    in controlFlowGraph2 xs (i+1) labels graphplusedges
+
+controlFlowGraph :: [TACInstruction] -> Graph TACInstruction
+controlFlowGraph is = controlFlowGraph2 is 0 (constructLabelKey is) emptyGraph
