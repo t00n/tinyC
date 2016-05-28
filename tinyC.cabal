@@ -36,7 +36,7 @@ library
 
 executable tinyC-exe
   hs-source-dirs:      app
-  main-is:             Main.hs
+  main-is:             TinyC.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
                      , array

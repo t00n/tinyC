@@ -76,9 +76,9 @@ instance NASMGenerator TACInstruction where
         else return ()
         return [LABEL l]
     nasmGenerateInstructions (TACReturn Nothing) = do
-        (tiny, _) <- get
+        (tiny, rs) <- get
         if tiny
-            then return [CALL "_exit"]
+            then put (False, rs) >> return [CALL "_exit"]
         else return [RET]
     nasmGenerateInstructions _ = return []
 
