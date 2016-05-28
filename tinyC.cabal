@@ -25,6 +25,7 @@ library
                      , SymbolTable
                      , SemanticError
                      , TACAnalysis
+                     , Queue
   build-depends:       base >= 4.7 && < 5
                      , array
                      , containers

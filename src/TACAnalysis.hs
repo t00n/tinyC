@@ -1,7 +1,8 @@
 module TACAnalysis where
 
 import Data.Set (Set(..), insert, empty)
-import Data.Map (fromList, Map(..), (!))
+import Data.Map (fromList, toList, Map(..), (!))
+import qualified Queue as Q
 import Debug.Trace (traceShow)
 
 import TACGenerator
@@ -43,3 +44,11 @@ controlFlowGraph2 (x:xs) i labels g =
 
 controlFlowGraph :: [TACInstruction] -> Graph TACInstruction
 controlFlowGraph is = controlFlowGraph2 is 0 (constructLabelKey is) emptyGraph
+
+
+dataFlow :: Graph TACInstruction -> [(Set String, Set String)]
+dataFlow (Graph nodes edges) = 
+    let invar = fromList [(i, empty :: Set String) | i <- [0..(length nodes) - 1]]
+        outvar = fromList [(i, empty :: Set String) | i <- [0..(length nodes) - 1]]
+        toProcess = Q.enqueueAll [0..(length nodes) - 1] Q.empty
+    in zip (map snd (toList invar)) (map snd (toList outvar))
