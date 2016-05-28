@@ -1,4 +1,4 @@
-module NASMOptimization where
+module TACAnalysis where
 
 import Data.Set (Set(..), insert, empty)
 import Data.Map (fromList, Map(..), (!))

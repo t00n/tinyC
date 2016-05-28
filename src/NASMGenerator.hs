@@ -25,42 +25,42 @@ nasmGenerateData p = evalState (evalStateT (nasmGenerateStaticData p) (False, em
 nasmGenerateText :: TACProgram -> SymbolTable -> [NASMInstruction]
 nasmGenerateText p = evalState (evalStateT (nasmGenerateTopLevel p) (False, empty))
 
-foldLevel :: Int -> Bool -> (TACInstruction -> SRSS [a]) -> TACProgram -> SRSS [a]
-foldLevel level foldData func ds = foldM f (0, []) ds >>= return . snd
+sortTopLevel :: Bool -> TACProgram -> SymbolTable -> [TACInstruction]
+sortTopLevel foldData ds st = snd (foldl f (0, []) ds)
     where datadecl (TACCopy _ _) = True
           datadecl (TACArrayDecl _ _) = True
           datadecl _ = False
-          beginFunc :: TACInstruction -> SRSS Bool
-          beginFunc (TACLabel s) = do
-            lift get >>= return . symbolIsFunction s
-          beginFunc _ = return False
+          beginFunc (TACLabel s) = symbolIsFunction s st
+          beginFunc _ = False
           endFunc (TACReturn _) = True
           endFunc _ = False
-          f (l, nasmData) tacInst = do
-              beg <- beginFunc tacInst
-              if l == level && datadecl tacInst == foldData
-                  then do
-                    new <- func tacInst 
-                    return (l, nasmData ++ new)
-              else if beg
-                  then return (l+1, nasmData)
-              else if endFunc tacInst
-                  then return (l-1, nasmData)
-              else return (l, nasmData)
+          f (l, acc) tacInst = 
+              let newlevel = if beginFunc tacInst then l+1 else if endFunc tacInst then (l-1) else l
+              in
+              if l == 0 && foldData == datadecl tacInst
+                  then (newlevel, acc ++ [tacInst])
+              else if l /= 0 && not foldData
+                  then (newlevel, acc ++ [tacInst])
+              else (newlevel, acc)
 
 
 nasmGenerateStaticData :: TACProgram -> SRSS [NASMData]
-nasmGenerateStaticData = foldLevel 0 True decl
+nasmGenerateStaticData ds = do
+    st <- lift get
+    return $ concatMap decl (sortTopLevel True ds st)
     where 
-          decl (TACCopy s (TACInt i)) = return [NASMData s DWORDADDRESS [i]]
+          decl (TACCopy s (TACInt i)) = [NASMData s DWORDADDRESS [i]]
 
-          decl (TACCopy s (TACChar c)) = return [NASMData s BYTEADDRESS [ord c]]
+          decl (TACCopy s (TACChar c)) = [NASMData s BYTEADDRESS [ord c]]
 
-          decl (TACArrayDecl s xs) = return [NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)]
+          decl (TACArrayDecl s xs) = [NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)]
+          decl _ = []
 
 
 nasmGenerateTopLevel :: TACProgram -> SRSS [NASMInstruction]
-nasmGenerateTopLevel ds = foldLevel 0 False nasmGenerateInstructions ds
+nasmGenerateTopLevel ds = do
+    st <- lift get
+    nasmGenerateInstructions (sortTopLevel False ds st)
 
 class NASMGenerator a where
     nasmGenerateInstructions :: a -> SRSS [NASMInstruction]
