@@ -399,3 +399,9 @@ main = hspec $ do
             let st = symbolTable ast
             let tac = generateTAC ast
             nasmGenerateData tac st `shouldBe` [NASMData "a" DWORDADDRESS [0],NASMData "c" DWORDADDRESS [0]]
+            --putStrLn $ nasmShow $ nasmGenerate tac st
+        it "Generates a simple tiny function" $ do
+            let ast = scan_and_parse "int tiny() {}"
+            let st = symbolTable ast
+            let tac = generateTAC ast
+            nasmGenerateText tac st `shouldBe` [LABEL "tiny",CALL "_exit"]

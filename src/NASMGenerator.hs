@@ -1,8 +1,14 @@
-module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
+{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
+
+module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, nasmShow, NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
 
 import Data.Set (Set, member, empty, insert, delete)
 import Control.Monad.State
 import Data.Char (ord)
+import Debug.Trace (traceShow)
+import Data.String.Builder
+import Text.Printf
+import Data.List
 
 
 import TACGenerator
@@ -10,57 +16,81 @@ import SymbolTable
 
 type SRSS = StateT RegisterState (State SymbolTable)
 
-nasmGenerate :: TACProgram -> SymbolTable -> ([NASMData], [NASMInstruction])
-nasmGenerate p = (,) <$> nasmGenerateData p <*> nasmGenerateText p
+nasmGenerate :: TACProgram -> SymbolTable -> NASMProgram
+nasmGenerate p = NASMProgram <$> nasmGenerateData p <*> nasmGenerateText p
+
+nasmGenerateData :: TACProgram -> SymbolTable -> [NASMData]
+nasmGenerateData p = evalState (evalStateT (nasmGenerateStaticData p) (False, empty))
 
 nasmGenerateText :: TACProgram -> SymbolTable -> [NASMInstruction]
-nasmGenerateText p = evalState (evalStateT (nasmCodeGenerate p) empty)
+nasmGenerateText p = evalState (evalStateT (nasmGenerateTopLevel p) (False, empty))
 
-foldLevel :: Int -> Bool -> TACProgram -> (TACInstruction -> a) -> SymbolTable -> [a]
-foldLevel level foldData ds func st = snd $ foldr f (0, []) ds
+foldLevel :: Int -> Bool -> (TACInstruction -> SRSS [a]) -> TACProgram -> SRSS [a]
+foldLevel level foldData func ds = foldM f (0, []) ds >>= return . snd
     where datadecl (TACCopy _ _) = True
           datadecl (TACArrayDecl _ _) = True
           datadecl _ = False
-          beginFunc (TACLabel s) = symbolIsFunction s st
-          beginFunc _ = False
+          beginFunc :: TACInstruction -> SRSS Bool
+          beginFunc (TACLabel s) = do
+            lift get >>= return . symbolIsFunction s
+          beginFunc _ = return False
           endFunc (TACReturn _) = True
           endFunc _ = False
-          f tacInst (l, nasmData) = 
+          f (l, nasmData) tacInst = do
+              beg <- beginFunc tacInst
               if l == level && datadecl tacInst == foldData
-                  then (l, func tacInst:nasmData)
-              else if beginFunc tacInst
-                  then (l+1, nasmData)
+                  then do
+                    new <- func tacInst 
+                    return (l, nasmData ++ new)
+              else if beg
+                  then return (l+1, nasmData)
               else if endFunc tacInst
-                  then (l-1, nasmData)
-              else (l, nasmData)
+                  then return (l-1, nasmData)
+              else return (l, nasmData)
 
 
-nasmGenerateData :: TACProgram -> SymbolTable -> [NASMData]
-nasmGenerateData ds = foldLevel 0 True ds decl
+nasmGenerateStaticData :: TACProgram -> SRSS [NASMData]
+nasmGenerateStaticData = foldLevel 0 True decl
     where 
-          decl (TACCopy s (TACInt i)) = NASMData s DWORDADDRESS [i]
-          decl (TACCopy s (TACChar c)) = NASMData s BYTEADDRESS [ord c]
-          decl (TACArrayDecl s xs) = NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)
+          decl (TACCopy s (TACInt i)) = return [NASMData s DWORDADDRESS [i]]
 
-class NASMCodeGenerator a where
-    nasmCodeGenerate :: a -> SRSS [NASMInstruction]
+          decl (TACCopy s (TACChar c)) = return [NASMData s BYTEADDRESS [ord c]]
 
-instance NASMCodeGenerator a => NASMCodeGenerator [a] where
-    nasmCodeGenerate [] = return []
-    nasmCodeGenerate (x:xs) = do
-        first <- nasmCodeGenerate x
-        rest <- nasmCodeGenerate xs
-        return $ first ++ rest
+          decl (TACArrayDecl s xs) = return [NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)]
 
-instance NASMCodeGenerator TACInstruction where
-    nasmCodeGenerate inst = return $ []
 
-type RegisterState = Set RegisterName
+nasmGenerateTopLevel :: TACProgram -> SRSS [NASMInstruction]
+nasmGenerateTopLevel ds = foldLevel 0 False nasmGenerateInstructions ds
+
+class NASMGenerator a where
+    nasmGenerateInstructions :: a -> SRSS [NASMInstruction]
+
+instance NASMGenerator a => NASMGenerator [a] where
+    nasmGenerateInstructions xs = (mapM nasmGenerateInstructions xs) >>= return . concat
+
+instance NASMGenerator TACInstruction where
+    nasmGenerateInstructions (TACLabel l) = do
+        (tiny, rs) <- get
+        if l == "tiny"
+            then put (True, rs)
+        else return ()
+        return [LABEL l]
+    nasmGenerateInstructions (TACReturn Nothing) = do
+        (tiny, _) <- get
+        if tiny
+            then return [CALL "_exit"]
+        else return [RET]
+    nasmGenerateInstructions _ = return []
+
+type RegisterState = (Bool, Set RegisterName)
+
+data NASMProgram = NASMProgram [NASMData] [NASMInstruction]
 
 data NASMData = NASMData Label AddressSize [Int]
     deriving(Eq, Show)
 
-data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
+data NASMInstruction = LABEL Label
+                     | MOV1 RegisterSize RegisterName RegisterName
                      | MOV2 Register Address
                      | MOV3 Address Register
                      | MOV4 Register Int
@@ -131,6 +161,7 @@ data NASMInstruction = MOV1 RegisterSize RegisterName RegisterName
                      | CMP4 Register Constant
                      | CALL Label
                      | RET
+                     | INTERRUPT Constant
     deriving (Eq, Show)
 
 data RegisterSize = LSB | MSB | WORD | DWORD
@@ -157,3 +188,37 @@ type Multiplier = Int
 type Offset = Int
 
 type Label = String
+
+class NASMShow a where
+    nasmShow :: a -> String
+
+instance NASMShow a => NASMShow [a] where
+    nasmShow = concatMap (\x -> nasmShow x ++ "\n")
+
+instance NASMShow NASMProgram where
+    nasmShow (NASMProgram ds is) = build $ do
+        "global tiny"
+        "section .data"
+        "\talign 2"
+        literal $ nasmShow ds
+        "section .bss"
+        "section .text"
+        literal $ nasmShow is
+        "_exit:"
+        "mov eax, 1"
+        "push dword 0"
+        "push eax"
+        "int 0x80"
+ 
+instance NASMShow NASMData where
+    nasmShow (NASMData l size vs) = printf "\t%s: %s\t" l (nasmShow size) ++ intercalate "," [printf "%d" v | v <- vs]
+
+instance NASMShow NASMInstruction where
+    nasmShow (LABEL l) = printf "%s:" l
+    nasmShow (RET) = "ret"
+    nasmShow (CALL l) = printf "call %s" l
+
+instance NASMShow AddressSize where
+    nasmShow BYTEADDRESS = "db"
+    nasmShow WORDADDRESS = "dw"
+    nasmShow DWORDADDRESS = "dd"

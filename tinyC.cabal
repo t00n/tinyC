@@ -31,6 +31,7 @@ library
                      , monad-supply
                      , transformers
                      , rosezipper
+                     , stringbuilder
   default-language:    Haskell2010
 
 executable tinyC-exe
