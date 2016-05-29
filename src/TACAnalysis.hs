@@ -32,6 +32,13 @@ predecessors n (Graph _ edges _) = map (\(from, _) -> from) $ filter (\(_, to) -
 successors :: Ord a => Node -> Graph a -> [Node]
 successors n (Graph _ edges _) = map (\(_, to) -> to) $ filter (\(from, _) -> from == n) $ S.toList edges
 
+subgraph :: Ord a => [a] -> Graph a -> Graph a
+subgraph xs (Graph nodes edges values) = 
+    let subGraphValues = M.filter (`elem` xs) values
+        subGraphNodes = S.filter (`M.member` subGraphValues) nodes
+        subGraphEdges = S.filter (\(p, c) -> S.member p subGraphNodes && S.member c subGraphNodes) edges
+    in Graph subGraphNodes subGraphEdges subGraphValues
+
 constructLabelKey :: [TACInstruction] -> M.Map String Int
 constructLabelKey is = 
     let isLabel (TACLabel _, _) = True
