@@ -2,7 +2,7 @@
 
 module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, nasmShow, nasmGetTopLevelData, nasmGetText, NASMProgram(..), NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
 
-import Data.Set (Set, member, empty, insert, delete)
+import qualified Data.Set as S
 import qualified Data.Map as M
 import Control.Monad.State
 import Data.Char (ord)
@@ -20,10 +20,10 @@ nasmGenerate :: TACProgram -> SymbolTable -> NASMProgram
 nasmGenerate p = NASMProgram <$> nasmGenerateData p <*> nasmGenerateText p
 
 nasmGenerateData :: TACProgram -> SymbolTable -> [NASMData]
-nasmGenerateData p = evalState (evalStateT (nasmGenerateStaticData p) (False, M.empty))
+nasmGenerateData p = evalState (evalStateT (nasmGenerateStaticData p) (False, Nothing))
 
 nasmGenerateText :: TACProgram -> SymbolTable -> [NASMInstruction]
-nasmGenerateText p = evalState (evalStateT (nasmGenerateTopLevel p) (False, M.empty))
+nasmGenerateText p = evalState (evalStateT (nasmGenerateTopLevel p) (False, Nothing))
 
 sortTopLevel :: Bool -> TACProgram -> SymbolTable -> [TACInstruction]
 sortTopLevel foldData ds st = snd (foldl f (0, []) ds)
@@ -111,7 +111,7 @@ instance NASMGenerator TACInstruction where
 
 type SRSS = StateT RegisterState (State SymbolTable)
 
-type RegisterState = (Bool, M.Map String VariableLocation)
+type RegisterState = (Bool, Maybe (M.Map String VariableLocation, M.Map Int (S.Set String, S.Set String)))
 
 data VariableLocation = InRegister RegisterName
                       | InMemory Label

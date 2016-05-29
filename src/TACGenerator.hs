@@ -179,6 +179,8 @@ data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpres
                     | TACArrayDecl String [TACExpression]
                     | TACArrayAccess String TACExpression
                     | TACArrayModif TACExpression TACExpression
+                    | TACLoad String
+                    | TACStore String
                      -- | TACAddress TACExpression TACExpression
                      -- | TACDeRef TACExpression TACExpression
                      -- | TACDeRefA TACExpression TACExpression
@@ -226,6 +228,8 @@ instance TACPrint TACInstruction where
     tacPrint (TACArrayDecl s xs) = s ++ " = { " ++ concatMap (\x -> tacPrint x ++ " ") xs ++ " }"
     tacPrint (TACArrayAccess e1 e2) = e1 ++ " = " ++ tacPrint e2
     tacPrint (TACArrayModif e1 e2) = tacPrint e1 ++ " = " ++ tacPrint e2
+    tacPrint (TACLoad s) = "load " ++ s
+    tacPrint (TACStore s) = "store " ++ s
     tacPrint (TACIf e l) = "if " ++ tacPrint e ++ " goto " ++ l
     tacPrint (TACGoto l) = "goto " ++ l
     tacPrint (TACCall l es) = intercalate "\n" (map (((++) "param ") . tacPrint) es) ++ "\ncall " ++ l

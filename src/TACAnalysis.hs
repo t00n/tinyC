@@ -3,6 +3,8 @@ module TACAnalysis where
 import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Queue as Q
+import Data.List (maximumBy)
+import Data.Ord
 import Debug.Trace (traceShow, trace)
 
 import TACGenerator
@@ -101,6 +103,8 @@ useDefInst inst =
         (TACReturn (Just e)) -> (expressionsToSet [e], S.empty)
         (TACWrite e) -> (expressionsToSet [e], S.empty)
         (TACRead e) -> (S.empty, expressionsToSet [e])
+        (TACLoad s) -> (S.empty, S.fromList [s])
+        (TACStore s) -> (S.fromList [s], S.empty)
         _ -> (S.empty, S.empty)
 
 dataFlow :: Graph TACInstruction -> M.Map Int (S.Set String, S.Set String)
@@ -136,7 +140,7 @@ simplify2 xs ss g@(Graph nodes _ _) k =
     let findSimplify x Nothing = if length (neighbours x g) < k then (Just x) else Nothing
         findSimplify _ (Just x) = (Just x)
         toSimplify = foldr findSimplify Nothing (S.toList nodes)
-        toSpill = last $ S.toList nodes
+        toSpill = fst $ maximumBy (comparing snd) (map (\x -> (x, length (neighbours x g))) (S.toList nodes))
     in case toSimplify of
             Nothing -> if null nodes then (xs, ss) else simplify2 xs (toSpill:ss) (delete toSpill g) k
             (Just x) -> simplify2 (x:xs) ss (delete x g) k
@@ -157,3 +161,25 @@ findRegisters2 (n:ns) g k mapping =
 
 findRegisters :: [Node] -> Graph String -> Int -> M.Map Node Int
 findRegisters nodes g k = findRegisters2 nodes g k M.empty
+
+fixInstructions :: TACProgram -> [String] -> TACProgram
+fixInstructions is spilled = concatMap f is
+    where f inst = load ++ [inst] ++ store
+            where (used, def) = useDefInst inst
+                  load = foldr (\x acc -> if S.member x used then (TACLoad x:acc) else acc) [] spilled
+                  store = foldr (\x acc -> if S.member x def then (TACStore x:acc) else acc) [] spilled
+
+mapVariableToRegisters2 :: TACProgram -> Int -> [Node] -> (M.Map Int Int, TACProgram)
+mapVariableToRegisters2 is k spilled = 
+    let cfg = controlFlowGraph is
+        df = dataFlow cfg
+        rig = registerInterferenceGraph df
+        (nodes, newspilled) = simplify rig k
+        newis = fixInstructions is (map (flip unsafeLookupNode rig) newspilled)
+    in
+    traceShow df $ if newspilled /= spilled 
+        then mapVariableToRegisters2 newis k newspilled
+    else (findRegisters nodes rig k, is)
+
+mapVariableToRegisters :: TACProgram -> Int -> (M.Map Int Int, TACProgram)
+mapVariableToRegisters is k = mapVariableToRegisters2 is k []
