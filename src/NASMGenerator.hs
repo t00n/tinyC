@@ -13,6 +13,7 @@ import Data.List
 
 import TACGenerator
 import SymbolTable
+import TACAnalysis
 
 type SRSS = StateT RegisterState (State SymbolTable)
 
@@ -49,6 +50,18 @@ nasmGetTopLevelData = sortTopLevel True
 nasmGetText :: TACProgram -> SymbolTable -> [TACInstruction]
 nasmGetText = sortTopLevel False
 
+nasmGetFunction :: [[TACInstruction]] -> TACInstruction -> SRSS [[TACInstruction]]
+nasmGetFunction [] i = return [[i]]
+nasmGetFunction (xs:xss) i = do
+    st <- lift get
+    case i of TACLabel l -> if symbolIsFunction l st then return ([i]:xs:xss)
+                            else return ((i:xs):xss)
+              _ -> return ((i:xs):xss)
+
+nasmGetFunctions :: TACProgram -> SRSS [[TACInstruction]]
+nasmGetFunctions xs = fmap (reverse . (fmap reverse)) $ foldM nasmGetFunction [] xs
+
+
 nasmGenerateStaticData :: TACProgram -> SRSS [NASMData]
 nasmGenerateStaticData ds = do
     st <- lift get
@@ -65,9 +78,11 @@ nasmGenerateStaticData ds = do
 nasmGenerateTopLevel :: TACProgram -> SRSS [NASMInstruction]
 nasmGenerateTopLevel ds = do
     st <- lift get
-    nasmGenerateInstructions (sortTopLevel False ds st)
+    functions <- nasmGetFunctions $ (nasmGetText ds st)
+    nasmInst <- mapM nasmGenerateInstructions functions
+    (return . concat) nasmInst
 
-class NASMGenerator a where
+class Show a => NASMGenerator a where
     nasmGenerateInstructions :: a -> SRSS [NASMInstruction]
 
 instance NASMGenerator a => NASMGenerator [a] where
