@@ -141,7 +141,16 @@ simplify g@(Graph nodes _ _) xs ss k =
             Nothing -> if null nodes then (xs, ss) else simplify (delete toSpill g) xs (toSpill:ss) k
             (Just x) -> simplify (delete x g) (x:xs) ss k
 
-findRegisters :: Graph String -> Int -> M.Map Int Int
-findRegisters vGraph k = 
-    let (nodes, spilled) = simplify vGraph [] [] k
-    in M.fromList [(x, 1) | x <- nodes]
+findRegister :: Node -> [Node] -> Int -> M.Map Node Int -> Int
+findRegister node neigh k mapping = 
+    let registersUsed = M.elems $ M.filterWithKey (\k v -> k `elem` neigh) mapping
+    in head $ [x | x <- [0..(k-1)], not (x `elem` registersUsed)]
+
+findRegisters2 :: [Node] -> Graph String -> Int -> M.Map Node Int -> M.Map Node Int
+findRegisters2 [] _ _ mapping = mapping
+findRegisters2 (n:ns) g k mapping = 
+    let register = findRegister n (neighbours n g) k mapping
+    in findRegisters2 ns g k (M.insert n register mapping)
+
+findRegisters :: [Node] -> Graph String -> Int -> M.Map Node Int
+findRegisters nodes g k = findRegisters2 nodes g k M.empty
