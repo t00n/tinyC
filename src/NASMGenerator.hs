@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
 
-module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, nasmShow, nasmGetTopLevelData, nasmGetText, NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
+module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, nasmShow, nasmGetTopLevelData, nasmGetText, NASMProgram(..), NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
 
 import Data.Set (Set, member, empty, insert, delete)
+import qualified Data.Map as M
 import Control.Monad.State
 import Data.Char (ord)
 import Debug.Trace (traceShow)
@@ -15,16 +16,14 @@ import TACGenerator
 import SymbolTable
 import TACAnalysis
 
-type SRSS = StateT RegisterState (State SymbolTable)
-
 nasmGenerate :: TACProgram -> SymbolTable -> NASMProgram
 nasmGenerate p = NASMProgram <$> nasmGenerateData p <*> nasmGenerateText p
 
 nasmGenerateData :: TACProgram -> SymbolTable -> [NASMData]
-nasmGenerateData p = evalState (evalStateT (nasmGenerateStaticData p) (False, empty))
+nasmGenerateData p = evalState (evalStateT (nasmGenerateStaticData p) (False, M.empty))
 
 nasmGenerateText :: TACProgram -> SymbolTable -> [NASMInstruction]
-nasmGenerateText p = evalState (evalStateT (nasmGenerateTopLevel p) (False, empty))
+nasmGenerateText p = evalState (evalStateT (nasmGenerateTopLevel p) (False, M.empty))
 
 sortTopLevel :: Bool -> TACProgram -> SymbolTable -> [TACInstruction]
 sortTopLevel foldData ds st = snd (foldl f (0, []) ds)
@@ -85,8 +84,16 @@ nasmGenerateTopLevel ds = do
 class Show a => NASMGenerator a where
     nasmGenerateInstructions :: a -> SRSS [NASMInstruction]
 
-instance NASMGenerator a => NASMGenerator [a] where
-    nasmGenerateInstructions xs = (mapM nasmGenerateInstructions xs) >>= return . concat
+instance NASMGenerator [TACInstruction] where
+    nasmGenerateInstructions xs = do
+        let cfg = controlFlowGraph xs
+        let df = dataFlow cfg
+        let rig = registerInterferenceGraph df
+        let registers = [A, B, C, D, SI, DI]
+        let (nodes, spilled) = simplify rig (length registers)
+        let registerMapping = M.map (\v -> InRegister (registers !! v)) (findRegisters nodes rig (length registers))
+        let variableMapping = M.union registerMapping (M.fromList $ zip spilled [InStack x | x <- [0,4..(length spilled)-1]])
+        (mapM nasmGenerateInstructions xs) >>= return . concat
 
 instance NASMGenerator TACInstruction where
     nasmGenerateInstructions (TACLabel l) = do
@@ -102,12 +109,20 @@ instance NASMGenerator TACInstruction where
         else return [RET]
     nasmGenerateInstructions _ = return []
 
-type RegisterState = (Bool, Set RegisterName)
+type SRSS = StateT RegisterState (State SymbolTable)
+
+type RegisterState = (Bool, M.Map String VariableLocation)
+
+data VariableLocation = InRegister RegisterName
+                      | InMemory Label
+                      | InStack Offset
+    deriving (Eq, Show)
 
 data NASMProgram = NASMProgram [NASMData] [NASMInstruction]
+    deriving (Eq, Show)
 
 data NASMData = NASMData Label AddressSize [Int]
-    deriving(Eq, Show)
+    deriving (Eq, Show)
 
 data NASMInstruction = LABEL Label
                      | MOV1 RegisterSize RegisterName RegisterName

@@ -121,8 +121,8 @@ dataFlow g@(Graph nodes edges values) =
                 in dataFlowRec newnewq newvs
     in dataFlowRec (Q.enqueueAll (S.toList nodes) Q.empty) variables
 
-registerInterferanceGraph :: M.Map Int (S.Set String, S.Set String) -> Graph String
-registerInterferanceGraph vs = Graph (S.fromList ids) edges values
+registerInterferenceGraph :: M.Map Int (S.Set String, S.Set String) -> Graph String
+registerInterferenceGraph vs = Graph (S.fromList ids) edges values
     where allsets = ((concatMap (\(s1, s2) -> [s1, s2])) . M.elems) vs
           nodes = (S.toList . S.unions) allsets
           ids = [0..(length nodes)-1]
