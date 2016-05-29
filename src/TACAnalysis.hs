@@ -102,3 +102,13 @@ dataFlow g@(Graph nodes edges values) =
                     newvs = M.insert e (newin, out) vs
                 in dataFlowRec newnewq newvs
     in dataFlowRec (Q.enqueueAll (S.toList nodes) Q.empty) variables
+
+registerInterferanceGraph :: M.Map Int (S.Set String, S.Set String) -> Graph String
+registerInterferanceGraph vs = Graph (S.fromList ids) edges values
+    where allsets = ((concatMap (\(s1, s2) -> [s1, s2])) . M.elems) vs
+          nodes = (S.toList . S.unions) allsets
+          ids = [0..(length nodes)-1]
+          valueIntMap = M.fromList (zip nodes ids)
+          values = M.fromList (zip ids nodes)
+          edges = foldr f S.empty allsets
+          f x g = foldr S.insert g [(a1, b1) | a <- S.toList x, b <- S.toList x, a /= b, let (Just a1) = M.lookup a valueIntMap, let (Just b1) = M.lookup b valueIntMap]
