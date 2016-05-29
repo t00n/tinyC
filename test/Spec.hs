@@ -427,10 +427,10 @@ main = hspec $ do
             let df = dataFlow cfg
             let rig = registerInterferanceGraph df
             rig `shouldBe` Graph (S.fromList [0,1,2,3,4,5]) (S.fromList [(0,1),(0,2),(1,0),(1,2),(1,3),(2,0),(2,1),(2,3),(3,1),(3,2),(3,4),(4,3)]) (M.fromList [(0,"a"),(1,"b"),(2,"c"),(3,"t1"),(4,"t2"),(5,"t3")])
-            simplify rig [] [] 2 `shouldBe` ([0,1,4,5],[2,3])
-            simplify rig [] [] 3 `shouldBe` ([0,1,2,3,4,5],[])
-            simplify rig [] [] 1 `shouldBe` ([0,5],[1,2,3,4])
-            let (nodes, spilled) = simplify rig [] [] 3
+            simplify rig 2 `shouldBe` ([0,1,4,5],[2,3])
+            simplify rig 3 `shouldBe` ([0,1,2,3,4,5],[])
+            simplify rig 1 `shouldBe` ([0,5],[1,2,3,4])
+            let (nodes, spilled) = simplify rig 3
             findRegisters nodes rig 3 `shouldBe` M.fromList [(0,0),(1,1),(2,2),(3,0),(4,1),(5,0)]
-            let (nodes, spilled) = simplify rig [] [] 2
+            let (nodes, spilled) = simplify rig 2
             findRegisters nodes rig 2 `shouldBe` M.fromList [(0,0),(1,1),(4,0),(5,0)]

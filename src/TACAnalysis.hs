@@ -131,15 +131,18 @@ registerInterferanceGraph vs = Graph (S.fromList ids) edges values
           edges = foldr f S.empty allsets
           f x g = foldr S.insert g [(a1, b1) | a <- S.toList x, b <- S.toList x, a /= b, let (Just a1) = M.lookup a valueIntMap, let (Just b1) = M.lookup b valueIntMap]
 
-simplify :: Graph String -> [Int] -> [Int] -> Int -> ([Int], [Int])
-simplify g@(Graph nodes _ _) xs ss k = 
+simplify2 :: [Int] -> [Int] -> Graph String -> Int -> ([Int], [Int])
+simplify2 xs ss g@(Graph nodes _ _) k = 
     let findSimplify x Nothing = if length (neighbours x g) < k then (Just x) else Nothing
         findSimplify _ (Just x) = (Just x)
         toSimplify = foldr findSimplify Nothing (S.toList nodes)
         toSpill = last $ S.toList nodes
     in case toSimplify of
-            Nothing -> if null nodes then (xs, ss) else simplify (delete toSpill g) xs (toSpill:ss) k
-            (Just x) -> simplify (delete x g) (x:xs) ss k
+            Nothing -> if null nodes then (xs, ss) else simplify2 xs (toSpill:ss) (delete toSpill g) k
+            (Just x) -> simplify2 (x:xs) ss (delete x g) k
+
+simplify :: Graph String -> Int -> ([Int], [Int])
+simplify = simplify2 [] []
 
 findRegister :: Node -> [Node] -> Int -> M.Map Node Int -> Int
 findRegister node neigh k mapping = 
