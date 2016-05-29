@@ -177,7 +177,7 @@ mapVariableToRegisters2 is k spilled =
         (nodes, newspilled) = simplify rig k
         newis = fixInstructions is (map (flip unsafeLookupNode rig) newspilled)
     in
-    traceShow df $ if newspilled /= spilled 
+    if newspilled /= spilled 
         then mapVariableToRegisters2 newis k newspilled
     else (findRegisters nodes rig k, is)
 
