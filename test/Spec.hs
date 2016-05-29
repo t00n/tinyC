@@ -426,3 +426,6 @@ main = hspec $ do
             let cfg = controlFlowGraph (nasmGetText tac st)
             let df = dataFlow cfg
             registerInterferanceGraph df `shouldBe` Graph (S.fromList [0,1,2,3,4,5]) (S.fromList [(0,1),(0,2),(1,0),(1,2),(1,3),(2,0),(2,1),(2,3),(3,1),(3,2),(3,4),(4,3)]) (M.fromList [(0,"a"),(1,"b"),(2,"c"),(3,"t1"),(4,"t2"),(5,"t3")])
+            simplify (registerInterferanceGraph df) [] [] 2 `shouldBe` ([0,1,4,5],[2,3])
+            simplify (registerInterferanceGraph df) [] [] 3 `shouldBe` ([0,1,2,3,4,5],[])
+            simplify (registerInterferanceGraph df) [] [] 1 `shouldBe` ([0,5],[1,2,3,4])

@@ -17,11 +17,26 @@ type Edge = (Int, Int)
 lookupNode :: Ord a => Node -> Graph a -> Maybe a
 lookupNode i (Graph _ _ values) = M.lookup i values
 
-addNode :: Ord a => Node -> a -> Graph a -> Graph a
-addNode x v (Graph nodes edges values) = Graph (S.insert x nodes) edges (M.insert x v values)
+unsafeLookupNode :: Ord a => Node -> Graph a -> a
+unsafeLookupNode n g = 
+    let v = lookupNode n g
+    in
+    case v of
+        Nothing -> error "in unsafeLookupNode"
+        (Just x) -> x
 
-addEdge :: Ord a => Int -> Int -> Graph a -> Graph a
-addEdge p c (Graph nodes edges values) = Graph nodes (S.insert (p, c) edges) values
+insertNode :: Ord a => Node -> a -> Graph a -> Graph a
+insertNode x v (Graph nodes edges values) = Graph (S.insert x nodes) edges (M.insert x v values)
+
+insertEdge :: Ord a => Int -> Int -> Graph a -> Graph a
+insertEdge p c (Graph nodes edges values) = Graph nodes (S.insert (p, c) edges) values
+
+delete :: Ord a => Int -> Graph a -> Graph a
+delete n (Graph nodes edges values) = Graph newnodes newedges newvalues
+    where
+        newnodes = S.delete n nodes
+        newedges = S.foldr (\(a, b) e -> if a == n || b == n then S.delete (a, b) e else e) edges edges
+        newvalues = M.delete n values 
 
 emptyGraph :: Graph a
 emptyGraph = Graph S.empty S.empty M.empty
@@ -31,6 +46,9 @@ predecessors n (Graph _ edges _) = map (\(from, _) -> from) $ filter (\(_, to) -
 
 successors :: Ord a => Node -> Graph a -> [Node]
 successors n (Graph _ edges _) = map (\(_, to) -> to) $ filter (\(from, _) -> from == n) $ S.toList edges
+
+neighbours :: Ord a => Node -> Graph a -> [Node]
+neighbours n g = S.toList $ S.fromList $ predecessors n g ++ successors n g
 
 subgraph :: Ord a => [a] -> Graph a -> Graph a
 subgraph xs (Graph nodes edges values) = 
@@ -48,13 +66,13 @@ constructLabelKey is =
 controlFlowGraph2 :: [TACInstruction] -> Int -> M.Map String Int -> Graph TACInstruction -> Graph TACInstruction
 controlFlowGraph2 [] _ _ g = g
 controlFlowGraph2 (x:xs) i labels g =
-    let graphplusnode = addNode i x g
+    let graphplusnode = insertNode i x g
         graphplusedges = case x of
-                        TACIf _ s -> ((addEdge i (labels M.! s)) . (addEdge i (i+1))) graphplusnode
-                        TACGoto s -> addEdge i (labels M.! s) graphplusnode
-                        TACCall s _ -> addEdge i (labels M.! s) graphplusnode
+                        TACIf _ s -> ((insertEdge i (labels M.! s)) . (insertEdge i (i+1))) graphplusnode
+                        TACGoto s -> insertEdge i (labels M.! s) graphplusnode
+                        TACCall s _ -> insertEdge i (labels M.! s) graphplusnode
                         TACReturn _ -> graphplusnode
-                        _ -> addEdge i (i+1) graphplusnode
+                        _ -> insertEdge i (i+1) graphplusnode
     in controlFlowGraph2 xs (i+1) labels graphplusedges
 
 controlFlowGraph :: [TACInstruction] -> Graph TACInstruction
@@ -112,3 +130,18 @@ registerInterferanceGraph vs = Graph (S.fromList ids) edges values
           values = M.fromList (zip ids nodes)
           edges = foldr f S.empty allsets
           f x g = foldr S.insert g [(a1, b1) | a <- S.toList x, b <- S.toList x, a /= b, let (Just a1) = M.lookup a valueIntMap, let (Just b1) = M.lookup b valueIntMap]
+
+simplify :: Graph String -> [Int] -> [Int] -> Int -> ([Int], [Int])
+simplify g@(Graph nodes _ _) xs ss k = 
+    let findSimplify x Nothing = if length (neighbours x g) < k then (Just x) else Nothing
+        findSimplify _ (Just x) = (Just x)
+        toSimplify = foldr findSimplify Nothing (S.toList nodes)
+        toSpill = last $ S.toList nodes
+    in case toSimplify of
+            Nothing -> if null nodes then (xs, ss) else simplify (delete toSpill g) xs (toSpill:ss) k
+            (Just x) -> simplify (delete x g) (x:xs) ss k
+
+findRegisters :: Graph String -> Int -> M.Map Int Int
+findRegisters vGraph k = 
+    let (nodes, spilled) = simplify vGraph [] [] k
+    in M.fromList [(x, 1) | x <- nodes]
