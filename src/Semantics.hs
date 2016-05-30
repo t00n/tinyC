@@ -6,6 +6,7 @@ import Control.Monad.Trans.Except (ExceptT(..), runExceptT, throwE)
 import Control.Monad.State (State(..), get, put, modify, runState)
 import Data.Maybe (isJust, fromJust)
 import Data.Char (ord)
+import qualified Data.Map as M
 import Debug.Trace (traceShow)
 
 import Parser
@@ -165,7 +166,7 @@ checkArguments :: [Expression] -> Name -> ESSS ()
 checkArguments args func = do
     st <- get
     let funcName = nameToString func
-    let params = (infoParams ... unsafeGetSymbolInfo) funcName st 
+    let params = M.elems $ (infoParams ... unsafeGetSymbolInfo) funcName st 
     foldl (>>) (return ()) $ zipWith checkArgument args params
 
 entryPointExists :: Program -> ESSS Program

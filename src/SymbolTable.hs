@@ -45,7 +45,7 @@ data SymbolInfo = VarInfo {
     infoSize :: SymbolSize
 }         | FuncInfo {
     infoType :: Type,
-    infoParams :: [SymbolInfo]
+    infoParams :: Symbols
 } deriving (Eq, Show)
 
 type Symbols = M.Map String SymbolInfo
@@ -155,8 +155,8 @@ addSymbol d st =
                 Right $ VarInfo t (nameToScalarity n) size
         declInfo (FuncDeclaration t n ps _) = 
             do
-                infos <- mapM paramToInfo ps
-                Right $ FuncInfo t infos
+                infos <- mapM paramToSymbol ps
+                Right $ FuncInfo t (M.fromList infos)
     in
     do
     info <- declInfo d

@@ -192,7 +192,7 @@ main = hspec $ do
             fmap root (constructST ast) `shouldBe` Left (SemanticError {errorType = NameExistsError, errorVariable = "a"})
         it "Constructs a two-level symbol table" $ do
             let ast = scan_and_parse "char a; int b = 5; int c[5]; char f() {} int g(int a) {}"
-            fmap root (constructST ast) `shouldBe` Right (zipper (T.Node (M.fromList [("a",VarInfo CharType Scalar 1),("b",VarInfo IntType Scalar 1),("c",VarInfo IntType Array 5),("f",FuncInfo CharType []),("g",FuncInfo IntType [VarInfo IntType Scalar 1])]) [T.Node (M.fromList []) [],T.Node (M.fromList [("a",VarInfo IntType Scalar 1)]) []]))
+            fmap root (constructST ast) `shouldBe` Right (zipper (T.Node (M.fromList [("a",VarInfo CharType Scalar 1),("b",VarInfo IntType Scalar 1),("c",VarInfo IntType Array 5),("f",FuncInfo CharType M.empty),("g",FuncInfo IntType (M.fromList [("a", VarInfo IntType Scalar 1)]))]) [T.Node (M.fromList []) [],T.Node (M.fromList [("a",VarInfo IntType Scalar 1)]) []]))
     describe "Semantics" $ do
         it "Checks that variables with same name are declared only once on a certain scope level" $ do
             let ast = scan_and_parse "int tiny() { int a; int a; }"
@@ -417,6 +417,11 @@ main = hspec $ do
             let st = symbolTable ast
             let tac = generateTAC ast
             nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DWORDADDRESS [0]] [LABEL "tiny",CALL "_exit"]
+        it "Generates functions with arguments and calling convention" $ do
+            let ast = scan_and_parse "int tiny() { int a = 2; f(5, a); } int f(int x, int y) { return x + y; }"
+            let st = symbolTable ast
+            let tac = generateTAC ast
+            nasmGenerate tac st `shouldBe` NASMProgram [] []
         it "Tests live variable analysis" $ do
             let ast = scan_and_parse "int tiny() { int a = 5; int b = 1 + a; } int f() {}"
             let st = symbolTable ast
