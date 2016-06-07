@@ -26,9 +26,7 @@ scan_parse_check xs =
     if check == Right ast then ast
     else error $ show check
 
-scan_to_tac s = do
-    let ast = scan_parse_check s
-    return $ generateTAC ast
+scan_to_tac s = tacGenerate . scan_parse_check
 
 testTokens s r = do
     it ("Tokenizes " ++ s) $ do
@@ -335,59 +333,59 @@ main = hspec $ do
     describe "The generation of three-address-code" $ do
         it "Generates a few declarations" $ do
             let ast = scan_parse_check "int a; int b; int tiny() {}"
-            generateTAC ast `shouldBe` [TACCopy "a" (TACInt 0),TACCopy "b" (TACInt 0),TACLabel "tiny",TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([TACCopy "a" (TACInt 0),TACCopy "b" (TACInt 0)],[[TACLabel "tiny",TACReturn Nothing]])
         it "Generates declarations with complex binary expressions" $ do
-            let ast = scan_parse_check "int a = 5; int b = (a+5)/(a-2); int tiny() {}"
-            generateTAC ast `shouldBe` [TACCopy "a" (TACInt 5),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "a") TACMinus (TACInt 2),TACBinary "t3" (TACVar "t1") TACDivide (TACVar "t2"),TACCopy "b" (TACVar "t3"),TACLabel "tiny",TACReturn Nothing]
+            let ast = scan_parse_check "int a = 5; int tiny() { int b = (a+5)/(a-2); }"
+            tacGenerate ast `shouldBe` ([TACCopy "a" (TACInt 5)],[[TACLabel "tiny",TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "a") TACMinus (TACInt 2),TACBinary "t3" (TACVar "t1") TACDivide (TACVar "t2"),TACCopy "b" (TACVar "t3"),TACReturn Nothing]])
         it "Generates function declarations" $ do
             let ast = scan_parse_check "int tiny() {}"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "tiny",TACReturn Nothing]])
             let ast = scan_parse_check "int f(int a, int b) {int c = 4;} int tiny() { }"
-            generateTAC ast `shouldBe` [TACLabel "f",TACCopy "c" (TACInt 4),TACReturn Nothing,TACLabel "tiny",TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "f",TACCopy "c" (TACInt 4),TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]])
         it "Generates declarations with complex unary expressions" $ do
-            let ast = scan_parse_check "int a = 5; int b = -(a - 5); int tiny() {}"
-            generateTAC ast `shouldBe` [TACCopy "a" (TACInt 5),TACBinary "t1" (TACVar "a") TACMinus (TACInt 5),TACUnary "t2" TACNeg (TACVar "t1"),TACCopy "b" (TACVar "t2"),TACLabel "tiny",TACReturn Nothing]
+            let ast = scan_parse_check "int a = 5; int tiny() { int b = -(a - 5); }"
+            tacGenerate ast `shouldBe` ([TACCopy "a" (TACInt 5)],[[TACLabel "tiny",TACBinary "t1" (TACVar "a") TACMinus (TACInt 5),TACUnary "t2" TACNeg (TACVar "t1"),TACCopy "b" (TACVar "t2"),TACReturn Nothing]])
         it "Generates function calls" $ do
             let ast = scan_parse_check "int f(int a, int b) { int c = 1; f(c, 2); } int tiny() {}"
-            generateTAC ast `shouldBe` [TACLabel "f",TACCopy "c" (TACInt 1),TACCall "f" [TACVar "c",TACInt 2,TACVar "t1"],TACReturn Nothing,TACLabel "tiny",TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "f",TACCopy "c" (TACInt 1),TACCall "f" [TACVar "c",TACInt 2,TACVar "t1"],TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]])
             let ast = scan_parse_check "int f(int a, int b) { int c = f(2 + 3, 1); } int tiny() {}"
-            generateTAC ast `shouldBe`  [TACLabel "f",TACBinary "t1" (TACInt 2) TACPlus (TACInt 3),TACCall "f" [TACVar "t1",TACInt 1,TACVar "t2"],TACCopy "c" (TACVar "t2"),TACReturn Nothing,TACLabel "tiny",TACReturn Nothing]
+            tacGenerate ast `shouldBe`  ([],[[TACLabel "f",TACBinary "t1" (TACInt 2) TACPlus (TACInt 3),TACCall "f" [TACVar "t1",TACInt 1,TACVar "t2"],TACCopy "c" (TACVar "t2"),TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]])
         it "Generates assignments" $ do
             let ast = scan_parse_check "int tiny() { int a; a = (a + 5) * 3; }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACCopy "a" (TACInt 0),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "t1") TACTimes (TACInt 3),TACCopy "a" (TACVar "t2"),TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "tiny",TACCopy "a" (TACInt 0),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "t1") TACTimes (TACInt 3),TACCopy "a" (TACVar "t2"),TACReturn Nothing]])
             let ast = scan_parse_check "int a[5]; int b = a[2]; int tiny() {}"
-            generateTAC ast `shouldBe` [TACArrayDecl "a" [TACInt 0, TACInt 0, TACInt 0, TACInt 0, TACInt 0],TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACCopy "b" (TACVar "t1"),TACLabel "tiny",TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACCopy "b" (TACVar "t1")],[[TACLabel "tiny",TACReturn Nothing]])
             let ast = scan_parse_check "int a[5]; int tiny() { a[2] = 5; }"
-            generateTAC ast `shouldBe` [TACArrayDecl "a" [TACInt 0, TACInt 0, TACInt 0, TACInt 0, TACInt 0],TACLabel "tiny",TACArrayModif (TACArray "a" (TACInt 2)) (TACInt 5),TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0]],[[TACLabel "tiny",TACArrayModif (TACArray "a" (TACInt 2)) (TACInt 5),TACReturn Nothing]])
             let ast = scan_parse_check "int a[5]; int b[5]; int tiny() { a[2] = b[3]; }"
-            generateTAC ast `shouldBe` [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayDecl "b" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACLabel "tiny",TACArrayAccess "t1" (TACArray "b" (TACInt 3)),TACArrayModif (TACArray "a" (TACInt 2)) (TACVar "t1"),TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayDecl "b" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0]],[[TACLabel "tiny",TACArrayAccess "t1" (TACArray "b" (TACInt 3)),TACArrayModif (TACArray "a" (TACInt 2)) (TACVar "t1"),TACReturn Nothing]])
         it "Generates if" $ do
             let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 5; a = 3; } }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 5),TACCopy "a" (TACInt 3),TACLabel "l2",TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 5),TACCopy "a" (TACInt 3),TACLabel "l2",TACReturn Nothing]])
         it "Generates if else" $ do
             let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 5; } else { int b = 5; } }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 5),TACGoto "l3",TACLabel "l2",TACCopy "b" (TACInt 5),TACLabel "l3",TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 5),TACGoto "l3",TACLabel "l2",TACCopy "b" (TACInt 5),TACLabel "l3",TACReturn Nothing]])
         it "Generates several if else" $ do
             let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 1; } else if (2 > 3) { int b = 2; } else { int c = 3; } }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 1),TACGoto "l3",TACLabel "l2",TACIf (TACExpr (TACInt 2) TACGreater (TACInt 3)) "l4",TACGoto "l5",TACLabel "l4",TACCopy "b" (TACInt 2),TACGoto "l6",TACLabel "l5",TACCopy "c" (TACInt 3),TACLabel "l6",TACLabel "l3",TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 1),TACGoto "l3",TACLabel "l2",TACIf (TACExpr (TACInt 2) TACGreater (TACInt 3)) "l4",TACGoto "l5",TACLabel "l4",TACCopy "b" (TACInt 2),TACGoto "l6",TACLabel "l5",TACCopy "c" (TACInt 3),TACLabel "l6",TACLabel "l3",TACReturn Nothing]])
         it "Generates a while" $ do
             let ast = scan_parse_check "int tiny() { int a = 2; while ( a > 1) { a = a - 1; } }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACCopy "a" (TACInt 2),TACLabel "l1",TACIf (TACExpr (TACVar "a") TACGreater (TACInt 1)) "l3",TACGoto "l2",TACLabel "l3",TACBinary "t1" (TACVar "a") TACMinus (TACInt 1),TACCopy "a" (TACVar "t1"),TACGoto "l1",TACLabel "l2",TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "tiny",TACCopy "a" (TACInt 2),TACLabel "l1",TACIf (TACExpr (TACVar "a") TACGreater (TACInt 1)) "l3",TACGoto "l2",TACLabel "l3",TACBinary "t1" (TACVar "a") TACMinus (TACInt 1),TACCopy "a" (TACVar "t1"),TACGoto "l1",TACLabel "l2",TACReturn Nothing]])
         it "Generates a return" $ do
             let ast = scan_parse_check "int tiny() { int a = 2; return a; }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACCopy "a" (TACInt 2),TACReturn (Just $ TACVar "a")]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "tiny",TACCopy "a" (TACInt 2),TACReturn (Just (TACVar "a"))]])
             let ast = scan_parse_check "int tiny() { return 3 + 4 / 5; }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACBinary "t1" (TACInt 4) TACDivide (TACInt 5),TACBinary "t2" (TACInt 3) TACPlus (TACVar "t1"),TACReturn (Just $ TACVar "t2")]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "tiny",TACBinary "t1" (TACInt 4) TACDivide (TACInt 5),TACBinary "t2" (TACInt 3) TACPlus (TACVar "t1"),TACReturn (Just (TACVar "t2"))]])
         it "Generates a write" $ do
             let ast = scan_parse_check "int tiny() { int a = 2; write a; }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACCopy "a" (TACInt 2),TACWrite (TACVar "a"),TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "tiny",TACCopy "a" (TACInt 2),TACWrite (TACVar "a"),TACReturn Nothing]])
             let ast = scan_parse_check "int tiny() { int a[5]; write a[2]; }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACArrayDecl "a" [TACInt 0, TACInt 0, TACInt 0, TACInt 0, TACInt 0],TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACWrite (TACVar "t1"),TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACWrite (TACVar "t1"),TACReturn Nothing]])
         it "Generates reads" $ do
             let ast = scan_parse_check "int tiny() { int a; read a; }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACCopy "a" (TACInt 0),TACRead (TACVar "a"),TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "tiny",TACCopy "a" (TACInt 0),TACRead (TACVar "a"),TACReturn Nothing]])
             let ast = scan_parse_check "int tiny() { int a[5]; read a[2]; }"
-            generateTAC ast `shouldBe` [TACLabel "tiny",TACArrayDecl "a" [TACInt 0, TACInt 0, TACInt 0, TACInt 0, TACInt 0],TACRead (TACArray "a" (TACInt 2)),TACReturn Nothing]
+            tacGenerate ast `shouldBe` ([],[[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACRead (TACVar "t1"),TACReturn Nothing]])
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]
@@ -395,50 +393,50 @@ main = hspec $ do
         it "Generates data" $ do
             let ast = scan_and_parse "int a; int b = 2; char c = 'a'; int v[5]; int tiny() {}"
             let st = symbolTable ast
-            let tac = generateTAC ast
+            let tac = tacGenerate ast
             nasmGenerateData tac st `shouldBe` [NASMData "a" DWORDADDRESS [0],NASMData "b" DWORDADDRESS [2],NASMData "c" BYTEADDRESS [97],NASMData "v" DWORDADDRESS [0,0,0,0,0]]
             let ast = scan_and_parse "int a; int tiny() { int b; } int c;"
             let st = symbolTable ast
-            let tac = generateTAC ast
+            let tac = tacGenerate ast
             nasmGenerateData tac st `shouldBe` [NASMData "a" DWORDADDRESS [0],NASMData "c" DWORDADDRESS [0]]
             --putStrLn $ nasmShow $ nasmGenerate tac st
         it "Generates a simple tiny function" $ do
             let ast = scan_and_parse "int tiny() {}"
             let st = symbolTable ast
-            let tac = generateTAC ast
+            let tac = tacGenerate ast
             nasmGenerateText tac st `shouldBe` [LABEL "tiny",CALL "_exit"]
         it "Generates two simple functions" $ do
             let ast = scan_and_parse "int tiny() {} int f() {}"
             let st = symbolTable ast
-            let tac = generateTAC ast
+            let tac = tacGenerate ast
             nasmGenerateText tac st `shouldBe` [LABEL "tiny",CALL "_exit",LABEL "f",RET]
         it "Generates a few declarations and computations" $ do
             let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); }"
             let st = symbolTable ast
-            let tac = generateTAC ast
+            let tac = tacGenerate ast
             nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DWORDADDRESS [0]] [LABEL "tiny",CALL "_exit"]
         it "Generates functions with arguments and calling convention" $ do
             let ast = scan_and_parse "int tiny() { int a = 2; f(5, a); } int f(int x, int y) { return x + y; }"
             let st = symbolTable ast
-            let tac = generateTAC ast
-            nasmGenerate tac st `shouldBe` NASMProgram [] []
+            let tac = tacGenerate ast
+            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "tiny",CALL "_exit",LABEL "f"]
         it "Tests live variable analysis" $ do
-            let ast = scan_and_parse "int tiny() { int a = 5; int b = 1 + a; } int f() {}"
+            let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"
             let st = symbolTable ast
-            let tac = generateTAC ast
-            constructLabelKey tac `shouldBe` M.fromList [("f",5),("tiny",0)]
+            let tac = tacGenerate ast
+            constructLabelKey ((snd tac) !! 0) `shouldBe` M.fromList [("l1",3),("l2",5),("l3",6),("tiny",0)]
             let ast = scan_and_parse "int a; int tiny() { int a = 5; if (a) { int b = 1 + a; } else { int c = 3; } } int f() { int a = 3 + 4; return a; } int b = 3;"
             let st = symbolTable ast
-            let tac = generateTAC ast
-            let cfg = controlFlowGraph (nasmGetText tac st)
+            let tac = tacGenerate ast
+            let cfg = controlFlowGraph (concat (snd tac))
             cfg `shouldBe` Graph (S.fromList [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]) (S.fromList [(0,1),(1,2),(2,3),(2,4),(3,8),(4,5),(5,6),(6,7),(7,10),(8,9),(9,10),(10,11),(12,13),(13,14),(14,15)]) (M.fromList [(0,TACLabel "tiny"),(1,TACCopy "a" (TACInt 5)),(2,TACIf (TACExpr (TACVar "a") TACNotEqual (TACInt 0)) "l1"),(3,TACGoto "l2"),(4,TACLabel "l1"),(5,TACBinary "t1" (TACInt 1) TACPlus (TACVar "a")),(6,TACCopy "b" (TACVar "t1")),(7,TACGoto "l3"),(8,TACLabel "l2"),(9,TACCopy "c" (TACInt 3)),(10,TACLabel "l3"),(11,TACReturn Nothing),(12,TACLabel "f"),(13,TACBinary "t2" (TACInt 3) TACPlus (TACInt 4)),(14,TACCopy "a" (TACVar "t2")),(15,TACReturn (Just (TACVar "a")))])
             dataFlow cfg `shouldBe` M.fromList [(0,(S.fromList [],S.fromList [])),(1,(S.fromList [],S.fromList ["a"])),(2,(S.fromList ["a"],S.fromList ["a"])),(3,(S.fromList [],S.fromList [])),(4,(S.fromList ["a"],S.fromList ["a"])),(5,(S.fromList ["a"],S.fromList ["t1"])),(6,(S.fromList ["t1"],S.fromList [])),(7,(S.fromList [],S.fromList [])),(8,(S.fromList [],S.fromList [])),(9,(S.fromList [],S.fromList [])),(10,(S.fromList [],S.fromList [])),(11,(S.fromList [],S.fromList [])),(12,(S.fromList [],S.fromList [])),(13,(S.fromList [],S.fromList ["t2"])),(14,(S.fromList ["t2"],S.fromList ["a"])),(15,(S.fromList ["a"],S.fromList []))]
             subgraph [TACLabel "l1",TACBinary "t1" (TACInt 1) TACPlus (TACVar "a"),TACCopy "b" (TACVar "t1"),TACGoto "l3",TACLabel "l2"] cfg `shouldBe` Graph (S.fromList [4,5,6,7,8]) (S.fromList [(4,5),(5,6),(6,7)]) (M.fromList [(4,TACLabel "l1"),(5,TACBinary "t1" (TACInt 1) TACPlus (TACVar "a")),(6,TACCopy "b" (TACVar "t1")),(7,TACGoto "l3"),(8,TACLabel "l2")])
             registerInterferenceGraph (dataFlow cfg) `shouldBe` Graph (S.fromList [0,1,2]) (S.fromList []) (M.fromList [(0,"a"),(1,"t1"),(2,"t2")])
             let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); }"
             let st = symbolTable ast
-            let tac = generateTAC ast
-            let cfg = controlFlowGraph (nasmGetText tac st)
+            let tac = tacGenerate ast
+            let cfg = controlFlowGraph ((concat . snd) tac)
             let df = dataFlow cfg
             let rig = registerInterferenceGraph df
             rig `shouldBe` Graph (S.fromList [0,1,2,3,4,5]) (S.fromList [(0,1),(0,2),(1,0),(1,2),(1,3),(2,0),(2,1),(2,3),(3,1),(3,2),(3,4),(4,3)]) (M.fromList [(0,"a"),(1,"b"),(2,"c"),(3,"t1"),(4,"t2"),(5,"t3")])
@@ -449,5 +447,5 @@ main = hspec $ do
             findRegisters nodes rig 3 `shouldBe` M.fromList [(0,0),(1,1),(2,2),(3,0),(4,1),(5,0)]
             let (nodes, spilled) = simplify rig 2
             findRegisters nodes rig 2 `shouldBe` M.fromList [(0,0),(1,1),(3,0),(4,1),(5,0)]
-            let (mapping, newtac) = mapVariableToRegisters tac 2
+            let (mapping, newtac) = mapVariableToRegisters ((concat . snd) tac) 2
             mapping `shouldBe` M.fromList [(0,0),(1,1),(3,0),(4,1),(5,0)]

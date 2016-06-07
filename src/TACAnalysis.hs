@@ -162,14 +162,14 @@ findRegisters2 (n:ns) g k mapping =
 findRegisters :: [Node] -> Graph String -> Int -> M.Map Node Int
 findRegisters nodes g k = findRegisters2 nodes g k M.empty
 
-fixInstructions :: TACProgram -> [String] -> TACProgram
+fixInstructions :: TACFunction -> [String] -> TACFunction
 fixInstructions is spilled = concatMap f is
     where f inst = load ++ [inst] ++ store
             where (used, def) = useDefInst inst
                   load = foldr (\x acc -> if S.member x used then (TACLoad x:acc) else acc) [] spilled
                   store = foldr (\x acc -> if S.member x def then (TACStore x:acc) else acc) [] spilled
 
-mapVariableToRegisters2 :: TACProgram -> Int -> [Node] -> (M.Map Int Int, TACProgram)
+mapVariableToRegisters2 :: TACFunction -> Int -> [Node] -> (M.Map Int Int, TACFunction)
 mapVariableToRegisters2 is k spilled = 
     let cfg = controlFlowGraph is
         df = dataFlow cfg
@@ -181,5 +181,5 @@ mapVariableToRegisters2 is k spilled =
         then mapVariableToRegisters2 newis k newspilled
     else (findRegisters nodes rig k, is)
 
-mapVariableToRegisters :: TACProgram -> Int -> (M.Map Int Int, TACProgram)
+mapVariableToRegisters :: TACFunction -> Int -> (M.Map Int Int, TACFunction)
 mapVariableToRegisters is k = mapVariableToRegisters2 is k []

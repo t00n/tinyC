@@ -16,6 +16,6 @@ main = do
     cCode <- readFile infile
     let ast = (parse . alexScanTokens) cCode
     let st = symbolTable ast
-    let tac = generateTAC ast
+    let tac = tacGenerate ast
     let nasm = nasmGenerate tac st
     writeFile outfile $ nasmShow nasm

@@ -1,7 +1,8 @@
-module TACGenerator (generateTAC, TACProgram(..), TACInstruction(..), TACBinaryOperator(..), TACUnaryOperator(..), TACExpression(..), TACPrint(..)) where
+module TACGenerator (tacGenerate, TACProgram(..), TACFunction(..), TACInstruction(..), TACBinaryOperator(..), TACUnaryOperator(..), TACExpression(..), TACPrint(..)) where
 
 import Control.Monad.Trans.State (StateT(..), evalStateT)
 import Control.Monad.Trans (lift)
+import Control.Monad (liftM2)
 import Data.Char (chr, ord)
 
 import Parser
@@ -16,88 +17,101 @@ type SSNSS = StateT SymbolTable (Names String String)
 infiniteNames :: String -> [String]
 infiniteNames s = [s ++ show i | i <- [1..]]
 
-generateTAC :: [Declaration] -> [TACInstruction]
-generateTAC xs = do
-    evalNames (evalStateT (tacGenerate xs) (zipper emptyST)) (infiniteNames "t") (infiniteNames "l")
+tacGenerate :: [Declaration] -> TACProgram
+tacGenerate = (,) <$> tacGenerateData <*> tacGenerateText
+
+tacGenerateData :: [Declaration] -> [TACInstruction]
+tacGenerateData xs = evalNames (evalStateT (tacGenerateInstructions xs) (zipper emptyST)) (infiniteNames "t") (infiniteNames "l")
+
+tacGenerateText :: [Declaration] -> [[TACInstruction]]
+tacGenerateText xs = evalNames (evalStateT (tacGenerateAllFunctions xs) (zipper emptyST)) (infiniteNames "t") (infiniteNames "l")
 
 class TACGenerator a where
-    tacGenerate :: a -> SSNSS [TACInstruction]
+    tacGenerateInstructions :: a -> SSNSS [TACInstruction]
 
 instance TACGenerator a => TACGenerator [a] where
-    tacGenerate [] = return []
-    tacGenerate (x:xs) = do
-        first <- tacGenerate x
-        rest <- tacGenerate xs
-        return $ first ++ rest
+    tacGenerateInstructions [] = return []
+    tacGenerateInstructions (x:xs) = liftM2 (++) (tacGenerateInstructions x) (tacGenerateInstructions xs)
 
-instance TACGenerator Declaration where
-    tacGenerate (VarDeclaration IntType (Name n) Nothing) = return $ [TACCopy n (TACInt 0)]
-    tacGenerate (VarDeclaration CharType (Name n) Nothing) = return $ [TACCopy n (TACChar (chr 0))]
-    tacGenerate (VarDeclaration IntType (Name n) (Just (Int x))) = return $ [TACCopy n (TACInt x)]
-    tacGenerate (VarDeclaration CharType (Name n) (Just (Char c))) = return $ [TACCopy n (TACChar c)]
-    tacGenerate (VarDeclaration _ (Name n) (Just e)) = do
-        (t, lines) <- tacExpression e
-        return $ lines ++ [TACCopy n t]
-    tacGenerate (VarDeclaration IntType (NameSubscription n e) _) = 
-        let size (Int i) = i
-            size (Char c) = ord c
-        in return $ [TACArrayDecl n (replicate (size e) (TACInt 0))]
-    tacGenerate (VarDeclaration CharType (NameSubscription n e) _) = 
-        let size (Int i) = i
-            size (Char c) = ord c
-        in return $ [TACArrayDecl n (replicate (size e) (TACChar (chr 0)))]
-    tacGenerate (FuncDeclaration t name params stmt) = do
-        functionBody <- tacGenerate stmt
+tacGenerateAllFunctions :: [Declaration] -> SSNSS [[TACInstruction]]
+tacGenerateAllFunctions [] = return []
+tacGenerateAllFunctions (x:xs) =
+    case x of
+        FuncDeclaration _ _ _ _ -> liftM2 (:) (tacGenerateFunction x) (tacGenerateAllFunctions xs)
+        _ -> tacGenerateAllFunctions xs
+
+tacGenerateFunction :: Declaration -> SSNSS [TACInstruction]
+tacGenerateFunction (FuncDeclaration t name params stmt) = do
+        functionBody <- tacGenerateInstructions stmt
         let ret = if functionBody == [] then [TACReturn Nothing] 
             else case last functionBody of
                 (TACReturn _) -> []
                 _ -> [TACReturn Nothing]
         return $ TACLabel (nameToString name) : functionBody ++ ret
 
-instance TACGenerator Statement where
-    tacGenerate (Assignment (Name n) e) = do
+instance TACGenerator Declaration where
+    tacGenerateInstructions (VarDeclaration IntType (Name n) Nothing) = return $ [TACCopy n (TACInt 0)]
+    tacGenerateInstructions (VarDeclaration CharType (Name n) Nothing) = return $ [TACCopy n (TACChar (chr 0))]
+    tacGenerateInstructions (VarDeclaration IntType (Name n) (Just (Int x))) = return $ [TACCopy n (TACInt x)]
+    tacGenerateInstructions (VarDeclaration CharType (Name n) (Just (Char c))) = return $ [TACCopy n (TACChar c)]
+    tacGenerateInstructions (VarDeclaration _ (Name n) (Just e)) = do
         (t, lines) <- tacExpression e
         return $ lines ++ [TACCopy n t]
-    tacGenerate (Assignment (NameSubscription n i) e) = do
+    tacGenerateInstructions (VarDeclaration IntType (NameSubscription n e) _) = 
+        let size (Int i) = i
+            size (Char c) = ord c
+        in return $ [TACArrayDecl n (replicate (size e) (TACInt 0))]
+    tacGenerateInstructions (VarDeclaration CharType (NameSubscription n e) _) = 
+        let size (Int i) = i
+            size (Char c) = ord c
+        in return $ [TACArrayDecl n (replicate (size e) (TACChar (chr 0)))]
+    tacGenerateInstructions _ = return []
+
+
+instance TACGenerator Statement where
+    tacGenerateInstructions (Assignment (Name n) e) = do
+        (t, lines) <- tacExpression e
+        return $ lines ++ [TACCopy n t]
+    tacGenerateInstructions (Assignment (NameSubscription n i) e) = do
         (t1, lines1) <- tacExpression i
         (t2, lines2) <- tacExpression e
         return $ lines1 ++ lines2 ++ [TACArrayModif (TACArray n t1) t2]
-    tacGenerate (If e stmt) = do
+    tacGenerateInstructions (If e stmt) = do
         (t, lines) <- tacRelExpression e
         labelYes <- lift popLabel
         labelNo <- lift popLabel
-        stmt <- tacGenerate stmt
+        stmt <- tacGenerateInstructions stmt
         return $ lines ++ [TACIf t labelYes, TACGoto labelNo, TACLabel labelYes] ++ stmt ++ [TACLabel labelNo]
-    tacGenerate (IfElse e s1 s2) = do
+    tacGenerateInstructions (IfElse e s1 s2) = do
         (t, lines) <- tacRelExpression e
         labelYes <- lift popLabel
         labelNo <- lift popLabel
         labelEnd <- lift popLabel
-        s1 <- tacGenerate s1
-        s2 <- tacGenerate s2
+        s1 <- tacGenerateInstructions s1
+        s2 <- tacGenerateInstructions s2
         return $ lines ++ [TACIf t labelYes, TACGoto labelNo, TACLabel labelYes] ++ s1 ++ [TACGoto labelEnd, TACLabel labelNo] ++ s2 ++ [TACLabel labelEnd]
-    tacGenerate (While e s) = do
+    tacGenerateInstructions (While e s) = do
         (t, lines) <- tacRelExpression e
         labelBeg <- lift popLabel
         labelEnd <- lift popLabel
         labelYes <- lift popLabel
-        s <- tacGenerate s
+        s <- tacGenerateInstructions s
         return $ [TACLabel labelBeg] ++ lines ++ [TACIf t labelYes, TACGoto labelEnd, TACLabel labelYes] ++ s ++ [TACGoto labelBeg, TACLabel labelEnd]
-    tacGenerate (Return e) = do
+    tacGenerateInstructions (Return e) = do
         (t, lines) <- tacExpression e
         return $ lines ++ [TACReturn $ Just t]
-    tacGenerate (Block ds ss) = do
-        ds <- tacGenerate ds
-        ss <- tacGenerate ss
+    tacGenerateInstructions (Block ds ss) = do
+        ds <- tacGenerateInstructions ds
+        ss <- tacGenerateInstructions ss
         return $ ds ++ ss
-    tacGenerate (Write e) = do
+    tacGenerateInstructions (Write e) = do
         (t, lines) <- tacExpression e
         return $ lines ++ [TACWrite t]
-    tacGenerate (Read (Name n)) = return [TACRead (TACVar n)]
-    tacGenerate (Read (NameSubscription n e)) = do
-        (t, lines) <- tacExpression e
-        return $ lines ++ [TACRead (TACArray n t)]
-    tacGenerate (Expr e) = do
+    tacGenerateInstructions (Read (Name n)) = return [TACRead (TACVar n)]
+    tacGenerateInstructions (Read n) = do
+        (t, lines) <- tacExpression (Var n)
+        return $ lines ++ [TACRead t]
+    tacGenerateInstructions (Expr e) = do
         (_, lines) <- tacExpression e
         return lines
 
@@ -171,7 +185,9 @@ tacUnaryOperator :: UnaryOperator -> TACUnaryOperator
 tacUnaryOperator Not = TACNot
 tacUnaryOperator Neg = TACNeg
 
-type TACProgram = [TACInstruction]
+type TACProgram = ([TACInstruction], [TACFunction])
+
+type TACFunction = [TACInstruction]
 
 data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpression
                     | TACUnary String TACUnaryOperator TACExpression

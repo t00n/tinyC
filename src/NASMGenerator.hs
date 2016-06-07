@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
 
-module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, nasmShow, nasmGetTopLevelData, nasmGetText, NASMProgram(..), NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
+module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, nasmShow, NASMProgram(..), NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
 
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -20,66 +20,23 @@ nasmGenerate :: TACProgram -> SymbolTable -> NASMProgram
 nasmGenerate p = NASMProgram <$> nasmGenerateData p <*> nasmGenerateText p
 
 nasmGenerateData :: TACProgram -> SymbolTable -> [NASMData]
-nasmGenerateData p = evalState (evalStateT (nasmGenerateStaticData p) (False, Nothing))
+nasmGenerateData p = evalState (evalStateT (nasmGenerateDataReal (fst p)) (False, Nothing))
 
 nasmGenerateText :: TACProgram -> SymbolTable -> [NASMInstruction]
-nasmGenerateText p = evalState (evalStateT (nasmGenerateTopLevel p) (False, Nothing))
+nasmGenerateText p = evalState (evalStateT (nasmGenerateTextReal (snd p)) (False, Nothing))
 
-sortTopLevel :: Bool -> TACProgram -> SymbolTable -> [TACInstruction]
-sortTopLevel foldData ds st = snd (foldl f (0, []) ds)
-    where datadecl (TACCopy _ _) = True
-          datadecl (TACArrayDecl _ _) = True
-          datadecl _ = False
-          beginFunc (TACLabel s) = nameInScope s st && symbolIsFunction s st
-          beginFunc _ = False
-          endFunc (TACReturn _) = True
-          endFunc _ = False
-          f (l, acc) tacInst = 
-              let newlevel = if beginFunc tacInst then l+1 else if endFunc tacInst then (l-1) else l
-              in
-              if l == 0 && foldData == datadecl tacInst
-                  then (newlevel, acc ++ [tacInst])
-              else if l /= 0 && not foldData
-                  then (newlevel, acc ++ [tacInst])
-              else (newlevel, acc)
-
-nasmGetTopLevelData :: TACProgram -> SymbolTable -> [TACInstruction]
-nasmGetTopLevelData = sortTopLevel True
-
-nasmGetText :: TACProgram -> SymbolTable -> [TACInstruction]
-nasmGetText = sortTopLevel False
-
-nasmGetFunction :: [[TACInstruction]] -> TACInstruction -> SRSS [[TACInstruction]]
-nasmGetFunction [] i = return [[i]]
-nasmGetFunction (xs:xss) i = do
-    st <- lift get
-    case i of TACLabel l -> if symbolIsFunction l st then return ([i]:xs:xss)
-                            else return ((i:xs):xss)
-              _ -> return ((i:xs):xss)
-
-nasmGetFunctions :: TACProgram -> SRSS [[TACInstruction]]
-nasmGetFunctions xs = fmap (reverse . (fmap reverse)) $ foldM nasmGetFunction [] xs
-
-
-nasmGenerateStaticData :: TACProgram -> SRSS [NASMData]
-nasmGenerateStaticData ds = do
-    st <- lift get
-    return $ concatMap decl (sortTopLevel True ds st)
+nasmGenerateDataReal :: [TACInstruction] -> SRSS [NASMData]
+nasmGenerateDataReal = return . (map decl)
     where 
-          decl (TACCopy s (TACInt i)) = [NASMData s DWORDADDRESS [i]]
+          decl (TACCopy s (TACInt i)) = NASMData s DWORDADDRESS [i]
 
-          decl (TACCopy s (TACChar c)) = [NASMData s BYTEADDRESS [ord c]]
+          decl (TACCopy s (TACChar c)) = NASMData s BYTEADDRESS [ord c]
 
-          decl (TACArrayDecl s xs) = [NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)]
-          decl _ = []
+          decl (TACArrayDecl s xs) = NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)
 
 
-nasmGenerateTopLevel :: TACProgram -> SRSS [NASMInstruction]
-nasmGenerateTopLevel ds = do
-    st <- lift get
-    functions <- nasmGetFunctions $ (nasmGetText ds st)
-    nasmInst <- mapM nasmGenerateInstructions functions
-    (return . concat) nasmInst
+nasmGenerateTextReal :: [TACFunction] -> SRSS [NASMInstruction]
+nasmGenerateTextReal functions = mapM nasmGenerateInstructions functions >>= (return . concat)
 
 class Show a => NASMGenerator a where
     nasmGenerateInstructions :: a -> SRSS [NASMInstruction]
