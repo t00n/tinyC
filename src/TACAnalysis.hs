@@ -133,18 +133,19 @@ registerInterferenceGraph vs = Graph (S.fromList ids) edges values
           edges = foldr f S.empty allsets
           f x g = foldr S.insert g [(a1, b1) | a <- S.toList x, b <- S.toList x, a /= b, let (Just a1) = M.lookup a valueIntMap, let (Just b1) = M.lookup b valueIntMap]
 
-simplify2 :: [Int] -> [Int] -> Graph String -> Int -> ([Int], [Int])
-simplify2 xs ss g@(Graph nodes _ _) k = 
-    let findSimplify x Nothing = if length (neighbours x g) < k then (Just x) else Nothing
-        findSimplify _ (Just x) = (Just x)
-        toSimplify = foldr findSimplify Nothing (S.toList nodes)
-        toSpill = fst $ maximumBy (comparing snd) (map (\x -> (x, length (neighbours x g))) (S.toList nodes))
-    in case toSimplify of
-            Nothing -> if null nodes then (xs, ss) else simplify2 xs (toSpill:ss) (delete toSpill g) k
-            (Just x) -> simplify2 (x:xs) ss (delete x g) k
+simplifyRIG2 :: [Int] -> [Int] -> Graph String -> Int -> ([Int], [Int])
+simplifyRIG2 xs spills g@(Graph nodes _ _) k = 
+    let isSimplifiable x Nothing = if length (neighbours x g) < k then (Just x) else Nothing
+        isSimplifiable _ (Just x) = (Just x)
+        findSimplify = S.foldr isSimplifiable Nothing nodes
+        findSpill = fst $ maximumBy (comparing snd) (S.map (\x -> (x, length (neighbours x g))) nodes)
+    in  if null nodes then (xs, spills)
+        else case findSimplify of
+            Nothing -> simplifyRIG2 xs (findSpill:spills) (delete findSpill g) k
+            (Just x) -> simplifyRIG2 (x:xs) spills (delete x g) k
 
-simplify :: Graph String -> Int -> ([Int], [Int])
-simplify = simplify2 [] []
+simplifyRIG :: Graph String -> Int -> ([Int], [Int])
+simplifyRIG = simplifyRIG2 [] []
 
 findRegister :: Node -> [Node] -> Int -> M.Map Node Int -> Int
 findRegister node neigh k mapping = 
@@ -172,7 +173,7 @@ mapVariableToRegisters2 is k spilled =
     let cfg = controlFlowGraph is
         df = dataFlowGraph cfg
         rig = registerInterferenceGraph df
-        (nodes, newspilled) = simplify rig k
+        (nodes, newspilled) = simplifyRIG rig k
         newis = fixInstructions is (map (flip unsafeLookupNode rig) newspilled)
     in
     if newspilled /= spilled 

@@ -47,7 +47,7 @@ instance NASMGenerator [TACInstruction] where
         let df = dataFlowGraph cfg
         let rig = registerInterferenceGraph df
         let registers = [A, B, C, D, SI, DI]
-        let (nodes, spilled) = simplify rig (length registers)
+        let (nodes, spilled) = simplifyRIG rig (length registers)
         let registerMapping = M.map (\v -> InRegister (registers !! v)) (findRegisters nodes rig (length registers))
         let variableMapping = M.union registerMapping (M.fromList $ zip spilled [InStack x | x <- [0,4..(length spilled)-1]])
         (mapM nasmGenerateInstructions xs) >>= return . concat
