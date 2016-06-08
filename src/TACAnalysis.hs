@@ -79,8 +79,8 @@ controlFlowGraph :: [TACInstruction] -> Graph TACInstruction
 controlFlowGraph is = controlFlowGraph2 is 0 (constructLabelKey is) emptyGraph
 
 
-useDefInst :: TACInstruction -> (S.Set String, S.Set String)
-useDefInst inst = 
+usedAndDefinedVariables :: TACInstruction -> (S.Set String, S.Set String)
+usedAndDefinedVariables inst = 
     let
         isVariable (TACVar _) = True
         isVariable (TACArray _ _) = True
@@ -105,23 +105,23 @@ useDefInst inst =
         (TACStore s) -> (S.fromList [s], S.empty)
         _ -> (S.empty, S.empty)
 
-dataFlow :: Graph TACInstruction -> M.Map Int (S.Set String, S.Set String)
-dataFlow g@(Graph nodes edges values) = 
+dataFlowGraph :: Graph TACInstruction -> M.Map Int (S.Set String, S.Set String)
+dataFlowGraph g@(Graph nodes edges values) = 
     let variables = M.fromSet (\k -> (S.empty :: S.Set String, S.empty :: S.Set String)) nodes
-        dataFlowRec q vs
+        dataFlowGraphRec q vs
             | null q = vs
             | otherwise = 
                 let (Just e, newq) = Q.dequeue q
                     succs = M.filterWithKey (\k _ -> k `elem` successors e g) vs
                     out = S.unions $ M.elems $ M.map (\(invar, outvar) -> invar) succs
                     (Just inst) = lookupNode e g
-                    (use, def) = useDefInst inst
+                    (use, def) = usedAndDefinedVariables inst
                     newin = S.union use (S.difference out def)
                     oldin = fst $ M.findWithDefault (S.empty, S.empty) e vs
                     newnewq = if newin /= oldin then Q.enqueueAll (S.toList $ predecessors e g) newq else newq
                     newvs = M.insert e (newin, out) vs
-                in dataFlowRec newnewq newvs
-    in dataFlowRec (Q.enqueueAll (S.toList nodes) Q.empty) variables
+                in dataFlowGraphRec newnewq newvs
+    in dataFlowGraphRec (Q.enqueueAll (S.toList nodes) Q.empty) variables
 
 registerInterferenceGraph :: M.Map Int (S.Set String, S.Set String) -> Graph String
 registerInterferenceGraph vs = Graph (S.fromList ids) edges values
@@ -163,14 +163,14 @@ findRegisters nodes g k = findRegisters2 nodes g k M.empty
 fixInstructions :: TACFunction -> [String] -> TACFunction
 fixInstructions is spilled = concatMap f is
     where f inst = load ++ [inst] ++ store
-            where (used, def) = useDefInst inst
+            where (used, def) = usedAndDefinedVariables inst
                   load = foldr (\x acc -> if S.member x used then (TACLoad x:acc) else acc) [] spilled
                   store = foldr (\x acc -> if S.member x def then (TACStore x:acc) else acc) [] spilled
 
 mapVariableToRegisters2 :: TACFunction -> Int -> [Node] -> (M.Map Int Int, TACFunction)
 mapVariableToRegisters2 is k spilled = 
     let cfg = controlFlowGraph is
-        df = dataFlow cfg
+        df = dataFlowGraph cfg
         rig = registerInterferenceGraph df
         (nodes, newspilled) = simplify rig k
         newis = fixInstructions is (map (flip unsafeLookupNode rig) newspilled)

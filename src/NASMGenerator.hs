@@ -44,7 +44,7 @@ class Show a => NASMGenerator a where
 instance NASMGenerator [TACInstruction] where
     nasmGenerateInstructions xs = do
         let cfg = controlFlowGraph xs
-        let df = dataFlow cfg
+        let df = dataFlowGraph cfg
         let rig = registerInterferenceGraph df
         let registers = [A, B, C, D, SI, DI]
         let (nodes, spilled) = simplify rig (length registers)
