@@ -21,9 +21,7 @@ lookupNode i (Graph _ _ values) = M.lookup i values
 
 unsafeLookupNode :: Ord a => Node -> Graph a -> a
 unsafeLookupNode n g = 
-    let v = lookupNode n g
-    in
-    case v of
+    case lookupNode n g of
         Nothing -> error "in unsafeLookupNode"
         (Just x) -> x
 
@@ -37,20 +35,20 @@ delete :: Ord a => Int -> Graph a -> Graph a
 delete n (Graph nodes edges values) = Graph newnodes newedges newvalues
     where
         newnodes = S.delete n nodes
-        newedges = S.foldr (\(a, b) e -> if a == n || b == n then S.delete (a, b) e else e) edges edges
+        newedges = S.filter (\(a, b) -> a /= n && b /= n) edges
         newvalues = M.delete n values 
 
 emptyGraph :: Graph a
 emptyGraph = Graph S.empty S.empty M.empty
 
-predecessors :: Ord a => Node -> Graph a -> [Node]
-predecessors n (Graph _ edges _) = map (\(from, _) -> from) $ filter (\(_, to) -> to == n) $ S.toList edges
+predecessors :: Ord a => Node -> Graph a -> S.Set Node
+predecessors n (Graph _ edges _) = S.map fst $ S.filter (((==) n) . snd) edges
 
-successors :: Ord a => Node -> Graph a -> [Node]
-successors n (Graph _ edges _) = map (\(_, to) -> to) $ filter (\(from, _) -> from == n) $ S.toList edges
+successors :: Ord a => Node -> Graph a -> S.Set Node
+successors n (Graph _ edges _) = S.map snd $ S.filter (((==) n) . fst) edges
 
-neighbours :: Ord a => Node -> Graph a -> [Node]
-neighbours n g = S.toList $ S.fromList $ predecessors n g ++ successors n g
+neighbours :: Ord a => Node -> Graph a -> S.Set Node
+neighbours n g = predecessors n g `S.union` successors n g
 
 subgraph :: Ord a => [a] -> Graph a -> Graph a
 subgraph xs (Graph nodes edges values) = 
@@ -120,7 +118,7 @@ dataFlow g@(Graph nodes edges values) =
                     (use, def) = useDefInst inst
                     newin = S.union use (S.difference out def)
                     oldin = fst $ M.findWithDefault (S.empty, S.empty) e vs
-                    newnewq = if newin /= oldin then Q.enqueueAll (predecessors e g) newq else newq
+                    newnewq = if newin /= oldin then Q.enqueueAll (S.toList $ predecessors e g) newq else newq
                     newvs = M.insert e (newin, out) vs
                 in dataFlowRec newnewq newvs
     in dataFlowRec (Q.enqueueAll (S.toList nodes) Q.empty) variables
@@ -156,7 +154,7 @@ findRegister node neigh k mapping =
 findRegisters2 :: [Node] -> Graph String -> Int -> M.Map Node Int -> M.Map Node Int
 findRegisters2 [] _ _ mapping = mapping
 findRegisters2 (n:ns) g k mapping = 
-    let register = findRegister n (neighbours n g) k mapping
+    let register = findRegister n (S.toList $ neighbours n g) k mapping
     in findRegisters2 ns g k (M.insert n register mapping)
 
 findRegisters :: [Node] -> Graph String -> Int -> M.Map Node Int
