@@ -42,6 +42,17 @@ nasmGenerateTextReal functions = mapM nasmGenerateInstructions functions >>= (re
 class Show a => NASMGenerator a where
     nasmGenerateInstructions :: a -> SRSS [NASMInstruction]
 
+nasmGeneratePreFunction :: TACInstruction -> SRSS [NASMInstruction]
+nasmGeneratePreFunction (TACLabel "tiny") = return []
+nasmGeneratePreFunction (TACLabel name) = do
+    info <- lift $ gets $ unsafeGetSymbolInfo name
+    traceShow info $ return []
+
+nasmGeneratePostFunction :: TACInstruction -> SRSS [NASMInstruction]
+nasmGeneratePostFunction (TACLabel "tiny") = return [CALL "_exit"]
+nasmGeneratePostFunction (TACLabel name) = do
+    return [RET]
+
 instance NASMGenerator TACFunction where
     nasmGenerateInstructions xs = do
         let rig@(Graph _ _ variables) = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) xs
@@ -50,10 +61,11 @@ instance NASMGenerator TACFunction where
         let registerMapping = M.mapKeys (\k -> fromJust (M.lookup k variables)) (M.map (\v -> InRegister (registers !! v)) registerIntMapping)
         let variableMapping = M.union registerMapping (M.fromList $ zip spilled [InStack x | x <- [0,4..(length spilled)-1]])
         put variableMapping
+        pre <- nasmGeneratePreFunction (head xs)
         nasmIS <- (mapM nasmGenerateInstructions (init xs)) >>= return . concat
-        if head xs == TACLabel "tiny"
-            then return $ nasmIS ++ [CALL "_exit"]
-        else return $ nasmIS ++ [RET]
+        post <- nasmGeneratePostFunction (head xs)
+        return $ pre ++ nasmIS ++ post
+
 
 instance NASMGenerator TACInstruction where
     nasmGenerateInstructions (TACLabel l) = return [LABEL l]
