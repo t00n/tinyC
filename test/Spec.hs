@@ -420,7 +420,8 @@ main = hspec $ do
             let st = symbolTable ast
             let tac = tacGenerate ast
             nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "tiny",CALL "_exit",LABEL "f"]
-        it "Tests live variable analysis" $ do
+    describe "Tests live variable analysis" $ do
+        it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"
             let st = symbolTable ast
             let tac = tacGenerate ast
@@ -433,6 +434,7 @@ main = hspec $ do
             dataFlowGraph cfg `shouldBe` M.fromList [(0,(S.fromList [],S.fromList [])),(1,(S.fromList [],S.fromList ["a"])),(2,(S.fromList ["a"],S.fromList ["a"])),(3,(S.fromList [],S.fromList [])),(4,(S.fromList ["a"],S.fromList ["a"])),(5,(S.fromList ["a"],S.fromList ["t1"])),(6,(S.fromList ["t1"],S.fromList [])),(7,(S.fromList [],S.fromList [])),(8,(S.fromList [],S.fromList [])),(9,(S.fromList [],S.fromList [])),(10,(S.fromList [],S.fromList [])),(11,(S.fromList [],S.fromList [])),(12,(S.fromList [],S.fromList [])),(13,(S.fromList [],S.fromList ["t2"])),(14,(S.fromList ["t2"],S.fromList ["a"])),(15,(S.fromList ["a"],S.fromList []))]
             subgraph [TACLabel "l1",TACBinary "t1" (TACInt 1) TACPlus (TACVar "a"),TACCopy "b" (TACVar "t1"),TACGoto "l3",TACLabel "l2"] cfg `shouldBe` Graph (S.fromList [4,5,6,7,8]) (S.fromList [(4,5),(5,6),(6,7)]) (M.fromList [(4,TACLabel "l1"),(5,TACBinary "t1" (TACInt 1) TACPlus (TACVar "a")),(6,TACCopy "b" (TACVar "t1")),(7,TACGoto "l3"),(8,TACLabel "l2")])
             registerInterferenceGraph (dataFlowGraph cfg) `shouldBe` Graph (S.fromList [0,1,2]) (S.fromList []) (M.fromList [(0,"a"),(1,"t1"),(2,"t2")])
+        it "tests register allocation with enough registers" $ do
             let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); }"
             let st = symbolTable ast
             let tac = tacGenerate ast
@@ -440,12 +442,21 @@ main = hspec $ do
             let df = dataFlowGraph cfg
             let rig = registerInterferenceGraph df
             rig `shouldBe` Graph (S.fromList [0,1,2,3,4,5]) (S.fromList [(0,1),(0,2),(1,0),(1,2),(1,3),(2,0),(2,1),(2,3),(3,1),(3,2),(3,4),(4,3)]) (M.fromList [(0,"a"),(1,"b"),(2,"c"),(3,"t1"),(4,"t2"),(5,"t3")])
-            simplifyRIG rig 2 `shouldBe` ([0,1,3,4,5],[2])
-            simplifyRIG rig 3 `shouldBe` ([0,1,2,3,4,5],[])
-            simplifyRIG rig 1 `shouldBe` ([0,4,5],[1,2,3])
             let (nodes, spilled) = simplifyRIG rig 3
+            (nodes, spilled) `shouldBe` ([0,1,2,3,4,5],[])
             findRegisters nodes rig 3 `shouldBe` M.fromList [(0,0),(1,1),(2,2),(3,0),(4,1),(5,0)]
-            let (nodes, spilled) = simplifyRIG rig 2
-            findRegisters nodes rig 2 `shouldBe` M.fromList [(0,0),(1,1),(3,0),(4,1),(5,0)]
-            let (mapping, newtac) = mapVariableToRegisters ((concat . snd) tac) 2
-            mapping `shouldBe` M.fromList [(0,0),(1,1),(3,0),(4,1),(5,0)]
+        it "tests register allocation with enough registers on real program" $ do
+            code <- readFile "test/fixtures/fibonacci.c"
+            let ast = scan_and_parse code
+            let st = symbolTable ast
+            let tac = tacGenerate ast
+            let cfg = controlFlowGraph ((concat . snd) tac)
+            let df = dataFlowGraph cfg
+            let rig = registerInterferenceGraph df
+            simplifyRIG rig 3 `shouldBe` ([0,1,2,3,4,5,6,7,8,9],[]) 
+            let (nodes, spilled) = simplifyRIG rig 3 
+            let tac2 = fixInstructions ((concat . snd) tac) (map (flip unsafeLookupNode rig) spilled)
+            let cfg = controlFlowGraph tac2
+            let dfg = dataFlowGraph cfg
+            let rig = registerInterferenceGraph dfg
+            findRegisters nodes rig 3 `shouldBe` M.fromList [(0,0),(1,1),(2,0),(3,0),(4,0),(5,0),(6,1),(7,0),(8,2),(9,0)]
