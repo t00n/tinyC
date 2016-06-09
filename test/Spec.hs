@@ -453,10 +453,24 @@ main = hspec $ do
             let cfg = controlFlowGraph ((concat . snd) tac)
             let df = dataFlowGraph cfg
             let rig = registerInterferenceGraph df
-            simplifyRIG rig 3 `shouldBe` ([0,1,2,3,4,5,6,7,8,9],[]) 
-            let (nodes, spilled) = simplifyRIG rig 3 
-            let tac2 = fixInstructions ((concat . snd) tac) (map (flip unsafeLookupNode rig) spilled)
+            let (nodes, spilled) = simplifyRIG rig 3
+            (nodes, spilled) `shouldBe` ([0,1,2,3,4,5,6,7,8,9],[])
+            findRegisters nodes rig 3 `shouldBe` M.fromList [(0,0),(1,1),(2,0),(3,0),(4,0),(5,0),(6,1),(7,0),(8,2),(9,0)]
+        it "tests register alloction with not enough registers" $ do
+            code <- readFile "test/fixtures/bigprogram.c"
+            let ast = scan_and_parse code
+            let st = symbolTable ast
+            let (tacData, tacCode) = tacGenerate ast
+            let cfg = controlFlowGraph (concat tacCode)
+            let dfg = dataFlowGraph cfg
+            let rig = registerInterferenceGraph dfg
+            let (nodes, spilled) = simplifyRIG rig 5
+            (nodes, spilled) `shouldBe` ([0,1,2,3,4,6,7,8,9,10],[5])
+            let (nodes, spilled) = simplifyRIG rig 4
+            let tac2 = fixInstructions (concat tacCode) (map (flip unsafeLookupNode rig) spilled)
             let cfg = controlFlowGraph tac2
             let dfg = dataFlowGraph cfg
             let rig = registerInterferenceGraph dfg
-            findRegisters nodes rig 3 `shouldBe` M.fromList [(0,0),(1,1),(2,0),(3,0),(4,0),(5,0),(6,1),(7,0),(8,2),(9,0)]
+            putStrLn $ show rig
+            putStrLn $ tacPrint tac2
+            findRegisters nodes rig 4 `shouldBe` M.fromList [(0,0),(1,1),(2,2),(4,3),(6,3),(7,0),(8,1),(9,0),(10,0)]
