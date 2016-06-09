@@ -70,7 +70,6 @@ controlFlowGraph2 (x:xs) i labels g =
         graphplusedges = case x of
                         TACIf _ s -> ((insertEdge i (labels M.! s)) . (insertEdge i (i+1))) graphplusnode
                         TACGoto s -> insertEdge i (labels M.! s) graphplusnode
-                        TACCall s _ -> insertEdge i (labels M.! s) graphplusnode
                         TACReturn _ -> graphplusnode
                         _ -> insertEdge i (i+1) graphplusnode
     in controlFlowGraph2 xs (i+1) labels graphplusedges
@@ -168,17 +167,15 @@ fixInstructions is spilled = concatMap f is
                   load = foldr (\x acc -> if S.member x used then (TACLoad x:acc) else acc) [] spilled
                   store = foldr (\x acc -> if S.member x def then (TACStore x:acc) else acc) [] spilled
 
-mapVariableToRegisters2 :: TACFunction -> Int -> [Node] -> (M.Map Int Int, TACFunction)
-mapVariableToRegisters2 is k spilled = 
+mapVariablesToRegisters :: TACFunction -> Int -> M.Map Int Int
+mapVariablesToRegisters is k = 
     let cfg = controlFlowGraph is
         df = dataFlowGraph cfg
         rig = registerInterferenceGraph df
-        (nodes, newspilled) = simplifyRIG rig k
+        (nodes, spilled) = simplifyRIG rig k
+        (newnodes, newspilled) = simplifyRIG rig (k-1)
         newis = fixInstructions is (map (flip unsafeLookupNode rig) newspilled)
     in
-    if newspilled /= spilled 
-        then mapVariableToRegisters2 newis k newspilled
-    else (findRegisters nodes rig k, is)
-
-mapVariableToRegisters :: TACFunction -> Int -> (M.Map Int Int, TACFunction)
-mapVariableToRegisters is k = mapVariableToRegisters2 is k []
+    if spilled == []
+        then findRegisters nodes rig k
+    else findRegisters newnodes ((registerInterferenceGraph . dataFlowGraph . controlFlowGraph) newis) (k-1)

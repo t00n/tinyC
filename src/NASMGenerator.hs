@@ -10,6 +10,7 @@ import Debug.Trace (traceShow)
 import Data.String.Builder
 import Text.Printf
 import Data.List
+import Data.Maybe (fromJust)
 
 
 import TACGenerator
@@ -20,10 +21,10 @@ nasmGenerate :: TACProgram -> SymbolTable -> NASMProgram
 nasmGenerate p = NASMProgram <$> nasmGenerateData p <*> nasmGenerateText p
 
 nasmGenerateData :: TACProgram -> SymbolTable -> [NASMData]
-nasmGenerateData p = evalState (evalStateT (nasmGenerateDataReal (fst p)) (False, Nothing))
+nasmGenerateData p = evalState (evalStateT (nasmGenerateDataReal (fst p)) M.empty)
 
 nasmGenerateText :: TACProgram -> SymbolTable -> [NASMInstruction]
-nasmGenerateText p = evalState (evalStateT (nasmGenerateTextReal (snd p)) (False, Nothing))
+nasmGenerateText p = evalState (evalStateT (nasmGenerateTextReal (snd p)) M.empty)
 
 nasmGenerateDataReal :: [TACInstruction] -> SRSS [NASMData]
 nasmGenerateDataReal = return . (map decl)
@@ -41,34 +42,26 @@ nasmGenerateTextReal functions = mapM nasmGenerateInstructions functions >>= (re
 class Show a => NASMGenerator a where
     nasmGenerateInstructions :: a -> SRSS [NASMInstruction]
 
-instance NASMGenerator [TACInstruction] where
+instance NASMGenerator TACFunction where
     nasmGenerateInstructions xs = do
-        let cfg = controlFlowGraph xs
-        let df = dataFlowGraph cfg
-        let rig = registerInterferenceGraph df
-        let registers = [A, B, C, D, SI, DI]
-        let (nodes, spilled) = simplifyRIG rig (length registers)
-        let registerMapping = M.map (\v -> InRegister (registers !! v)) (findRegisters nodes rig (length registers))
+        let rig@(Graph _ _ variables) = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) xs
+        let registerIntMapping = mapVariablesToRegisters xs (length registers)
+        let spilled = map (\x -> fromJust (M.lookup x variables)) [x | x <- [0..(M.size variables)-1], not (x `elem` M.keys registerIntMapping)]
+        let registerMapping = M.mapKeys (\k -> fromJust (M.lookup k variables)) (M.map (\v -> InRegister (registers !! v)) registerIntMapping)
         let variableMapping = M.union registerMapping (M.fromList $ zip spilled [InStack x | x <- [0,4..(length spilled)-1]])
-        (mapM nasmGenerateInstructions xs) >>= return . concat
+        put variableMapping
+        nasmIS <- (mapM nasmGenerateInstructions (init xs)) >>= return . concat
+        if head xs == TACLabel "tiny"
+            then return $ nasmIS ++ [CALL "_exit"]
+        else return $ nasmIS ++ [RET]
 
 instance NASMGenerator TACInstruction where
-    nasmGenerateInstructions (TACLabel l) = do
-        (tiny, rs) <- get
-        if l == "tiny"
-            then put (True, rs)
-        else return ()
-        return [LABEL l]
-    nasmGenerateInstructions (TACReturn Nothing) = do
-        (tiny, rs) <- get
-        if tiny
-            then put (False, rs) >> return [CALL "_exit"]
-        else return [RET]
+    nasmGenerateInstructions (TACLabel l) = return [LABEL l]
     nasmGenerateInstructions _ = return []
 
 type SRSS = StateT RegisterState (State SymbolTable)
 
-type RegisterState = (Bool, Maybe (M.Map String VariableLocation, M.Map Int (S.Set String, S.Set String)))
+type RegisterState = M.Map String VariableLocation
 
 data VariableLocation = InRegister RegisterName
                       | InMemory Label
@@ -161,6 +154,9 @@ data RegisterSize = LSB | MSB | WORD | DWORD
 
 data RegisterName = A | B | C | D | SI | DI | SP | BP
     deriving (Eq, Show, Ord)
+
+registers :: [RegisterName]
+registers = [A, B, C, D, SI, DI]
 
 data Register = Register RegisterName RegisterSize
     deriving (Eq, Show)

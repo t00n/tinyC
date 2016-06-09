@@ -419,7 +419,13 @@ main = hspec $ do
             let ast = scan_and_parse "int tiny() { int a = 2; f(5, a); } int f(int x, int y) { return x + y; }"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "tiny",CALL "_exit",LABEL "f"]
+            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "tiny",CALL "_exit",LABEL "f",RET]
+        it "Generates code for bigprogram.c" $ do
+            code <- readFile "test/fixtures/bigprogram.c"
+            let ast = scan_parse_check code
+            let st = symbolTable ast
+            let tac = tacGenerate ast
+            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DWORDADDRESS [5],NASMData "b" DWORDADDRESS [2],NASMData "c" DWORDADDRESS [4],NASMData "d" DWORDADDRESS [3]] [LABEL "tiny",CALL "_exit"]
     describe "Tests live variable analysis" $ do
         it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"
@@ -455,7 +461,7 @@ main = hspec $ do
             let rig = registerInterferenceGraph df
             let (nodes, spilled) = simplifyRIG rig 3
             (nodes, spilled) `shouldBe` ([0,1,2,3,4,5,6,7,8,9],[])
-            findRegisters nodes rig 3 `shouldBe` M.fromList [(0,0),(1,1),(2,0),(3,0),(4,0),(5,0),(6,1),(7,0),(8,2),(9,0)]
+            findRegisters nodes rig 3 `shouldBe` M.fromList [(0,0),(1,0),(2,0),(3,1),(4,1),(5,0),(6,0),(7,0),(8,1),(9,0)]
         it "tests register alloction with not enough registers" $ do
             code <- readFile "test/fixtures/bigprogram.c"
             let ast = scan_and_parse code
@@ -471,6 +477,4 @@ main = hspec $ do
             let cfg = controlFlowGraph tac2
             let dfg = dataFlowGraph cfg
             let rig = registerInterferenceGraph dfg
-            putStrLn $ show rig
-            putStrLn $ tacPrint tac2
             findRegisters nodes rig 4 `shouldBe` M.fromList [(0,0),(1,1),(2,2),(4,3),(6,3),(7,0),(8,1),(9,0),(10,0)]
