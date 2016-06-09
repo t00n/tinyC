@@ -46,7 +46,7 @@ nasmGeneratePreFunction :: TACInstruction -> SRSS [NASMInstruction]
 nasmGeneratePreFunction (TACLabel "tiny") = return []
 nasmGeneratePreFunction (TACLabel name) = do
     info <- lift $ gets $ unsafeGetSymbolInfo name
-    traceShow info $ return []
+    return []
 
 nasmGeneratePostFunction :: TACInstruction -> SRSS [NASMInstruction]
 nasmGeneratePostFunction (TACLabel "tiny") = return [CALL "_exit"]
@@ -59,7 +59,8 @@ instance NASMGenerator TACFunction where
         let registerIntMapping = mapVariablesToRegisters xs (length registers)
         let spilled = map (\x -> fromJust (M.lookup x variables)) [x | x <- [0..(M.size variables)-1], not (x `elem` M.keys registerIntMapping)]
         let registerMapping = M.mapKeys (\k -> fromJust (M.lookup k variables)) (M.map (\v -> InRegister (registers !! v)) registerIntMapping)
-        let variableMapping = M.union registerMapping (M.fromList $ zip spilled [InStack x | x <- [0,4..(length spilled)-1]])
+        let stackMapping = M.fromList $ zip spilled [InStack x | x <- [-4,-8..(-4*(length spilled))]]
+        let variableMapping = M.unions [registerMapping, stackMapping]
         put variableMapping
         pre <- nasmGeneratePreFunction (head xs)
         nasmIS <- (mapM nasmGenerateInstructions (init xs)) >>= return . concat
