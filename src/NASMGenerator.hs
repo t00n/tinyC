@@ -42,30 +42,53 @@ nasmGenerateTextReal functions = mapM nasmGenerateInstructions functions >>= (re
 class Show a => NASMGenerator a where
     nasmGenerateInstructions :: a -> SRSS [NASMInstruction]
 
-nasmGeneratePreFunction :: TACInstruction -> SRSS [NASMInstruction]
-nasmGeneratePreFunction (TACLabel "tiny") = return []
-nasmGeneratePreFunction (TACLabel name) = do
+nasmGeneratePreFunction :: String -> SRSS [NASMInstruction]
+nasmGeneratePreFunction "tiny" = return []
+nasmGeneratePreFunction name = do
     info <- lift $ gets $ unsafeGetSymbolInfo name
     return []
 
-nasmGeneratePostFunction :: TACInstruction -> SRSS [NASMInstruction]
-nasmGeneratePostFunction (TACLabel "tiny") = return [CALL "_exit"]
-nasmGeneratePostFunction (TACLabel name) = do
+nasmGeneratePostFunction :: String -> SRSS [NASMInstruction]
+nasmGeneratePostFunction "tiny" = return [CALL "_exit"]
+nasmGeneratePostFunction name = do
     return [RET]
+
+labelToName :: TACInstruction -> String
+labelToName (TACLabel x) = x
+
+mapParameter :: M.Map String Int -> Symbols -> String -> (String, VariableLocation)
+mapParameter varInRegisters funcParams p = 
+    if p `elem` M.keys varInRegisters
+        then (p, InRegister (registers !! fromJust (M.lookup p varInRegisters)))
+    else case elemIndex p (M.keys funcParams) of
+        Nothing -> error "no parameter lolol"
+        (Just x) -> (p, InStack (8+x*4))
+
+mapLocal :: M.Map String Int -> [String] -> String -> (String, VariableLocation)
+mapLocal varInRegisters varSpilled p = 
+    if p `elem` M.keys varInRegisters
+        then (p, InRegister (registers !! fromJust (M.lookup p varInRegisters)))
+    else case elemIndex p varSpilled of
+        Nothing -> error "no local lolol"
+        (Just x) -> (p, InStack (-4-x*4))
 
 instance NASMGenerator TACFunction where
     nasmGenerateInstructions xs = do
+        let funcName = (labelToName . head) xs
+        funcInfo <- lift $ gets $ unsafeGetSymbolInfo funcName
+        let parameters = infoParams funcInfo
         let rig@(Graph _ _ variables) = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) xs
         let registerIntMapping = mapVariablesToRegisters xs (length registers)
+        let registerStringMapping = M.mapKeys (\k -> fromJust (M.lookup k variables)) registerIntMapping
         let spilled = map (\x -> fromJust (M.lookup x variables)) [x | x <- [0..(M.size variables)-1], not (x `elem` M.keys registerIntMapping)]
-        let registerMapping = M.mapKeys (\k -> fromJust (M.lookup k variables)) (M.map (\v -> InRegister (registers !! v)) registerIntMapping)
-        let stackMapping = M.fromList $ zip spilled [InStack x | x <- [-4,-8..(-4*(length spilled))]]
-        let variableMapping = M.unions [registerMapping, stackMapping]
+        let parametersMapping = M.fromList $ map (mapParameter registerStringMapping parameters) (M.keys parameters)
+        let localMapping = M.fromList $ map (mapLocal registerStringMapping spilled) (M.elems variables)
+        let variableMapping = M.unions [parametersMapping, localMapping]
         put variableMapping
-        pre <- nasmGeneratePreFunction (head xs)
+        pre <- nasmGeneratePreFunction funcName
         nasmIS <- (mapM nasmGenerateInstructions (init xs)) >>= return . concat
-        post <- nasmGeneratePostFunction (head xs)
-        return $ pre ++ nasmIS ++ post
+        post <- nasmGeneratePostFunction funcName
+        traceShow variableMapping $ return $ pre ++ nasmIS ++ post
 
 
 instance NASMGenerator TACInstruction where
