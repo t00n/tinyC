@@ -16,6 +16,7 @@ import Data.Maybe (fromJust)
 import TACGenerator
 import SymbolTable
 import TACAnalysis
+import Graph
 
 nasmGenerate :: TACProgram -> SymbolTable -> NASMProgram
 nasmGenerate p = NASMProgram <$> nasmGenerateData p <*> nasmGenerateText p

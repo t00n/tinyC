@@ -8,54 +8,7 @@ import Data.Ord
 import Debug.Trace (traceShow, trace)
 
 import TACGenerator
-
-data Graph a = Graph (S.Set Node) (S.Set Edge) (M.Map Node a)
-    deriving (Eq, Show)
-
-type Node = Int
-
-type Edge = (Int, Int)
-
-lookupNode :: Ord a => Node -> Graph a -> Maybe a
-lookupNode i (Graph _ _ values) = M.lookup i values
-
-unsafeLookupNode :: Ord a => Node -> Graph a -> a
-unsafeLookupNode n g = 
-    case lookupNode n g of
-        Nothing -> error "in unsafeLookupNode"
-        (Just x) -> x
-
-insertNode :: Ord a => Node -> a -> Graph a -> Graph a
-insertNode x v (Graph nodes edges values) = Graph (S.insert x nodes) edges (M.insert x v values)
-
-insertEdge :: Ord a => Int -> Int -> Graph a -> Graph a
-insertEdge p c (Graph nodes edges values) = Graph nodes (S.insert (p, c) edges) values
-
-delete :: Ord a => Int -> Graph a -> Graph a
-delete n (Graph nodes edges values) = Graph newnodes newedges newvalues
-    where
-        newnodes = S.delete n nodes
-        newedges = S.filter (\(a, b) -> a /= n && b /= n) edges
-        newvalues = M.delete n values 
-
-emptyGraph :: Graph a
-emptyGraph = Graph S.empty S.empty M.empty
-
-predecessors :: Ord a => Node -> Graph a -> S.Set Node
-predecessors n (Graph _ edges _) = S.map fst $ S.filter (((==) n) . snd) edges
-
-successors :: Ord a => Node -> Graph a -> S.Set Node
-successors n (Graph _ edges _) = S.map snd $ S.filter (((==) n) . fst) edges
-
-neighbours :: Ord a => Node -> Graph a -> S.Set Node
-neighbours n g = predecessors n g `S.union` successors n g
-
-subgraph :: Ord a => [a] -> Graph a -> Graph a
-subgraph xs (Graph nodes edges values) = 
-    let subGraphValues = M.filter (`elem` xs) values
-        subGraphNodes = S.filter (`M.member` subGraphValues) nodes
-        subGraphEdges = S.filter (\(p, c) -> S.member p subGraphNodes && S.member c subGraphNodes) edges
-    in Graph subGraphNodes subGraphEdges subGraphValues
+import Graph
 
 constructLabelKey :: [TACInstruction] -> M.Map String Int
 constructLabelKey is = 
@@ -63,7 +16,9 @@ constructLabelKey is =
         isLabel (_, _) = False
     in M.fromList $ map (\(TACLabel x, i) -> (x, i)) $ filter isLabel (zip is [0..])
 
-controlFlowGraph2 :: [TACInstruction] -> Int -> M.Map String Int -> Graph TACInstruction -> Graph TACInstruction
+type ControlFlowGraph = Graph TACInstruction
+
+controlFlowGraph2 :: [TACInstruction] -> Int -> M.Map String Int -> ControlFlowGraph -> ControlFlowGraph
 controlFlowGraph2 [] _ _ g = g
 controlFlowGraph2 (x:xs) i labels g =
     let graphplusnode = insertNode i x g
@@ -74,7 +29,7 @@ controlFlowGraph2 (x:xs) i labels g =
                         _ -> insertEdge i (i+1) graphplusnode
     in controlFlowGraph2 xs (i+1) labels graphplusedges
 
-controlFlowGraph :: [TACInstruction] -> Graph TACInstruction
+controlFlowGraph :: [TACInstruction] -> ControlFlowGraph
 controlFlowGraph is = controlFlowGraph2 is 0 (constructLabelKey is) emptyGraph
 
 
@@ -104,7 +59,9 @@ usedAndDefinedVariables inst =
         (TACStore s) -> (S.fromList [s], S.empty)
         _ -> (S.empty, S.empty)
 
-dataFlowGraph :: Graph TACInstruction -> M.Map Int (S.Set String, S.Set String)
+type DataFlowGraph = M.Map Int (S.Set String, S.Set String)
+
+dataFlowGraph :: ControlFlowGraph -> DataFlowGraph
 dataFlowGraph g@(Graph nodes edges values) = 
     let variables = M.fromSet (\k -> (S.empty :: S.Set String, S.empty :: S.Set String)) nodes
         dataFlowGraphRec q vs
@@ -122,7 +79,9 @@ dataFlowGraph g@(Graph nodes edges values) =
                 in dataFlowGraphRec newnewq newvs
     in dataFlowGraphRec (Q.enqueueAll (S.toList nodes) Q.empty) variables
 
-registerInterferenceGraph :: M.Map Int (S.Set String, S.Set String) -> Graph String
+type RegisterInterferenceGraph = Graph String
+
+registerInterferenceGraph :: DataFlowGraph -> RegisterInterferenceGraph
 registerInterferenceGraph vs = Graph (S.fromList ids) edges values
     where allsets = ((concatMap (\(s1, s2) -> [s1, s2])) . M.elems) vs
           nodes = (S.toList . S.unions) allsets
@@ -132,7 +91,11 @@ registerInterferenceGraph vs = Graph (S.fromList ids) edges values
           edges = foldr f S.empty allsets
           f x g = foldr S.insert g [(a1, b1) | a <- S.toList x, b <- S.toList x, a /= b, let (Just a1) = M.lookup a valueIntMap, let (Just b1) = M.lookup b valueIntMap]
 
-simplifyRIG2 :: [Int] -> [Int] -> Graph String -> Int -> ([Int], [Int])
+type Variables = [Int]
+type Spilled = [Int]
+type K = Int
+
+simplifyRIG2 :: Variables -> Spilled -> RegisterInterferenceGraph -> K -> (Variables, Spilled)
 simplifyRIG2 xs spills g@(Graph nodes _ _) k = 
     let isSimplifiable x Nothing = if length (neighbours x g) < k then (Just x) else Nothing
         isSimplifiable _ (Just x) = (Just x)
@@ -143,21 +106,23 @@ simplifyRIG2 xs spills g@(Graph nodes _ _) k =
             Nothing -> simplifyRIG2 xs (findSpill:spills) (delete findSpill g) k
             (Just x) -> simplifyRIG2 (x:xs) spills (delete x g) k
 
-simplifyRIG :: Graph String -> Int -> ([Int], [Int])
+simplifyRIG :: RegisterInterferenceGraph -> K -> (Variables, Spilled)
 simplifyRIG = simplifyRIG2 [] []
 
-findRegister :: Node -> [Node] -> Int -> M.Map Node Int -> Int
+type RegisterMapping = M.Map Node Int
+
+findRegister :: Node -> [Node] -> K -> RegisterMapping -> Int
 findRegister node neigh k mapping = 
     let registersUsed = M.elems $ M.filterWithKey (\k v -> k `elem` neigh) mapping
     in head $ [x | x <- [0..(k-1)], not (x `elem` registersUsed)]
 
-findRegisters2 :: [Node] -> Graph String -> Int -> M.Map Node Int -> M.Map Node Int
+findRegisters2 :: [Node] -> RegisterInterferenceGraph -> K -> RegisterMapping -> RegisterMapping
 findRegisters2 [] _ _ mapping = mapping
 findRegisters2 (n:ns) g k mapping = 
     let register = findRegister n (S.toList $ neighbours n g) k mapping
     in findRegisters2 ns g k (M.insert n register mapping)
 
-findRegisters :: [Node] -> Graph String -> Int -> M.Map Node Int
+findRegisters :: [Node] -> RegisterInterferenceGraph -> K -> RegisterMapping
 findRegisters nodes g k = findRegisters2 nodes g k M.empty
 
 fixInstructions :: TACFunction -> [String] -> TACFunction
@@ -167,7 +132,7 @@ fixInstructions is spilled = concatMap f is
                   load = foldr (\x acc -> if S.member x used then (TACLoad x:acc) else acc) [] spilled
                   store = foldr (\x acc -> if S.member x def then (TACStore x:acc) else acc) [] spilled
 
-mapVariablesToRegisters :: TACFunction -> Int -> M.Map Int Int
+mapVariablesToRegisters :: TACFunction -> K -> RegisterMapping
 mapVariablesToRegisters is k = 
     let cfg = controlFlowGraph is
         df = dataFlowGraph cfg

@@ -16,6 +16,7 @@ import NASMGenerator
 import SymbolTable
 import SemanticError
 import TACAnalysis
+import Graph
 
 scan_and_parse = parse . alexScanTokens
 
