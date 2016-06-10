@@ -139,7 +139,7 @@ fixInstructions is spilled = concatMap f is
                   load = foldr (\x acc -> if S.member x used then (TACLoad x:acc) else acc) [] spilled
                   store = foldr (\x acc -> if S.member x def then (TACStore x:acc) else acc) [] spilled
 
-mapVariablesToRegisters :: TACFunction -> K -> RegisterMapping
+mapVariablesToRegisters :: TACFunction -> K -> (RegisterMapping, Spilled, TACFunction)
 mapVariablesToRegisters is k = 
     let cfg = controlFlowGraph is
         df = dataFlowGraph cfg
@@ -147,7 +147,8 @@ mapVariablesToRegisters is k =
         (nodes, spilled) = simplifyRIG rig k
         (newnodes, newspilled) = simplifyRIG rig (k-1)
         newis = fixInstructions is newspilled
+        newrig = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) newis
     in
     if spilled == []
-        then findRegisters nodes rig k
-    else findRegisters newnodes ((registerInterferenceGraph . dataFlowGraph . controlFlowGraph) newis) (k-1)
+        then (findRegisters nodes rig k, [], is)
+    else (findRegisters newnodes newrig (k-1), newspilled, newis)
