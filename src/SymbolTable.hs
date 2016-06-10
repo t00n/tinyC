@@ -92,6 +92,9 @@ root = Z.root
 zipper :: Tree Symbols -> SymbolTable
 zipper = Z.fromTree
 
+symbols :: SymbolTable -> Symbols
+symbols = rootLabel . Z.toTree
+
 memberST :: String -> SymbolTable -> Bool
 memberST s stz = (M.member s . rootLabel . Z.tree) stz
 

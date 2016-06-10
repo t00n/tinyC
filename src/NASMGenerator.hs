@@ -57,6 +57,14 @@ nasmGeneratePostFunction name = do
 labelToName :: TACInstruction -> String
 labelToName (TACLabel x) = x
 
+mapGlobal :: RegisterMapping -> Variables -> Variable -> (Variable, VariableLocation)
+mapGlobal varInRegisters globals v = 
+    if v `elem` M.keys varInRegisters
+        then (v, InRegister (registers !! fromJust (M.lookup v varInRegisters)))
+    else case elemIndex v globals of
+        Nothing -> error "no global lololol"
+        (Just x) -> (v, InMemory v)
+
 mapParameter :: RegisterMapping -> Symbols -> Variable -> (Variable, VariableLocation)
 mapParameter varInRegisters funcParams p = 
     if p `elem` M.keys varInRegisters
@@ -66,12 +74,12 @@ mapParameter varInRegisters funcParams p =
         (Just x) -> (p, InStack (8+x*4))
 
 mapLocal :: RegisterMapping -> Spilled -> Variable -> (Variable, VariableLocation)
-mapLocal varInRegisters varSpilled p = 
-    if p `elem` M.keys varInRegisters
-        then (p, InRegister (registers !! fromJust (M.lookup p varInRegisters)))
-    else case elemIndex p varSpilled of
+mapLocal varInRegisters varSpilled v = 
+    if v `elem` M.keys varInRegisters
+        then (v, InRegister (registers !! fromJust (M.lookup v varInRegisters)))
+    else case elemIndex v varSpilled of
         Nothing -> error "no local lolol"
-        (Just x) -> (p, InStack (-4-x*4))
+        (Just x) -> (v, InStack (-4-x*4))
 
 instance NASMGenerator TACFunction where
     nasmGenerateInstructions xs = do
@@ -81,9 +89,13 @@ instance NASMGenerator TACFunction where
         let rig@(Graph variables _) = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) xs
         let registerMapping = mapVariablesToRegisters xs (length registers)
         let spilled = S.toList $ S.filter (not . (`elem` M.keys registerMapping)) variables
-        let parametersMapping = M.fromList $ map (mapParameter registerMapping funcParams) (M.keys funcParams)
+        st <- lift get
+        let topLevel = root st
+        let globalVariables = M.keys $ M.filter (\x -> case x of VarInfo _ _ _ -> True; FuncInfo _ _ -> False) (symbols topLevel)
+        let globalMapping = M.fromList $ map (mapGlobal registerMapping globalVariables) (S.toList variables)
+        let parametersMapping = M.fromList $ map (mapParameter registerMapping funcParams) (S.toList variables)
         let localMapping = M.fromList $ map (mapLocal registerMapping spilled) (S.toList variables)
-        let variableMapping = M.unions [parametersMapping, localMapping]
+        let variableMapping = M.unions [globalMapping, parametersMapping, localMapping]
         put variableMapping
         pre <- nasmGeneratePreFunction funcName
         nasmIS <- (mapM nasmGenerateInstructions ((tail . init) xs)) >>= return . concat
