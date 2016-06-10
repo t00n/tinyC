@@ -43,13 +43,13 @@ nasmGenerateTextReal functions = mapM nasmGenerateInstructions functions >>= (re
 class Show a => NASMGenerator a where
     nasmGenerateInstructions :: a -> SRSS [NASMInstruction]
 
-nasmGeneratePreFunction :: String -> SRSS [NASMInstruction]
-nasmGeneratePreFunction "tiny" = return []
+nasmGeneratePreFunction :: Label -> SRSS [NASMInstruction]
+nasmGeneratePreFunction "tiny" = return [LABEL "tiny"]
 nasmGeneratePreFunction name = do
     info <- lift $ gets $ unsafeGetSymbolInfo name
-    return []
+    return [LABEL name]
 
-nasmGeneratePostFunction :: String -> SRSS [NASMInstruction]
+nasmGeneratePostFunction :: Label -> SRSS [NASMInstruction]
 nasmGeneratePostFunction "tiny" = return [CALL "_exit"]
 nasmGeneratePostFunction name = do
     return [RET]
@@ -57,7 +57,7 @@ nasmGeneratePostFunction name = do
 labelToName :: TACInstruction -> String
 labelToName (TACLabel x) = x
 
-mapParameter :: M.Map String Int -> Symbols -> String -> (String, VariableLocation)
+mapParameter :: RegisterMapping -> Symbols -> Variable -> (Variable, VariableLocation)
 mapParameter varInRegisters funcParams p = 
     if p `elem` M.keys varInRegisters
         then (p, InRegister (registers !! fromJust (M.lookup p varInRegisters)))
@@ -65,7 +65,7 @@ mapParameter varInRegisters funcParams p =
         Nothing -> error "no parameter lolol"
         (Just x) -> (p, InStack (8+x*4))
 
-mapLocal :: M.Map String Int -> [String] -> String -> (String, VariableLocation)
+mapLocal :: RegisterMapping -> Spilled -> Variable -> (Variable, VariableLocation)
 mapLocal varInRegisters varSpilled p = 
     if p `elem` M.keys varInRegisters
         then (p, InRegister (registers !! fromJust (M.lookup p varInRegisters)))
@@ -77,17 +77,16 @@ instance NASMGenerator TACFunction where
     nasmGenerateInstructions xs = do
         let funcName = (labelToName . head) xs
         funcInfo <- lift $ gets $ unsafeGetSymbolInfo funcName
-        let parameters = infoParams funcInfo
-        let rig@(Graph _ _ variables) = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) xs
-        let registerIntMapping = mapVariablesToRegisters xs (length registers)
-        let registerStringMapping = M.mapKeys (\k -> fromJust (M.lookup k variables)) registerIntMapping
-        let spilled = map (\x -> fromJust (M.lookup x variables)) [x | x <- [0..(M.size variables)-1], not (x `elem` M.keys registerIntMapping)]
-        let parametersMapping = M.fromList $ map (mapParameter registerStringMapping parameters) (M.keys parameters)
-        let localMapping = M.fromList $ map (mapLocal registerStringMapping spilled) (M.elems variables)
+        let funcParams = infoParams funcInfo
+        let rig@(Graph variables _) = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) xs
+        let registerMapping = mapVariablesToRegisters xs (length registers)
+        let spilled = S.toList $ S.filter (not . (`elem` M.keys registerMapping)) variables
+        let parametersMapping = M.fromList $ map (mapParameter registerMapping funcParams) (M.keys funcParams)
+        let localMapping = M.fromList $ map (mapLocal registerMapping spilled) (S.toList variables)
         let variableMapping = M.unions [parametersMapping, localMapping]
         put variableMapping
         pre <- nasmGeneratePreFunction funcName
-        nasmIS <- (mapM nasmGenerateInstructions (init xs)) >>= return . concat
+        nasmIS <- (mapM nasmGenerateInstructions ((tail . init) xs)) >>= return . concat
         post <- nasmGeneratePostFunction funcName
         traceShow variableMapping $ return $ pre ++ nasmIS ++ post
 
@@ -203,7 +202,7 @@ data AddressSize = BYTEADDRESS | WORDADDRESS | DWORDADDRESS
 
 data Address = Address Register Multiplier Offset
              | AddressBase Register Register Multiplier Offset
-             | AddressLabel String Offset
+             | AddressLabel Label Offset
     deriving (Eq, Show)
 
 type Constant = Int
@@ -211,8 +210,6 @@ type Constant = Int
 type Multiplier = Int
 
 type Offset = Int
-
-type Label = String
 
 class NASMShow a where
     nasmShow :: a -> String

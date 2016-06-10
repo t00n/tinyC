@@ -10,27 +10,48 @@ import Debug.Trace (traceShow, trace)
 import TACGenerator
 import Graph
 
-constructLabelKey :: [TACInstruction] -> M.Map String Int
-constructLabelKey is = 
-    let isLabel (TACLabel _, _) = True
-        isLabel (_, _) = False
-    in M.fromList $ map (\(TACLabel x, i) -> (x, i)) $ filter isLabel (zip is [0..])
-
+type Label = String
+type Variable = String
+type Variables = [Variable]
+type Spilled = [Variable]
+type LabelInstructionMapping = M.Map Label TACInstruction
 type ControlFlowGraph = Graph TACInstruction
+type DataFlowIn = S.Set Variable
+type DataFlowOut = S.Set Variable
+type DataFlowGraph = M.Map TACInstruction (DataFlowIn, DataFlowOut)
+type RegisterInterferenceGraph = Graph Variable
+type K = Int
+type RegisterMapping = M.Map Variable Int
 
-controlFlowGraph2 :: [TACInstruction] -> Int -> M.Map String Int -> ControlFlowGraph -> ControlFlowGraph
-controlFlowGraph2 [] _ _ g = g
-controlFlowGraph2 (x:xs) i labels g =
-    let graphplusnode = insertNode i x g
-        graphplusedges = case x of
-                        TACIf _ s -> ((insertEdge i (labels M.! s)) . (insertEdge i (i+1))) graphplusnode
-                        TACGoto s -> insertEdge i (labels M.! s) graphplusnode
-                        TACReturn _ -> graphplusnode
-                        _ -> insertEdge i (i+1) graphplusnode
-    in controlFlowGraph2 xs (i+1) labels graphplusedges
+-- map labels to instruction
+constructLabelKey :: TACFunction -> LabelInstructionMapping
+constructLabelKey is = 
+    let isLabel (TACLabel _) = True
+        isLabel _ = False
+    in M.fromList $ map (\(TACLabel x) -> (x, TACLabel x)) $ filter isLabel is
 
-controlFlowGraph :: [TACInstruction] -> ControlFlowGraph
-controlFlowGraph is = controlFlowGraph2 is 0 (constructLabelKey is) emptyGraph
+controlFlowGraph2 :: TACFunction -> LabelInstructionMapping -> ControlFlowGraph -> ControlFlowGraph
+controlFlowGraph2 instructions labels g = 
+    let insertLabel curr label g = insertEdge curr (labels M.! label) g
+        updateGraph curr next = 
+            let graphwithnode = insertNode curr g in
+            case curr of
+                TACIf _ s -> case next of 
+                    (Just x) -> ((insertLabel curr s) . (insertEdge curr x)) graphwithnode
+                    Nothing -> insertLabel curr s graphwithnode
+                TACGoto s -> insertLabel curr s graphwithnode
+                TACReturn _ -> graphwithnode
+                _ -> case next of 
+                        (Just x) -> insertEdge curr x graphwithnode
+                        Nothing -> graphwithnode
+    in
+    case instructions of
+        (x:y:xs) -> controlFlowGraph2 (y:xs) labels (updateGraph x (Just y))
+        (x:xs) -> controlFlowGraph2 xs labels (updateGraph x Nothing)
+        [] -> g
+
+controlFlowGraph :: TACFunction -> ControlFlowGraph
+controlFlowGraph is = controlFlowGraph2 is (constructLabelKey is) emptyGraph
 
 
 usedAndDefinedVariables :: TACInstruction -> (S.Set String, S.Set String)
@@ -59,73 +80,59 @@ usedAndDefinedVariables inst =
         (TACStore s) -> (S.fromList [s], S.empty)
         _ -> (S.empty, S.empty)
 
-type DataFlowGraph = M.Map Int (S.Set String, S.Set String)
-
 dataFlowGraph :: ControlFlowGraph -> DataFlowGraph
-dataFlowGraph g@(Graph nodes edges values) = 
-    let variables = M.fromSet (\k -> (S.empty :: S.Set String, S.empty :: S.Set String)) nodes
+dataFlowGraph g@(Graph nodes edges) = 
+    let variables = M.fromSet (\k -> (S.empty :: DataFlowIn, S.empty :: DataFlowOut)) nodes
         dataFlowGraphRec q vs
             | null q = vs
             | otherwise = 
-                let (Just e, newq) = Q.dequeue q
-                    succs = M.filterWithKey (\k _ -> k `elem` successors e g) vs
-                    out = S.unions $ M.elems $ M.map (\(invar, outvar) -> invar) succs
-                    (Just inst) = lookupNode e g
+                let (Just inst, newq) = Q.dequeue q
+                    succs = M.filterWithKey (\k _ -> k `elem` successors inst g) vs
+                    out = S.unions $ M.elems $ M.map fst succs
                     (use, def) = usedAndDefinedVariables inst
                     newin = S.union use (S.difference out def)
-                    oldin = fst $ M.findWithDefault (S.empty, S.empty) e vs
-                    newnewq = if newin /= oldin then Q.enqueueAll (S.toList $ predecessors e g) newq else newq
-                    newvs = M.insert e (newin, out) vs
+                    oldin = fst $ M.findWithDefault (S.empty, S.empty) inst vs
+                    newnewq = if newin /= oldin then Q.enqueueAll (S.toList $ predecessors inst g) newq else newq
+                    newvs = M.insert inst (newin, out) vs
                 in dataFlowGraphRec newnewq newvs
     in dataFlowGraphRec (Q.enqueueAll (S.toList nodes) Q.empty) variables
 
-type RegisterInterferenceGraph = Graph String
-
 registerInterferenceGraph :: DataFlowGraph -> RegisterInterferenceGraph
-registerInterferenceGraph vs = Graph (S.fromList ids) edges values
+registerInterferenceGraph vs = Graph nodes edges
     where allsets = ((concatMap (\(s1, s2) -> [s1, s2])) . M.elems) vs
-          nodes = (S.toList . S.unions) allsets
-          ids = [0..(length nodes)-1]
-          valueIntMap = M.fromList (zip nodes ids)
-          values = M.fromList (zip ids nodes)
+          nodes = S.unions allsets
           edges = foldr f S.empty allsets
-          f x g = foldr S.insert g [(a1, b1) | a <- S.toList x, b <- S.toList x, a /= b, let (Just a1) = M.lookup a valueIntMap, let (Just b1) = M.lookup b valueIntMap]
-
-type Variables = [Int]
-type Spilled = [Int]
-type K = Int
+          f x g = foldr S.insert g [(a, b) | a <- S.toList x, b <- S.toList x, a /= b]
 
 simplifyRIG2 :: Variables -> Spilled -> RegisterInterferenceGraph -> K -> (Variables, Spilled)
-simplifyRIG2 xs spills g@(Graph nodes _ _) k = 
+simplifyRIG2 xs spills g@(Graph nodes _) k = 
     let isSimplifiable x Nothing = if length (neighbours x g) < k then (Just x) else Nothing
         isSimplifiable _ (Just x) = (Just x)
         findSimplify = S.foldr isSimplifiable Nothing nodes
         findSpill = fst $ maximumBy (comparing snd) (S.map (\x -> (x, length (neighbours x g))) nodes)
     in  if null nodes then (xs, spills)
         else case findSimplify of
-            Nothing -> simplifyRIG2 xs (findSpill:spills) (delete findSpill g) k
-            (Just x) -> simplifyRIG2 (x:xs) spills (delete x g) k
+            Nothing -> simplifyRIG2 xs (findSpill:spills) (deleteNode findSpill g) k
+            (Just x) -> simplifyRIG2 (x:xs) spills (deleteNode x g) k
 
 simplifyRIG :: RegisterInterferenceGraph -> K -> (Variables, Spilled)
 simplifyRIG = simplifyRIG2 [] []
 
-type RegisterMapping = M.Map Node Int
-
-findRegister :: Node -> [Node] -> K -> RegisterMapping -> Int
+findRegister :: Variable -> Variables -> K -> RegisterMapping -> Int
 findRegister node neigh k mapping = 
     let registersUsed = M.elems $ M.filterWithKey (\k v -> k `elem` neigh) mapping
     in head $ [x | x <- [0..(k-1)], not (x `elem` registersUsed)]
 
-findRegisters2 :: [Node] -> RegisterInterferenceGraph -> K -> RegisterMapping -> RegisterMapping
+findRegisters2 :: Variables -> RegisterInterferenceGraph -> K -> RegisterMapping -> RegisterMapping
 findRegisters2 [] _ _ mapping = mapping
 findRegisters2 (n:ns) g k mapping = 
     let register = findRegister n (S.toList $ neighbours n g) k mapping
     in findRegisters2 ns g k (M.insert n register mapping)
 
-findRegisters :: [Node] -> RegisterInterferenceGraph -> K -> RegisterMapping
+findRegisters :: Variables -> RegisterInterferenceGraph -> K -> RegisterMapping
 findRegisters nodes g k = findRegisters2 nodes g k M.empty
 
-fixInstructions :: TACFunction -> [String] -> TACFunction
+fixInstructions :: TACFunction -> Spilled -> TACFunction
 fixInstructions is spilled = concatMap f is
     where f inst = load ++ [inst] ++ store
             where (used, def) = usedAndDefinedVariables inst
@@ -139,7 +146,7 @@ mapVariablesToRegisters is k =
         rig = registerInterferenceGraph df
         (nodes, spilled) = simplifyRIG rig k
         (newnodes, newspilled) = simplifyRIG rig (k-1)
-        newis = fixInstructions is (map (flip unsafeLookupNode rig) newspilled)
+        newis = fixInstructions is newspilled
     in
     if spilled == []
         then findRegisters nodes rig k
