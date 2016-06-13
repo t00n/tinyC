@@ -38,3 +38,15 @@ subgraph xs (Graph nodes edges) =
     let subGraphNodes = S.filter (`elem` xs) nodes
         subGraphEdges = S.filter (\(p, c) -> S.member p subGraphNodes && S.member c subGraphNodes) edges
     in Graph subGraphNodes subGraphEdges
+
+removeDuplicateEdges :: Ord a => Edges a -> Edges a
+removeDuplicateEdges = S.foldr (\(x, y) acc -> if not ((y, x) `S.member` acc) then S.insert (x, y) acc else acc) S.empty
+
+toDotNodes :: Show a => Nodes a -> String
+toDotNodes = concat . S.toList  . (S.map (\x -> show x ++ ";\n"))
+
+toDotEdges :: Show a => Edges a -> String
+toDotEdges = concat . S.toList . (S.map (\(x, y) -> show x ++ " -- " ++ show y ++ ";\n"))
+
+toDot :: (Show a, Ord a) => Graph a -> String
+toDot (Graph nodes edges) = "graph { \n" ++ toDotNodes nodes ++ ((toDotEdges . removeDuplicateEdges) edges) ++ "}\n"
