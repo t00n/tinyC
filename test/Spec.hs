@@ -431,15 +431,16 @@ main = hspec $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            constructLabelKey ((snd tac) !! 0) `shouldBe` M.fromList [("l1",TACLabel "l1"),("l2",TACLabel "l2"),("l3",TACLabel "l3"),("tiny",TACLabel "tiny")]
+            constructLabelKey ((snd tac) !! 0) `shouldBe` M.fromList [("l1",3),("l2",5),("l3",6),("tiny",0)]
             let ast = scan_and_parse "int a; int tiny() { int a = 5; if (a) { int b = 1 + a; } else { int c = 3; } } int f() { int a = 3 + 4; return a; } int b = 3;"
             let st = symbolTable ast
             let tac = tacGenerate ast
             let cfg = controlFlowGraph (concat (snd tac))
-            cfg `shouldBe` Graph (S.fromList [TACBinary "t1" (TACInt 1) TACPlus (TACVar "a"),TACBinary "t2" (TACInt 3) TACPlus (TACInt 4),TACCopy "a" (TACInt 5),TACCopy "a" (TACVar "t2"),TACCopy "b" (TACVar "t1"),TACCopy "c" (TACInt 3),TACIf (TACExpr (TACVar "a") TACNotEqual (TACInt 0)) "l1",TACGoto "l2",TACGoto "l3",TACReturn Nothing,TACReturn (Just (TACVar "a")),TACLabel "f",TACLabel "l1",TACLabel "l2",TACLabel "l3",TACLabel "tiny"]) (S.fromList [(TACBinary "t1" (TACInt 1) TACPlus (TACVar "a"),TACCopy "b" (TACVar "t1")),(TACBinary "t2" (TACInt 3) TACPlus (TACInt 4),TACCopy "a" (TACVar "t2")),(TACCopy "a" (TACInt 5),TACIf (TACExpr (TACVar "a") TACNotEqual (TACInt 0)) "l1"),(TACCopy "a" (TACVar "t2"),TACReturn (Just (TACVar "a"))),(TACCopy "b" (TACVar "t1"),TACGoto "l3"),(TACCopy "c" (TACInt 3),TACLabel "l3"),(TACIf (TACExpr (TACVar "a") TACNotEqual (TACInt 0)) "l1",TACGoto "l2"),(TACIf (TACExpr (TACVar "a") TACNotEqual (TACInt 0)) "l1",TACLabel "l1"),(TACGoto "l2",TACLabel "l2"),(TACGoto "l3",TACLabel "l3"),(TACLabel "f",TACBinary "t2" (TACInt 3) TACPlus (TACInt 4)),(TACLabel "l1",TACBinary "t1" (TACInt 1) TACPlus (TACVar "a")),(TACLabel "l2",TACCopy "c" (TACInt 3)),(TACLabel "l3",TACReturn Nothing),(TACLabel "tiny",TACCopy "a" (TACInt 5))])
-            dataFlowGraph cfg `shouldBe` M.fromList [(TACBinary "t1" (TACInt 1) TACPlus (TACVar "a"),(S.fromList ["a"],S.fromList ["t1"])),(TACBinary "t2" (TACInt 3) TACPlus (TACInt 4),(S.fromList [],S.fromList ["t2"])),(TACCopy "a" (TACInt 5),(S.fromList [],S.fromList ["a"])),(TACCopy "a" (TACVar "t2"),(S.fromList ["t2"],S.fromList ["a"])),(TACCopy "b" (TACVar "t1"),(S.fromList ["t1"],S.fromList [])),(TACCopy "c" (TACInt 3),(S.fromList [],S.fromList [])),(TACIf (TACExpr (TACVar "a") TACNotEqual (TACInt 0)) "l1",(S.fromList ["a"],S.fromList ["a"])),(TACGoto "l2",(S.fromList [],S.fromList [])),(TACGoto "l3",(S.fromList [],S.fromList [])),(TACReturn Nothing,(S.fromList [],S.fromList [])),(TACReturn (Just (TACVar "a")),(S.fromList ["a"],S.fromList [])),(TACLabel "f",(S.fromList [],S.fromList [])),(TACLabel "l1",(S.fromList ["a"],S.fromList ["a"])),(TACLabel "l2",(S.fromList [],S.fromList [])),(TACLabel "l3",(S.fromList [],S.fromList [])),(TACLabel "tiny",(S.fromList [],S.fromList []))]
-            subgraph [TACLabel "l1",TACBinary "t1" (TACInt 1) TACPlus (TACVar "a"),TACCopy "b" (TACVar "t1"),TACGoto "l3",TACLabel "l2"] cfg `shouldBe` Graph (S.fromList [TACBinary "t1" (TACInt 1) TACPlus (TACVar "a"),TACCopy "b" (TACVar "t1"),TACGoto "l3",TACLabel "l1",TACLabel "l2"]) (S.fromList [(TACBinary "t1" (TACInt 1) TACPlus (TACVar "a"),TACCopy "b" (TACVar "t1")),(TACCopy "b" (TACVar "t1"),TACGoto "l3"),(TACLabel "l1",TACBinary "t1" (TACInt 1) TACPlus (TACVar "a"))])
-            registerInterferenceGraph (dataFlowGraph cfg) `shouldBe` Graph (S.fromList ["a","t1","t2"]) (S.fromList [])
+            let dfg = dataFlowGraph cfg
+            let rig = registerInterferenceGraph dfg
+            cfg `shouldBe` Graph (M.fromList [(0,TACLabel "tiny"),(1,TACCopy "a" (TACInt 5)),(2,TACIf (TACExpr (TACVar "a") TACNotEqual (TACInt 0)) "l1"),(3,TACGoto "l2"),(4,TACLabel "l1"),(5,TACBinary "t1" (TACInt 1) TACPlus (TACVar "a")),(6,TACCopy "b" (TACVar "t1")),(7,TACGoto "l3"),(8,TACLabel "l2"),(9,TACCopy "c" (TACInt 3)),(10,TACLabel "l3"),(11,TACReturn Nothing),(12,TACLabel "f"),(13,TACBinary "t2" (TACInt 3) TACPlus (TACInt 4)),(14,TACCopy "a" (TACVar "t2")),(15,TACReturn (Just (TACVar "a")))]) (S.fromList [(0,1),(1,2),(2,3),(2,4),(3,8),(4,5),(5,6),(6,7),(7,10),(8,9),(9,10),(10,11),(12,13),(13,14),(14,15)])
+            dfg `shouldBe` M.fromList [(0,(S.fromList [],S.fromList [])),(1,(S.fromList [],S.fromList ["a"])),(2,(S.fromList ["a"],S.fromList ["a"])),(3,(S.fromList [],S.fromList [])),(4,(S.fromList ["a"],S.fromList ["a"])),(5,(S.fromList ["a"],S.fromList ["t1"])),(6,(S.fromList ["t1"],S.fromList [])),(7,(S.fromList [],S.fromList [])),(8,(S.fromList [],S.fromList [])),(9,(S.fromList [],S.fromList [])),(10,(S.fromList [],S.fromList [])),(11,(S.fromList [],S.fromList [])),(12,(S.fromList [],S.fromList [])),(13,(S.fromList [],S.fromList ["t2"])),(14,(S.fromList ["t2"],S.fromList ["a"])),(15,(S.fromList ["a"],S.fromList []))]
+            rig `shouldBe` Graph (M.fromList [(0,"a"),(1,"t1"),(2,"t2")]) (S.fromList [])
         it "tests register allocation with enough registers" $ do
             let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); }"
             let st = symbolTable ast
@@ -447,7 +448,7 @@ main = hspec $ do
             let cfg = controlFlowGraph ((concat . snd) tac)
             let df = dataFlowGraph cfg
             let rig = registerInterferenceGraph df
-            rig `shouldBe` Graph (S.fromList ["a","b","c","t1","t2","t3"]) (S.fromList [("a","b"),("a","c"),("b","a"),("b","c"),("b","t1"),("c","a"),("c","b"),("c","t1"),("t1","b"),("t1","c"),("t1","t2"),("t2","t1")])
+            rig `shouldBe` Graph (M.fromList [(0,"a"),(1,"b"),(2,"c"),(3,"t1"),(4,"t2"),(5,"t3")]) (S.fromList [(0,1),(0,2),(1,0),(1,2),(1,3),(2,0),(2,1),(2,3),(3,1),(3,2),(3,4),(4,3)])
             let (nodes, spilled) = simplifyRIG rig 3
             (nodes, spilled) `shouldBe` (["a","b","c","t1","t2","t3"],[])
             findRegisters nodes rig 3 `shouldBe` M.fromList [("a",0),("b",1),("c",2),("t1",0),("t2",1),("t3",0)]
@@ -470,11 +471,13 @@ main = hspec $ do
             let cfg = controlFlowGraph (concat tacCode)
             let dfg = dataFlowGraph cfg
             let rig = registerInterferenceGraph dfg
+            let (nodes, spilled) = simplifyRIG rig 6
+            writeFile "rig1.dot" (toDot rig)
+            (nodes, spilled) `shouldBe` (["a","b","c","d","t3","t4","t1","t10","t11","t2","t6","t7","t8","t9"],["t5"])
             let (nodes, spilled) = simplifyRIG rig 5
-            (nodes, spilled) `shouldBe` (["a","b","c","d","t1","t3","t4","t5","t6","t7"],["t2"])
-            let (nodes, spilled) = simplifyRIG rig 4
             let tac2 = fixInstructions (concat tacCode) spilled
             let cfg = controlFlowGraph tac2
             let dfg = dataFlowGraph cfg
             let rig = registerInterferenceGraph dfg
-            findRegisters nodes rig 4 `shouldBe` M.fromList [("a",0),("b",1),("c",2),("t1",3),("t3",3),("t4",0),("t5",1),("t6",0),("t7",0)]
+            writeFile "rig2.dot" (toDot rig)
+            findRegisters nodes rig 5 `shouldBe` M.fromList [("a",0),("b",1),("c",2),("t1",3),("t10",0),("t11",0),("t2",4),("t3",3),("t4",4),("t6",4),("t7",3),("t8",0),("t9",1)]

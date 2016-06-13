@@ -84,21 +84,21 @@ instance NASMGenerator TACFunction where
         let funcName = (labelToName . head) xs
         funcInfo <- lift $ gets $ unsafeGetSymbolInfo funcName
         let funcParams = infoParams funcInfo
-        let rig@(Graph variables _) = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) xs
+        let rig = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) xs
         let (registerMapping, spilled, is) = mapVariablesToRegisters xs (length registers)
         st <- lift get
         let notspilled = M.filterWithKey (\x _ -> not (x `elem` spilled)) registerMapping
         let topLevel = root st
         let globalVariables = M.keys $ M.filter (\x -> case x of VarInfo _ _ _ -> True; FuncInfo _ _ -> False) (symbols topLevel)
         let globalMapping = M.fromList $ map (mapGlobal notspilled) globalVariables
-        let parametersMapping = M.fromList $ map (mapParameter notspilled funcParams) (S.toList variables)
-        let localMapping = M.fromList $ map (mapLocal notspilled spilled) (S.toList variables)
+        let parametersMapping = M.fromList $ map (mapParameter notspilled funcParams) (values rig)
+        let localMapping = M.fromList $ map (mapLocal notspilled spilled) (values rig)
         let variableMapping = M.unions [globalMapping, parametersMapping, localMapping]
         put variableMapping
         pre <- nasmGeneratePreFunction funcName
         nasmIS <- (mapM nasmGenerateInstructions ((tail . init) is)) >>= return . concat
         post <- nasmGeneratePostFunction funcName
-        traceShow spilled $ return $ pre ++ nasmIS ++ post
+        return $ pre ++ nasmIS ++ post
 
 
 instance NASMGenerator TACInstruction where
