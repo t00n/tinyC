@@ -2,6 +2,7 @@ module Graph where
 
 import qualified Data.Set as S
 import qualified Data.Map as M
+import Data.Maybe (fromJust)
 
 data Graph a = Graph (Nodes a) (Edges a)
     deriving (Eq, Show)
@@ -39,14 +40,24 @@ subgraph xs (Graph nodes edges) =
         subGraphEdges = S.filter (\(p, c) -> S.member p subGraphNodes && S.member c subGraphNodes) edges
     in Graph subGraphNodes subGraphEdges
 
+mapToNumbers :: [a]-> [Integer]
+mapToNumbers = map fst . zip [0..]
+
 removeDuplicateEdges :: Ord a => Edges a -> Edges a
-removeDuplicateEdges = S.foldr (\(x, y) acc -> if not ((y, x) `S.member` acc) then S.insert (x, y) acc else acc) S.empty
+removeDuplicateEdges = S.foldr (\(x, y) acc -> if not ((y, x) `S.member` acc) && not ((x, y) `S.member` acc) then S.insert (x, y) acc else acc) S.empty
 
-toDotNodes :: Show a => Nodes a -> String
-toDotNodes = concat . S.toList  . (S.map (\x -> show x ++ ";\n"))
+escape :: String -> String
+escape = map (\x -> if x == '"' then ' ' else x)
 
-toDotEdges :: Show a => Edges a -> String
-toDotEdges = concat . S.toList . (S.map (\(x, y) -> show x ++ " -- " ++ show y ++ ";\n"))
+toDotNodes :: (Show a, Show b) => [(a, b)] -> String
+toDotNodes = concatMap (\(x, y) -> show y ++ " [label=\"" ++ (escape . show) x ++ "\"];\n")
+
+toDotEdges :: Show a => [(a, a)] -> String
+toDotEdges = concatMap (\(x, y) -> show x ++ " -- " ++ show y ++ ";\n")
 
 toDot :: (Show a, Ord a) => Graph a -> String
-toDot (Graph nodes edges) = "graph { \n" ++ toDotNodes nodes ++ ((toDotEdges . removeDuplicateEdges) edges) ++ "}\n"
+toDot (Graph nodes edges) = 
+    let
+        nodesMapping = M.fromList $ zip (S.toList nodes) [0..]
+        edgesMapping = S.map (\(x, y) -> (fromJust (M.lookup x nodesMapping), fromJust (M.lookup y nodesMapping))) (removeDuplicateEdges edges)
+    in "graph { \n" ++ toDotNodes (M.toList nodesMapping) ++ (toDotEdges (S.toList edgesMapping)) ++ "}\n"
