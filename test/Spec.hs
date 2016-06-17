@@ -395,11 +395,11 @@ main = hspec $ do
             let ast = scan_and_parse "int a; int b = 2; char c = 'a'; int v[5]; int tiny() {}"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerateData tac st `shouldBe` [NASMData "a" DWORDADDRESS [0],NASMData "b" DWORDADDRESS [2],NASMData "c" BYTEADDRESS [97],NASMData "v" DWORDADDRESS [0,0,0,0,0]]
+            nasmGenerateData tac st `shouldBe` [NASMData "a" DD [0],NASMData "b" DD [2],NASMData "c" DB [97],NASMData "v" DD [0,0,0,0,0]]
             let ast = scan_and_parse "int a; int tiny() { int b; } int c;"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerateData tac st `shouldBe` [NASMData "a" DWORDADDRESS [0],NASMData "c" DWORDADDRESS [0]]
+            nasmGenerateData tac st `shouldBe` [NASMData "a" DD [0],NASMData "c" DD [0]]
         it "Generates a simple tiny function" $ do
             let ast = scan_and_parse "int tiny() {}"
             let st = symbolTable ast
@@ -414,7 +414,7 @@ main = hspec $ do
             let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); return d; }"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DWORDADDRESS [0]] [LABEL "tiny",CALL "_exit"]
+            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [0]] [LABEL "tiny",CALL "_exit"]
         it "Generates functions with arguments and calling convention" $ do
             let ast = scan_and_parse "int tiny() { int a = 2; f(5, a); } int f(int x, int y) { return x + y; }"
             let st = symbolTable ast
@@ -425,7 +425,7 @@ main = hspec $ do
             let ast = scan_parse_check code
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DWORDADDRESS [5],NASMData "b" DWORDADDRESS [2],NASMData "c" DWORDADDRESS [4],NASMData "d" DWORDADDRESS [3]] [LABEL "tiny",SUB4 (Register SP DWORD) 4,CALL "_exit"]
+            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [5],NASMData "b" DD [2],NASMData "c" DD [4],NASMData "d" DD [3]] [LABEL "tiny",SUB4 (Register SP DWORD) 4,CALL "_exit"]
     describe "Tests live variable analysis" $ do
         it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"

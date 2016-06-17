@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
 
-module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, nasmShow, NASMProgram(..), NASMData(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
+module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, nasmShow, NASMProgram(..), NASMData(..), DataSize(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
 
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -12,6 +12,8 @@ import Text.Printf
 import Data.List
 import Data.Maybe (fromJust)
 import Data.Foldable (foldrM)
+import Numeric (showHex)
+import Data.Char (toLower)
 
 
 import TACGenerator
@@ -32,11 +34,11 @@ nasmGenerateText p = evalState (evalStateT (nasmGenerateTextReal (snd p)) M.empt
 nasmGenerateDataReal :: [TACInstruction] -> SRSS [NASMData]
 nasmGenerateDataReal = return . (map decl)
     where 
-          decl (TACCopy s (TACInt i)) = NASMData s DWORDADDRESS [i]
+          decl (TACCopy s (TACInt i)) = NASMData s DD [i]
 
-          decl (TACCopy s (TACChar c)) = NASMData s BYTEADDRESS [ord c]
+          decl (TACCopy s (TACChar c)) = NASMData s DB [ord c]
 
-          decl (TACArrayDecl s xs) = NASMData s DWORDADDRESS (map (\(TACInt i) -> i) xs)
+          decl (TACArrayDecl s xs) = NASMData s DD (map (\(TACInt i) -> i) xs)
 
 
 nasmGenerateTextReal :: [TACFunction] -> SRSS [NASMInstruction]
@@ -118,7 +120,10 @@ data VariableLocation = InRegister RegisterName
 data NASMProgram = NASMProgram [NASMData] [NASMInstruction]
     deriving (Eq, Show)
 
-data NASMData = NASMData Label AddressSize [Int]
+data NASMData = NASMData Label DataSize [Int]
+    deriving (Eq, Show)
+
+data DataSize = DB | DW | DD
     deriving (Eq, Show)
 
 data NASMInstruction = LABEL Label
@@ -173,12 +178,12 @@ data NASMInstruction = LABEL Label
                      | NOT2 Address
                      | SHL1 Register Constant -- Constant must be 8-bit value
                      | SHL2 Address Constant -- Constant must be 8-bit value
-                     | SHL3 Register Register -- Second Register must be CL
-                     | SHL4 Address Register -- Second Register must be CL
+                     | SHL3 Register -- Shift by the value in CL
+                     | SHL4 Address -- Shift by the value in CL
                      | SHR1 Register Constant -- Constant must be 8-bit value
                      | SHR2 Address Constant -- Constant must be 8-bit value
-                     | SHR3 Register Register -- Second Register must be CL
-                     | SHR4 Address Register -- Second Register must be CL
+                     | SHR3 Register -- Shift by the value in CL
+                     | SHR4 Address -- Shift by the value in CL
                      | JMP Label
                      | JE Label
                      | JNE Label
@@ -246,12 +251,111 @@ instance NASMShow NASMProgram where
 instance NASMShow NASMData where
     nasmShow (NASMData l size vs) = printf "\t%s: %s\t" l (nasmShow size) ++ intercalate "," [printf "%d" v | v <- vs]
 
+instShow :: String -> [String] -> String
+instShow inst ops = inst ++ " " ++ intercalate ", " ops
+
 instance NASMShow NASMInstruction where
     nasmShow (LABEL l) = printf "%s:" l
-    nasmShow (RET) = "ret"
+    nasmShow (MOV1 size r1 r2) = instShow "mov" [nasmShow (Register r1 size), nasmShow (Register r2 size)]
+    nasmShow (MOV2 reg addr) = instShow "mov" [nasmShow reg, nasmShow addr]
+    nasmShow (MOV3 addr reg) = instShow "mov" [nasmShow addr, nasmShow reg]
+    nasmShow (MOV4 reg cst) = instShow "mov" [nasmShow reg, nasmShow cst]
+    nasmShow (MOV5 size addr cst) = "mov " ++ nasmShow size ++ " " ++ nasmShow addr ++ "," ++ nasmShow cst
+    nasmShow (PUSH1 rname ) = instShow "push" [nasmShow (Register rname DWORD)]
+    nasmShow (PUSH2 addr) = instShow "push" [nasmShow addr]
+    nasmShow (PUSH3 cst) = instShow "push" [nasmShow cst]
+    nasmShow (POP1 rname ) = instShow "pop" [nasmShow (Register rname DWORD)]
+    nasmShow (POP2 addr) = instShow "pop" [nasmShow addr]
+    nasmShow (LEA rname addr ) = instShow "lea" [nasmShow (Register rname DWORD), nasmShow addr]
+    nasmShow (ADD1 size r1 r2) = instShow "add" [nasmShow (Register r1 size), nasmShow (Register r2 size)]
+    nasmShow (ADD2 reg addr) = instShow "add" [nasmShow reg, nasmShow addr]
+    nasmShow (ADD3 addr reg) = instShow "add" [nasmShow addr, nasmShow reg]
+    nasmShow (ADD4 reg cst) = instShow "add" [nasmShow reg, nasmShow cst]
+    nasmShow (ADD5 addr cst) = instShow "add" [nasmShow addr, nasmShow cst]
+    nasmShow (SUB1 size r1 r2) = instShow "sub" [nasmShow (Register r1 size), nasmShow (Register r2 size)]
+    nasmShow (SUB2 reg addr) = instShow "sub" [nasmShow reg, nasmShow addr]
+    nasmShow (SUB3 addr reg) = instShow "sub" [nasmShow addr, nasmShow reg]
+    nasmShow (SUB4 reg cst) = instShow "sub" [nasmShow reg, nasmShow cst]
+    nasmShow (SUB5 addr cst) = instShow "sub" [nasmShow addr, nasmShow cst]
+    nasmShow (INC1 reg) = instShow "inc" [nasmShow reg]
+    nasmShow (INC2 addr) = instShow "inc" [nasmShow addr]
+    nasmShow (DEC1 reg) = instShow "dec" [nasmShow reg]
+    nasmShow (DEC2 addr) = instShow "dec" [nasmShow addr]
+    nasmShow (IMUL1 r1 r2) = instShow "imul" [nasmShow (Register r1 DWORD), nasmShow (Register r2 DWORD)]
+    nasmShow (IMUL2 rname addr ) = instShow "imul" [nasmShow (Register rname DWORD), nasmShow addr]
+    nasmShow (IMUL3 r1 r2 cst ) = instShow "imul" [nasmShow (Register r1 DWORD), nasmShow (Register r2 DWORD), nasmShow cst]
+    nasmShow (IMUL4 rname addr cst ) = instShow "imul" [nasmShow (Register rname DWORD), nasmShow addr, nasmShow cst]
+    nasmShow (IDIV1 rname ) = instShow "idiv" [nasmShow (Register rname DWORD)]
+    nasmShow (IDIV2 addr) = instShow "idiv" [nasmShow addr]
+    nasmShow (AND1 size r1 r2) = instShow "and" [nasmShow (Register r1 size), nasmShow (Register r2 size)]
+    nasmShow (AND2 reg addr) = instShow "and" [nasmShow reg, nasmShow addr]
+    nasmShow (AND3 addr reg) = instShow "and" [nasmShow addr, nasmShow reg]
+    nasmShow (AND4 reg cst) = instShow "and" [nasmShow reg, nasmShow cst]
+    nasmShow (AND5 addr cst) = instShow "and" [nasmShow addr, nasmShow cst]
+    nasmShow (OR1 size r1 r2) = instShow "or" [nasmShow (Register r1 size), nasmShow (Register r2 size)]
+    nasmShow (OR2 reg addr) = instShow "or" [nasmShow reg, nasmShow addr]
+    nasmShow (OR3 addr reg) = instShow "or" [nasmShow addr, nasmShow reg]
+    nasmShow (OR4 reg cst) = instShow "or" [nasmShow reg, nasmShow cst]
+    nasmShow (OR5 addr cst) = instShow "or" [nasmShow addr, nasmShow cst]
+    nasmShow (XOR1 size r1 r2) = instShow "xor" [nasmShow (Register r1 size), nasmShow (Register r2 size)]
+    nasmShow (XOR2 reg addr) = instShow "xor" [nasmShow reg, nasmShow addr]
+    nasmShow (XOR3 addr reg) = instShow "xor" [nasmShow addr, nasmShow reg]
+    nasmShow (XOR4 reg cst) = instShow "xor" [nasmShow reg, nasmShow cst]
+    nasmShow (XOR5 addr cst) = instShow "xor" [nasmShow addr, nasmShow cst]
+    nasmShow (NOT1 reg) = instShow "not" [nasmShow reg]
+    nasmShow (NOT2 addr) = instShow "not" [nasmShow addr]
+    nasmShow (SHL1 reg cst) = instShow "shl" [nasmShow reg, nasmShow cst]
+    nasmShow (SHL2 addr cst) = instShow "shl" [nasmShow addr, nasmShow cst]
+    nasmShow (SHL3 reg) = instShow "shl" [nasmShow reg, "cl"]
+    nasmShow (SHL4 addr) = instShow "shl" [nasmShow addr, "cl"]
+    nasmShow (SHR1 reg cst) = instShow "shr" [nasmShow reg, nasmShow cst]
+    nasmShow (SHR2 addr cst) = instShow "shr" [nasmShow addr, nasmShow cst]
+    nasmShow (SHR3 reg) = instShow "shr" [nasmShow reg, "cl"]
+    nasmShow (SHR4 addr) = instShow "shr" [nasmShow addr, "cl"]
+    nasmShow (JMP label) = instShow "jmp" [nasmShow label]
+    nasmShow (JE label) = instShow "je" [nasmShow label]
+    nasmShow (JNE label) = instShow "jne" [nasmShow label]
+    nasmShow (JZ label) = instShow "jz" [nasmShow label]
+    nasmShow (JG label) = instShow "jg" [nasmShow label]
+    nasmShow (JGE label) = instShow "jge" [nasmShow label]
+    nasmShow (JL label) = instShow "jl" [nasmShow label]
+    nasmShow (JLE label) = instShow "jle" [nasmShow label]
+    nasmShow (CMP1 r1 r2) = instShow "cmp" [nasmShow r1, nasmShow r2]
+    nasmShow (CMP2 reg addr) = instShow "cmp" [nasmShow reg, nasmShow addr]
+    nasmShow (CMP3 addr reg) = instShow "cmp" [nasmShow addr, nasmShow reg]
+    nasmShow (CMP4 reg cst) = instShow "cmp" [nasmShow reg, nasmShow cst]
     nasmShow (CALL l) = printf "call %s" l
+    nasmShow (RET) = "ret"
+    nasmShow (INTERRUPT cst) = instShow "int" [showHex cst ""]
 
 instance NASMShow AddressSize where
-    nasmShow BYTEADDRESS = "db"
-    nasmShow WORDADDRESS = "dw"
-    nasmShow DWORDADDRESS = "dd"
+    nasmShow BYTEADDRESS = "dword"
+    nasmShow WORDADDRESS = "word"
+    nasmShow DWORDADDRESS = "byte"
+
+instance NASMShow Address where
+    nasmShow (Address reg mult offset) = "[" ++ nasmShow reg ++ "+" ++ nasmShow mult ++ "*" ++ nasmShow offset ++ "]"
+    nasmShow (AddressBase r1 r2 mult offset) = "[" ++ nasmShow r1 ++ "+" ++ nasmShow r2 ++ "*" ++ nasmShow mult ++ "+" ++ nasmShow offset ++ "]"
+    nasmShow (AddressLabel label offset) = "[" ++ nasmShow label ++ "+" ++ nasmShow offset ++ "]"
+instance NASMShow Multiplier where
+    nasmShow = show
+
+instance NASMShow Char where
+    nasmShow = show
+
+instance NASMShow DataSize where
+    nasmShow = (map toLower) . show
+
+instance NASMShow RegisterName where
+    nasmShow = (map toLower) . show
+
+instance NASMShow Register where
+    nasmShow (Register name size) = 
+        let (prev, next) = case size of
+                                DWORD -> ("e", "x")
+                                WORD -> ("", "x")
+                                MSB -> ("", "h")
+                                LSB -> ("", "l")
+        in  if name `elem` [SI, DI, BP, SP]
+                then prev ++ nasmShow name
+            else prev ++ nasmShow name ++ next
