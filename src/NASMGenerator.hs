@@ -94,7 +94,8 @@ instance NASMGenerator TACFunction where
         let locals = (variables \\ globals) \\ params
         localMapping <- foldrM (foldLocal spilled varRegMap) (M.empty, 0) locals
         paramMapping <- foldrM (foldParam spilled varRegMap) (M.empty, 8) params
-        let totalMapping = M.unions $ map fst [paramMapping, localMapping]
+        let globalMapping = M.fromList $ map (\x -> (x, (varRegMap M.! x, InMemory x))) globals
+        let totalMapping = M.unions $ (map fst [paramMapping, localMapping] ++ [globalMapping])
         put totalMapping
         pre <- nasmGeneratePreFunction funcName
         nasmIS <- (mapM nasmGenerateInstructions ((tail . init) is)) >>= return . concat
