@@ -11,12 +11,14 @@ import Data.String.Builder
 import Text.Printf
 import Data.List
 import Data.Maybe (fromJust)
+import Data.Foldable (foldrM)
 
 
 import TACGenerator
 import SymbolTable
 import TACAnalysis
 import Graph
+import Parser (Type(..))
 
 nasmGenerate :: TACProgram -> SymbolTable -> NASMProgram
 nasmGenerate p = NASMProgram <$> nasmGenerateData p <*> nasmGenerateText p
@@ -38,7 +40,12 @@ nasmGenerateDataReal = return . (map decl)
 
 
 nasmGenerateTextReal :: [TACFunction] -> SRSS [NASMInstruction]
-nasmGenerateTextReal functions = mapM nasmGenerateInstructions functions >>= (return . concat)
+nasmGenerateTextReal functions = do
+    st <- lift get
+    case nextDF st of
+        Nothing -> lift $ put st
+        (Just x) -> lift $ put x
+    mapM nasmGenerateInstructions functions >>= (return . concat)
 
 class Show a => NASMGenerator a where
     nasmGenerateInstructions :: a -> SRSS [NASMInstruction]
@@ -57,48 +64,29 @@ nasmGeneratePostFunction name = do
 labelToName :: TACInstruction -> String
 labelToName (TACLabel x) = x
 
-mapGlobal :: RegisterMapping -> Variable -> (Variable, VariableLocation)
-mapGlobal varInRegisters v = 
-    if v `elem` M.keys varInRegisters
-        then (v, InRegister (registers !! fromJust (M.lookup v varInRegisters)))
-    else (v, InMemory v)
-
-mapParameter :: RegisterMapping -> Symbols -> Variable -> (Variable, VariableLocation)
-mapParameter varInRegisters funcParams p = 
-    if p `elem` M.keys varInRegisters
-        then (p, InRegister (registers !! fromJust (M.lookup p varInRegisters)))
-    else case elemIndex p (M.keys funcParams) of
-        Nothing -> error "no parameter lolol"
-        (Just x) -> (p, InStack (8+x*4))
-
-mapLocal :: RegisterMapping -> Spilled -> Variable -> (Variable, VariableLocation)
-mapLocal varInRegisters varSpilled v = 
-    if v `elem` M.keys varInRegisters
-        then (v, InRegister (registers !! fromJust (M.lookup v varInRegisters)))
-    else case elemIndex v varSpilled of
-        Nothing -> error "no local lolol"
-        (Just x) -> (v, InStack (-4-x*4))
+foldLocal :: Spilled -> M.Map String RegisterName -> Variable -> (M.Map String (RegisterName, VariableLocation), Offset) -> SRSS (M.Map String (RegisterName, VariableLocation), Offset)
+foldLocal spilled rMapping var (mapping, offset) = do
+    t <- lift (gets (infoType . (unsafeGetSymbolInfo var)))
+    let newoffset = offset - (if t == IntType then 4 else 1)
+    if var `elem` spilled
+        then return (M.insert var (rMapping M.! var, InStack newoffset) mapping, newoffset)
+    else return (M.insert var (rMapping M.! var, InRegister (rMapping M.! var)) mapping, offset)
 
 instance NASMGenerator TACFunction where
     nasmGenerateInstructions xs = do
         let funcName = (labelToName . head) xs
-        funcInfo <- lift $ gets $ unsafeGetSymbolInfo funcName
-        let funcParams = infoParams funcInfo
-        let rig = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) xs
-        let (registerMapping, spilled, is) = mapVariablesToRegisters xs (length registers)
+        let (varIntMap, spilled, is) = mapVariablesToRegisters xs (length registers)
+        let varRegMap = M.map (\v -> registers !! v) varIntMap
+        let variables = M.keys varRegMap
         st <- lift get
-        let notspilled = M.filterWithKey (\x _ -> not (x `elem` spilled)) registerMapping
-        let topLevel = root st
-        let globalVariables = M.keys $ M.filter (\x -> case x of VarInfo _ _ _ -> True; FuncInfo _ _ -> False) (symbols topLevel)
-        let globalMapping = M.fromList $ map (mapGlobal notspilled) globalVariables
-        let parametersMapping = M.fromList $ map (mapParameter notspilled funcParams) (values rig)
-        let localMapping = M.fromList $ map (mapLocal notspilled spilled) (values rig)
-        let variableMapping = M.unions [globalMapping, parametersMapping, localMapping]
-        put variableMapping
+        let locals = filter (flip memberST st) variables
+        localMapping <- foldrM (foldLocal spilled varRegMap) (M.empty, 0) locals
+        let totalMapping = M.unions $ map fst [localMapping]
+        put totalMapping
         pre <- nasmGeneratePreFunction funcName
         nasmIS <- (mapM nasmGenerateInstructions ((tail . init) is)) >>= return . concat
         post <- nasmGeneratePostFunction funcName
-        return $ pre ++ nasmIS ++ post
+        traceShow totalMapping $ return $ pre ++ nasmIS ++ post
 
 
 instance NASMGenerator TACInstruction where
@@ -107,7 +95,7 @@ instance NASMGenerator TACInstruction where
 
 type SRSS = StateT RegisterState (State SymbolTable)
 
-type RegisterState = M.Map String VariableLocation
+type RegisterState = M.Map String (RegisterName, VariableLocation)
 
 data VariableLocation = InRegister RegisterName
                       | InMemory Label

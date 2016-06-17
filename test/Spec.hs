@@ -411,7 +411,7 @@ main = hspec $ do
             let tac = tacGenerate ast
             nasmGenerateText tac st `shouldBe` [LABEL "tiny",CALL "_exit",LABEL "f",RET]
         it "Generates a few declarations and computations" $ do
-            let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); }"
+            let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); return d; }"
             let st = symbolTable ast
             let tac = tacGenerate ast
             nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DWORDADDRESS [0]] [LABEL "tiny",CALL "_exit"]
