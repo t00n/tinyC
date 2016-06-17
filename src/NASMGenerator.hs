@@ -45,16 +45,18 @@ nasmGenerateTextReal functions = mapM nasmGenerateInstructions functions >>= (re
 class Show a => NASMGenerator a where
     nasmGenerateInstructions :: a -> SRSS [NASMInstruction]
 
-nasmGeneratePreFunction :: Label -> SRSS [NASMInstruction]
-nasmGeneratePreFunction "tiny" = return [LABEL "tiny"]
-nasmGeneratePreFunction name = do
+nasmGeneratePreFunction :: Label -> Offset -> SRSS [NASMInstruction]
+nasmGeneratePreFunction name offset = do
     info <- lift $ gets $ unsafeGetSymbolInfo name
-    return [LABEL name]
+    let allocateLocal = if offset == 0 then [] else [SUB4 (Register SP DWORD) (-offset)]
+    if name == "tiny" 
+        then return $ LABEL name:allocateLocal
+        else return $ [LABEL name, PUSH1 BP, MOV1 DWORD BP SP] ++ allocateLocal ++ [PUSH1 B, PUSH1 SI, PUSH1 DI]
 
 nasmGeneratePostFunction :: Label -> SRSS [NASMInstruction]
 nasmGeneratePostFunction "tiny" = return [CALL "_exit"]
 nasmGeneratePostFunction name = do
-    return [RET]
+    return [POP1 DI, POP1 SI, POP1 B, MOV1 DWORD SP BP, POP1 BP, RET]
 
 labelToName :: TACInstruction -> String
 labelToName (TACLabel x) = x
@@ -89,15 +91,15 @@ instance NASMGenerator TACFunction where
         params <- lift (gets (M.keys . infoParams . (unsafeGetSymbolInfo funcName)))
         let globals = filter (flip nameInParent st) variables
         let locals = (variables \\ globals) \\ params
-        localMapping <- foldrM (foldLocal spilled varRegMap) (M.empty, 0) locals
+        (localMapping, offset) <- foldrM (foldLocal spilled varRegMap) (M.empty, 0) locals
         paramMapping <- foldrM (foldParam varRegMap) (M.empty, 8) (reverse params)
         let globalMapping = M.fromList $ map (\x -> (x, (varRegMap M.! x, InMemory x))) globals
-        let totalMapping = M.unions $ (map fst [paramMapping, localMapping] ++ [globalMapping])
+        let totalMapping = M.unions $ (fst paramMapping:localMapping:[globalMapping])
         put totalMapping
-        pre <- nasmGeneratePreFunction funcName
+        pre <- nasmGeneratePreFunction funcName offset
         nasmIS <- (mapM nasmGenerateInstructions ((tail . init) is)) >>= return . concat
         post <- nasmGeneratePostFunction funcName
-        traceShow totalMapping $ return $ pre ++ nasmIS ++ post
+        return $ pre ++ nasmIS ++ post
 
 
 instance NASMGenerator TACInstruction where

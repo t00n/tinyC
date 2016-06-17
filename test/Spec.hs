@@ -409,7 +409,7 @@ main = hspec $ do
             let ast = scan_and_parse "int tiny() {} int f() {}"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerateText tac st `shouldBe` [LABEL "tiny",CALL "_exit",LABEL "f",RET]
+            nasmGenerateText tac st `shouldBe` [LABEL "tiny",CALL "_exit",LABEL "f",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET]
         it "Generates a few declarations and computations" $ do
             let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); return d; }"
             let st = symbolTable ast
@@ -419,13 +419,13 @@ main = hspec $ do
             let ast = scan_and_parse "int tiny() { int a = 2; f(5, a); } int f(int x, int y) { return x + y; }"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "tiny",CALL "_exit",LABEL "f",RET]
+            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "tiny",CALL "_exit",LABEL "f",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET]
         it "Generates code for bigprogram.c" $ do
             code <- readFile "test/fixtures/bigprogram.c"
             let ast = scan_parse_check code
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DWORDADDRESS [5],NASMData "b" DWORDADDRESS [2],NASMData "c" DWORDADDRESS [4],NASMData "d" DWORDADDRESS [3]] [LABEL "tiny",CALL "_exit"]
+            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DWORDADDRESS [5],NASMData "b" DWORDADDRESS [2],NASMData "c" DWORDADDRESS [4],NASMData "d" DWORDADDRESS [3]] [LABEL "tiny",SUB4 (Register SP DWORD) 4,CALL "_exit"]
     describe "Tests live variable analysis" $ do
         it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"
