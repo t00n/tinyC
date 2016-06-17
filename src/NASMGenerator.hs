@@ -66,8 +66,10 @@ labelToName (TACLabel x) = x
 
 foldLocal :: Spilled -> M.Map String RegisterName -> Variable -> (M.Map String (RegisterName, VariableLocation), Offset) -> SRSS (M.Map String (RegisterName, VariableLocation), Offset)
 foldLocal spilled rMapping var (mapping, offset) = do
-    t <- lift (gets (infoType . (unsafeGetSymbolInfo var)))
-    let newoffset = offset - (if t == IntType then 4 else 1)
+    info <- lift (gets (getSymbolInfo var))
+    let newoffset = case info of
+            Nothing -> offset - 4
+            (Just x) -> offset - (if (infoType x) == IntType then 4 else 1)
     if var `elem` spilled
         then return (M.insert var (rMapping M.! var, InStack newoffset) mapping, newoffset)
     else return (M.insert var (rMapping M.! var, InRegister (rMapping M.! var)) mapping, offset)
@@ -87,8 +89,9 @@ instance NASMGenerator TACFunction where
         let varRegMap = M.map (\v -> registers !! v) varIntMap
         let variables = M.keys varRegMap
         st <- lift get
-        let locals = filter (flip memberST st) variables
         params <- lift (gets (M.keys . infoParams . (unsafeGetSymbolInfo funcName)))
+        let globals = filter (flip nameInParent st) variables
+        let locals = (variables \\ globals) \\ params
         localMapping <- foldrM (foldLocal spilled varRegMap) (M.empty, 0) locals
         paramMapping <- foldrM (foldParam spilled varRegMap) (M.empty, 8) params
         let totalMapping = M.unions $ map fst [paramMapping, localMapping]
