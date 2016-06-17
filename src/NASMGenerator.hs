@@ -40,12 +40,7 @@ nasmGenerateDataReal = return . (map decl)
 
 
 nasmGenerateTextReal :: [TACFunction] -> SRSS [NASMInstruction]
-nasmGenerateTextReal functions = do
-    st <- lift get
-    case nextDF st of
-        Nothing -> lift $ put st
-        (Just x) -> lift $ put x
-    mapM nasmGenerateInstructions functions >>= (return . concat)
+nasmGenerateTextReal functions = mapM nasmGenerateInstructions functions >>= (return . concat)
 
 class Show a => NASMGenerator a where
     nasmGenerateInstructions :: a -> SRSS [NASMInstruction]
@@ -74,26 +69,28 @@ foldLocal spilled rMapping var (mapping, offset) = do
         then return (M.insert var (rMapping M.! var, InStack newoffset) mapping, newoffset)
     else return (M.insert var (rMapping M.! var, InRegister (rMapping M.! var)) mapping, offset)
 
-foldParam :: Spilled -> M.Map String RegisterName -> Variable -> (M.Map String (RegisterName, VariableLocation), Offset) -> SRSS (M.Map String (RegisterName, VariableLocation), Offset)
-foldParam spilled rMapping var (mapping, offset) = do
+foldParam :: M.Map String RegisterName -> Variable -> (M.Map String (RegisterName, VariableLocation), Offset) -> SRSS (M.Map String (RegisterName, VariableLocation), Offset)
+foldParam rMapping var (mapping, offset) = do
     t <- lift (gets (infoType . (unsafeGetSymbolInfo var)))
     let newoffset = offset + (if t == IntType then 4 else 1)
-    if var `elem` spilled
-        then return (M.insert var (rMapping M.! var, InStack offset) mapping, newoffset)
-    else return (M.insert var (rMapping M.! var, InRegister (rMapping M.! var)) mapping, offset)
+    return (M.insert var (rMapping M.! var, InStack offset) mapping, newoffset)
 
 instance NASMGenerator TACFunction where
     nasmGenerateInstructions xs = do
+        st <- lift get
+        case nextDF st of
+            Nothing -> lift $ put st
+            (Just x) -> lift $ put x
         let funcName = (labelToName . head) xs
         let (varIntMap, spilled, is) = mapVariablesToRegisters xs (length registers)
-        let varRegMap = M.map (\v -> registers !! v) varIntMap
+        let varRegMap = M.map (\v -> registers !! v) varIntMap `M.union` M.fromList (map (\x -> (x, last registers)) spilled)
         let variables = M.keys varRegMap
         st <- lift get
         params <- lift (gets (M.keys . infoParams . (unsafeGetSymbolInfo funcName)))
         let globals = filter (flip nameInParent st) variables
         let locals = (variables \\ globals) \\ params
         localMapping <- foldrM (foldLocal spilled varRegMap) (M.empty, 0) locals
-        paramMapping <- foldrM (foldParam spilled varRegMap) (M.empty, 8) params
+        paramMapping <- foldrM (foldParam varRegMap) (M.empty, 8) (reverse params)
         let globalMapping = M.fromList $ map (\x -> (x, (varRegMap M.! x, InMemory x))) globals
         let totalMapping = M.unions $ (map fst [paramMapping, localMapping] ++ [globalMapping])
         put totalMapping
