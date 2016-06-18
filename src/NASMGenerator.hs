@@ -55,10 +55,9 @@ nasmGeneratePreFunction name offset = do
         then return $ LABEL name:allocateLocal
         else return $ [LABEL name, PUSH1 BP, MOV1 DWORD BP SP] ++ allocateLocal ++ [PUSH1 B, PUSH1 SI, PUSH1 DI]
 
-nasmGeneratePostFunction :: Label -> SRSS [NASMInstruction]
-nasmGeneratePostFunction "tiny" = return [CALL "_exit"]
-nasmGeneratePostFunction name = do
-    return [POP1 DI, POP1 SI, POP1 B, MOV1 DWORD SP BP, POP1 BP, RET]
+nasmGeneratePostFunction :: Label -> TACInstruction -> SRSS [NASMInstruction]
+nasmGeneratePostFunction "tiny" _ = return [CALL "_exit"]
+nasmGeneratePostFunction _ inst = nasmGenerateInstructions inst
 
 labelToName :: TACInstruction -> String
 labelToName (TACLabel x) = x
@@ -100,12 +99,41 @@ instance NASMGenerator TACFunction where
         put totalMapping
         pre <- nasmGeneratePreFunction funcName offset
         nasmIS <- (mapM nasmGenerateInstructions ((tail . init) is)) >>= return . concat
-        post <- nasmGeneratePostFunction funcName
+        post <- nasmGeneratePostFunction funcName (last is)
         return $ pre ++ nasmIS ++ post
 
 
+retFunction :: [NASMInstruction]
+retFunction = [POP1 DI, POP1 SI, POP1 B, MOV1 DWORD SP BP, POP1 BP, RET]
+
 instance NASMGenerator TACInstruction where
-    nasmGenerateInstructions (TACLabel l) = return [LABEL l]
+    --nasmGenerateInstructions (TACBinary var TACExpression TACBinaryOperator TACExpression) = 
+    --nasmGenerateInstructions (TACUnary var TACUnaryOperator TACExpression) = 
+    --nasmGenerateInstructions (TACCopy var TACExpression) = 
+    --nasmGenerateInstructions (TACArrayDecl var [TACExpression]) = 
+    --nasmGenerateInstructions (TACArrayAccess var TACExpression) = 
+    --nasmGenerateInstructions (TACArrayModif TACExpression TACExpression) = 
+    --nasmGenerateInstructions (TACLoad var) = 
+    --nasmGenerateInstructions (TACStore var) = 
+    --nasmGenerateInstructions (TACIf TACExpression label) = 
+    --nasmGenerateInstructions (TACGoto label) = 
+    --nasmGenerateInstructions (TACCall label [TACExpression]) = 
+    nasmGenerateInstructions (TACReturn Nothing) = return retFunction
+    nasmGenerateInstructions (TACReturn (Just ex)) = do
+        mapping <- get 
+        return (
+            (case ex of
+                (TACInt i) -> [MOV4 (Register A DWORD) i]
+                (TACChar c) -> [MOV4 (Register A DWORD) (ord c)]
+                (TACVar var) -> 
+                    let reg = fst (mapping M.! var) 
+                    in  if reg == A then []
+                        else [MOV1 DWORD A reg]
+                -- TACArray TODO
+            ) ++ retFunction)
+    nasmGenerateInstructions (TACLabel label) = return [LABEL label]
+    --nasmGenerateInstructions (TACWrite TACExpression) = 
+    --nasmGenerateInstructions (TACRead TACExpression) = 
     nasmGenerateInstructions _ = return []
 
 type SRSS = StateT RegisterState (State SymbolTable)
@@ -130,7 +158,7 @@ data NASMInstruction = LABEL Label
                      | MOV1 RegisterSize RegisterName RegisterName
                      | MOV2 Register Address
                      | MOV3 Address Register
-                     | MOV4 Register Int
+                     | MOV4 Register Constant
                      | MOV5 AddressSize Address Constant
                      | PUSH1 RegisterName -- Only 32-bit register
                      | PUSH2 Address
