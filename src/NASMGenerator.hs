@@ -26,10 +26,10 @@ nasmGenerate :: TACProgram -> SymbolTable -> NASMProgram
 nasmGenerate p = NASMProgram <$> nasmGenerateData p <*> nasmGenerateText p
 
 nasmGenerateData :: TACProgram -> SymbolTable -> [NASMData]
-nasmGenerateData p = evalState (evalStateT (nasmGenerateDataReal (fst p)) M.empty)
+nasmGenerateData p st = evalState (evalStateT (evalStateT (nasmGenerateDataReal (fst p)) M.empty) st) (Flags False)
 
 nasmGenerateText :: TACProgram -> SymbolTable -> [NASMInstruction]
-nasmGenerateText p = evalState (evalStateT (nasmGenerateTextReal (snd p)) M.empty)
+nasmGenerateText p st = evalState (evalStateT (evalStateT (nasmGenerateTextReal (snd p)) M.empty) st) (Flags False)
 
 nasmGenerateDataReal :: [TACInstruction] -> SRSS [NASMData]
 nasmGenerateDataReal = return . (map decl)
@@ -52,12 +52,12 @@ nasmGeneratePreFunction name offset = do
     info <- lift $ gets $ unsafeGetSymbolInfo name
     let allocateLocal = if offset == 0 then [] else [SUB4 (Register SP DWORD) (-offset)]
     if name == "tiny" 
-        then return $ LABEL name:allocateLocal
-        else return $ [LABEL name, PUSH1 BP, MOV1 DWORD BP SP] ++ allocateLocal ++ [PUSH1 B, PUSH1 SI, PUSH1 DI]
+        then (lift $ lift $ put (Flags True)) >> return (LABEL name:allocateLocal)
+    else return $ [LABEL name, PUSH1 BP, MOV1 DWORD BP SP] ++ allocateLocal ++ [PUSH1 B, PUSH1 SI, PUSH1 DI]
 
-nasmGeneratePostFunction :: Label -> TACInstruction -> SRSS [NASMInstruction]
-nasmGeneratePostFunction "tiny" _ = return [CALL "_exit"]
-nasmGeneratePostFunction _ inst = nasmGenerateInstructions inst
+nasmGeneratePostFunction :: Label -> SRSS ()
+nasmGeneratePostFunction "tiny" = lift $ lift $ put (Flags False)
+nasmGeneratePostFunction _ = return ()
 
 labelToName :: TACInstruction -> String
 labelToName (TACLabel x) = x
@@ -98,13 +98,16 @@ instance NASMGenerator TACFunction where
         let totalMapping = M.unions $ (fst paramMapping:localMapping:[globalMapping])
         put totalMapping
         pre <- nasmGeneratePreFunction funcName offset
-        nasmIS <- (mapM nasmGenerateInstructions ((tail . init) is)) >>= return . concat
-        post <- nasmGeneratePostFunction funcName (last is)
-        return $ pre ++ nasmIS ++ post
+        nasmIS <- (mapM nasmGenerateInstructions (tail is)) >>= return . concat
+        post <- nasmGeneratePostFunction funcName
+        return $ pre ++ nasmIS
 
 
-retFunction :: [NASMInstruction]
-retFunction = [POP1 DI, POP1 SI, POP1 B, MOV1 DWORD SP BP, POP1 BP, RET]
+retInstructions :: [NASMInstruction]
+retInstructions = [POP1 DI, POP1 SI, POP1 B, MOV1 DWORD SP BP, POP1 BP, RET]
+
+exitInstructions :: [NASMInstruction]
+exitInstructions = [CALL "_exit"]
 
 instance NASMGenerator TACInstruction where
     --nasmGenerateInstructions (TACBinary var TACExpression TACBinaryOperator TACExpression) = 
@@ -118,25 +121,33 @@ instance NASMGenerator TACInstruction where
     --nasmGenerateInstructions (TACIf TACExpression label) = 
     --nasmGenerateInstructions (TACGoto label) = 
     --nasmGenerateInstructions (TACCall label [TACExpression]) = 
-    nasmGenerateInstructions (TACReturn Nothing) = return retFunction
+    nasmGenerateInstructions (TACReturn Nothing) = do
+        (Flags tiny) <- lift $ lift get
+        if tiny then return exitInstructions
+        else return retInstructions
     nasmGenerateInstructions (TACReturn (Just ex)) = do
-        mapping <- get 
-        return (
-            (case ex of
-                (TACInt i) -> [MOV4 (Register A DWORD) i]
-                (TACChar c) -> [MOV4 (Register A DWORD) (ord c)]
-                (TACVar var) -> 
-                    let reg = fst (mapping M.! var) 
-                    in  if reg == A then []
-                        else [MOV1 DWORD A reg]
-                -- TACArray TODO
-            ) ++ retFunction)
+        mapping <- get
+        (Flags tiny) <- lift $ lift get
+        let retValue = case ex of
+                            (TACInt i) -> [MOV4 (Register A DWORD) i]
+                            (TACChar c) -> [MOV4 (Register A DWORD) (ord c)]
+                            (TACVar var) -> 
+                                let reg = fst (mapping M.! var) 
+                                in  if reg == A then []
+                                    else [MOV1 DWORD A reg]
+                            -- TACArray TODO
+        let ret = if tiny then exitInstructions else retInstructions
+        return $ retValue ++ ret
     nasmGenerateInstructions (TACLabel label) = return [LABEL label]
     --nasmGenerateInstructions (TACWrite TACExpression) = 
     --nasmGenerateInstructions (TACRead TACExpression) = 
     nasmGenerateInstructions _ = return []
 
-type SRSS = StateT RegisterState (State SymbolTable)
+type SRSS = StateT RegisterState (StateT SymbolTable (State Flags))
+
+data Flags = Flags {
+    inTiny :: Bool
+}
 
 type RegisterState = M.Map String (RegisterName, VariableLocation)
 
