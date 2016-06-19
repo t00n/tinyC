@@ -92,8 +92,11 @@ root = Z.root
 zipper :: Tree Symbols -> SymbolTable
 zipper = Z.fromTree
 
+unzip :: SymbolTable -> Tree Symbols
+unzip = Z.toTree
+
 symbols :: SymbolTable -> Symbols
-symbols = rootLabel . Z.toTree
+symbols = Z.label
 
 memberST :: String -> SymbolTable -> Bool
 memberST s stz = (M.member s . rootLabel . Z.tree) stz
@@ -172,8 +175,8 @@ declare decl st = do
     else
         addSymbol decl st
 
-constructBlock :: Statement -> Either SemanticError (Tree Symbols)
-constructBlock (Block ds stmts) = 
+constructBlock :: Statement -> Tree Symbols -> Either SemanticError (Tree Symbols)
+constructBlock (Block ds stmts) st = 
     let isBlock (Block _ _) = True
         isBlock (If _ _) = True
         isBlock (IfElse _ _ _) = True
@@ -181,30 +184,28 @@ constructBlock (Block ds stmts) =
         isBlock _ = False
     in
     do
-    st <- constructSubST ds
-    subst <- mapM constructBlock (filter isBlock stmts)
-    return $ addChildren subst st
-constructBlock (If _ stmt) = constructBlock stmt
-constructBlock (IfElse _ stmt1 stmt2) = do
-    st1 <- constructBlock stmt1
-    st2 <- constructBlock stmt2
-    return $ addChildren [st1, st2] emptyST
-constructBlock (While _ stmt) = constructBlock stmt
-constructBlock _ = return emptyST
+    constructDeclarations ds st >>= flip (foldM (flip constructBlock)) stmts
+constructBlock (If _ stmt) st = constructBlock stmt st
+constructBlock (IfElse _ stmt1 stmt2) st = constructBlock stmt1 st >>= constructBlock stmt2
+constructBlock (While _ stmt) st = constructBlock stmt st
+constructBlock _ st = return st
 
--- SymbolTable construction
-constructSubST :: [Declaration] -> Either SemanticError (Tree Symbols)
-constructSubST ds = 
+constructDeclarations :: [Declaration] -> Tree Symbols -> Either SemanticError (Tree Symbols)
+constructDeclarations ds st = 
     let isFuncDecl (FuncDeclaration _ _ _ _) = True
         isFuncDecl _ = False
         subdecl (FuncDeclaration _ _ ps stmt) = do
-            st <- constructBlock stmt
-            foldM (flip addSymbol) st (map paramToDecl ps)
+            block <- constructBlock stmt emptyST
+            foldM (flip addSymbol) block (map paramToDecl ps)
     in
     do
-    st <- foldM (flip declare) emptyST ds
+    decl <- foldM (flip declare) st ds
     subds <- ((mapM subdecl) . (filter isFuncDecl)) ds
-    Right (addChildren subds st)
+    Right (addChildren subds decl)
+
+-- SymbolTable construction
+constructFunction :: [Declaration] -> Either SemanticError (Tree Symbols)
+constructFunction ds = constructDeclarations ds emptyST
 
 constructST :: [Declaration] -> Either SemanticError SymbolTable
-constructST ds = constructSubST ds >>= (return . fromTree)
+constructST ds = constructFunction ds >>= (return . fromTree)

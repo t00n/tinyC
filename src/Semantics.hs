@@ -3,11 +3,12 @@
 module Semantics (checkSemantics, symbolTable) where
 
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT, throwE)
-import Control.Monad.State (State(..), get, put, modify, runState)
+import Control.Monad.State (State(..), get, put, modify, runState, gets)
 import Data.Maybe (isJust, fromJust)
 import Data.Char (ord)
 import qualified Data.Map as M
-import Debug.Trace (traceShow)
+import Debug.Trace (traceShow, trace)
+import Data.Tree (drawTree)
 
 import Parser
 import Utility
@@ -35,22 +36,21 @@ instance Checkable [Declaration] where
         let isFuncDecl (FuncDeclaration _ _ _ _) = True
             isFuncDecl _ = False
             checkFunc (FuncDeclaration t n ps stmt) = do
+                consumeST
                 newstmt <- check stmt
                 newps <- check ps
                 return $ FuncDeclaration t n newps newstmt
-
         in
         do
             mapM check ds
             mapM (\x -> if isFuncDecl x then checkFunc x else return x) ds
             return ds
 
-consumeST :: SymbolTable -> SymbolTable
-consumeST st = 
-    let next = nextDF st
-    in
+consumeST :: ESSS ()
+consumeST = do
+    next <- gets nextDF
     if next /= Nothing
-        then fromJust next
+        then traceShow (fromJust next) $ put $ fromJust next
     else error "No symbol table anymore ????"
 
 instance Checkable Declaration where
@@ -64,18 +64,17 @@ instance Checkable Statement where
         case stmt of
             Assignment v e -> checkNameDeclared v >> check e >> checkAssignment v e >> return stmt
             If e stmt1 -> check e >> checkExpressionIsScalar e >> check stmt1 >> return stmt
-            IfElse e stmt1 stmt2 -> check e >> checkExpressionIsScalar e >> check stmt1 >> check stmt2 >> return stmt
+            IfElse e stmt1 stmt2 ->  check e >> checkExpressionIsScalar e >> check stmt1 >> check stmt2 >> return stmt
             While e stmt1 -> check e >> checkExpressionIsScalar e >> check stmt1 >> return stmt
             Return e -> check e >> checkExpressionIsScalar e >> return stmt
-            Block decl stmts -> do
-                modify consumeST
-                check decl >> check stmts >> return stmt
+            Block decl stmts -> check decl >> check stmts >> return stmt
             Write e -> check e >> checkExpressionIsScalar e >> return stmt
             Read v -> checkNameDeclared v >> checkNameIsScalarity v Scalar >> return stmt
             Expr e -> check e >> return stmt
 
 instance Checkable Expression where
-    check expr = 
+    check expr = do
+        st <- get
         case expr of 
             BinOp e1 _ e2 -> check e1
                         >> check e2 
@@ -214,10 +213,9 @@ getExpressionScalarity expr = do
 run ::Program -> (Either SemanticError Program, SymbolTable)
 run prog = (runState . runExceptT) (do
     st <- ExceptT $ return $ constructST prog
-    put st
+    trace (drawTree $ fmap show $ SymbolTable.unzip st) $ put st
     entryPointExists prog >>= check)
     (zipper emptyST)
-    --runState (runExceptT (entryPointExists prog >>= check)) (zipper st)
 
 checkSemantics :: Program -> (Either SemanticError Program)
 checkSemantics = fst . run

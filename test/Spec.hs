@@ -416,7 +416,7 @@ main = hspec $ do
             let tac = tacGenerate ast
             nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [0]] [LABEL "tiny",CALL "_exit"]
         it "Generates functions with arguments and calling convention" $ do
-            let ast = scan_and_parse "int g() {} int tiny() { int a = 2; f(5, a); } int f(int x, int y) { return x + y; }"
+            let ast = scan_parse_check "int g() {} int tiny() { int a = 2; f(5, a); } int f(int x, int y) { return x + y; }"
             let st = symbolTable ast
             let tac = tacGenerate ast
             nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "g",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "tiny",CALL "_exit",LABEL "f",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET]
@@ -426,12 +426,12 @@ main = hspec $ do
             let st = symbolTable ast
             let tac = tacGenerate ast
             nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [5],NASMData "b" DD [2],NASMData "c" DD [4],NASMData "d" DD [3]] [LABEL "tiny",SUB4 (Register SP DWORD) 4,CALL "_exit"]
-        --it "Generates code for fibonacci.c" $ do
-        --    code <- readFile "test/fixtures/fibonacci.c"
-        --    let ast = scan_parse_check code
-        --    let st = symbolTable ast
-        --    let tac = tacGenerate ast
-        --    nasmGenerate tac st `shouldBe` NASMProgram [] []
+        it "Generates code for fibonacci.c" $ do
+            code <- readFile "test/fixtures/fibonacci.c"
+            let ast = scan_parse_check code
+            let st = symbolTable ast
+            let tac = tacGenerate ast
+            nasmGenerate tac st `shouldBe` NASMProgram [] []
     describe "Tests live variable analysis" $ do
         it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"
