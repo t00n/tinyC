@@ -109,12 +109,12 @@ retInstructions = [POP1 DI, POP1 SI, POP1 B, MOV1 DWORD SP BP, POP1 BP, RET]
 exitInstructions :: [NASMInstruction]
 exitInstructions = [CALL "_exit"]
 
-destRegister :: Variable -> SRSS RegisterName
-destRegister var = gets (fst . (M.! var))
+varRegister :: Variable -> SRSS RegisterName
+varRegister var = gets (fst . (M.! var))
 
 nasmGenerateMove :: Variable -> TACExpression -> SRSS [NASMInstruction]
 nasmGenerateMove var ex = do
-    dest <- destRegister var
+    dest <- varRegister var
     case ex of
          (TACInt i) -> return [MOV4 (Register dest DWORD) i]
          (TACChar c) -> return [MOV4 (Register dest LSB) (ord c)]
@@ -124,7 +124,7 @@ nasmGenerateMove var ex = do
 
 nasmGeneratePlusMinus :: Variable -> TACBinaryOperator -> TACExpression -> SRSS [NASMInstruction]
 nasmGeneratePlusMinus var op ex = do
-    dest <- destRegister var
+    dest <- varRegister var
     case ex of
          (TACInt i) -> case op of
                             TACPlus -> return [ADD4 (Register dest DWORD) i]
@@ -138,30 +138,45 @@ nasmGeneratePlusMinus var op ex = do
 
 nasmGenerateTimes :: Variable -> TACExpression -> TACExpression -> SRSS [NASMInstruction]
 nasmGenerateTimes var e1 e2 = do
-    dest <- destRegister var
+    dest <- varRegister var
     case e1 of
          (TACInt i1) -> case e2 of
                              (TACInt i2) -> return [MOV4 (Register dest DWORD) i1, IMUL3 dest i2]
                              (TACChar c2) -> return [MOV4 (Register dest DWORD) i1, IMUL3 dest (ord c2)]
                              (TACVar v2) -> if v2 == var then return [IMUL3 dest i1]
-                                            else destRegister v2 >>= \src -> return [IMUL6 dest src i1]
+                                            else varRegister v2 >>= \src -> return [IMUL6 dest src i1]
          (TACChar c1) -> case e2 of
                              (TACInt i2) -> return [MOV4 (Register dest DWORD) (ord c1), IMUL3 dest i2]
                              (TACChar c2) -> return [MOV4 (Register dest DWORD) (ord c1), IMUL3 dest (ord c2)]
                              (TACVar v2) -> if v2 == var then return [IMUL3 dest (ord c1)]
-                                            else destRegister v2 >>= \src -> return [IMUL6 dest src (ord c1)]
+                                            else varRegister v2 >>= \src -> return [IMUL6 dest src (ord c1)]
          (TACVar v1) -> case e2 of
                              (TACInt i2) -> if v1 == var then return [IMUL3 dest i2]
-                                            else destRegister v1 >>= \src -> return [IMUL6 dest src i2]
+                                            else varRegister v1 >>= \src -> return [IMUL6 dest src i2]
                              (TACChar c2) -> if v1 == var then return [IMUL3 dest (ord c2)]
-                                             else destRegister v1 >>= \src -> return [IMUL6 dest src (ord c2)]
-                             (TACVar v2) -> if v1 == var then destRegister v2 >>= \src -> return [IMUL4 dest src]
-                                            else if v2 == var then destRegister v1 >>= \src -> return [IMUL4 dest src]
-                                            else destRegister v1 >>= \src1 -> destRegister v2 >>= \src2 -> return [MOV1 DWORD dest src1, IMUL4 dest src2]
+                                             else varRegister v1 >>= \src -> return [IMUL6 dest src (ord c2)]
+                             (TACVar v2) -> if v1 == var then varRegister v2 >>= \src -> return [IMUL4 dest src]
+                                            else if v2 == var then varRegister v1 >>= \src -> return [IMUL4 dest src]
+                                            else varRegister v1 >>= \src1 -> varRegister v2 >>= \src2 -> return [MOV1 DWORD dest src1, IMUL4 dest src2]
 
 
 nasmGenerateDivide :: Variable -> TACExpression -> TACExpression -> SRSS [NASMInstruction]
-nasmGenerateDivide var e1 e2 = return []
+nasmGenerateDivide var e1 e2 = do
+    dest <- varRegister var
+    case e1 of
+         (TACInt i1) -> case e2 of
+                             (TACInt i2) -> return [PUSH1 A, PUSH1 B, MOV4 (Register A DWORD) i1, MOV4 (Register B DWORD) i2, IDIV1 B, MOV1 DWORD dest A, POP1 B, POP1 A]
+                             (TACChar c2) -> return [PUSH1 A, PUSH1 B, MOV4 (Register A DWORD) i1, MOV4 (Register B DWORD) (ord c2), IDIV1 B, MOV1 DWORD dest A, POP1 B, POP1 A]
+                             (TACVar v2) -> varRegister v2 >>= \src -> return [PUSH1 A, MOV4 (Register A DWORD) i1, IDIV1 src, MOV1 DWORD dest A, POP1 A]
+         (TACChar c1) -> case e2 of
+                             (TACInt i2) -> return [PUSH1 A, PUSH1 B, MOV4 (Register A DWORD) (ord c1), MOV4 (Register B DWORD) i2, IDIV1 B, MOV1 DWORD dest A, POP1 B, POP1 A]
+                             (TACChar c2) -> return [PUSH1 A, PUSH1 B, MOV4 (Register A DWORD) (ord c1), MOV4 (Register B DWORD) (ord c2), IDIV1 B, MOV1 DWORD dest A, POP1 B, POP1 A]
+                             (TACVar v2) -> varRegister v2 >>= \src -> return [PUSH1 A, MOV4 (Register A DWORD) (ord c1), IDIV1 src, MOV1 DWORD dest A, POP1 A]
+         (TACVar v1) -> case e2 of
+                             (TACInt i2) -> varRegister v1 >>= \src -> return [PUSH1 A, PUSH1 B, MOV1 DWORD A src, MOV4 (Register B DWORD) i2, IDIV1 B, MOV1 DWORD dest A, POP1 B, POP1 A]
+                             (TACChar c2) -> varRegister v1 >>= \src -> return [PUSH1 A, PUSH1 B, MOV1 DWORD A src, MOV4 (Register B DWORD) (ord c2), IDIV1 B, MOV1 DWORD dest A, POP1 B, POP1 A]
+                             (TACVar v2) -> varRegister v1 >>= \src1 -> varRegister v2 >>= \src2 -> return [PUSH1 A, MOV1 DWORD A src1, IDIV1 src2, MOV1 DWORD dest A, POP1 A]
+
 
 instance NASMGenerator TACInstruction where
     nasmGenerateInstructions (TACBinary var e1 op e2) =
