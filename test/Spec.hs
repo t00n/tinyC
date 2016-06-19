@@ -414,7 +414,7 @@ main = hspec $ do
             let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); return d; }"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [0]] [LABEL "tiny",ADD1 DWORD A C,SUB1 DWORD C D,IDIV1 C,CALL "_exit"]
+            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [0]] [LABEL "tiny",MOV4 (Register C DWORD) 2,MOV4 (Register D DWORD) 3,ADD1 DWORD A C,SUB1 DWORD C D,IDIV1 C,CALL "_exit"]
         it "Generates functions with arguments and calling convention" $ do
             let ast = scan_parse_check "int g() {} int tiny() { int a = 2; f(5, a); } int f(int x, int y) { return x + y; }"
             let st = symbolTable ast
@@ -425,7 +425,6 @@ main = hspec $ do
             let ast = scan_parse_check code
             let st = symbolTable ast
             let tac = tacGenerate ast
-            putStrLn $ nasmShow $ nasmGenerate tac st
             nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [5],NASMData "b" DD [2],NASMData "c" DD [4],NASMData "d" DD [3]] [LABEL "tiny",SUB4 (Register SP DWORD) 4,MOV1 DWORD SI A,IMUL4 SI C,MOV1 DWORD DI C,SUB1 DWORD DI D,PUSH1 A,MOV1 DWORD A SI,IDIV1 DI,MOV1 DWORD SI A,POP1 A,MOV1 DWORD DI B,IMUL4 DI A,MOV1 DWORD B D,IMUL4 B C,ADD1 DWORD DI B,PUSH1 A,MOV1 DWORD A SI,IDIV1 DI,MOV1 DWORD SI A,POP1 A,MOV1 DWORD A A,IMUL4 A D,SUB1 DWORD C B,IDIV1 C,ADD1 DWORD A SI,CALL "_exit"]
         it "Generates code for fibonacci.c" $ do
             code <- readFile "test/fixtures/fibonacci.c"

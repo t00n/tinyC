@@ -216,7 +216,7 @@ instance NASMGenerator TACInstruction where
              TACTimes -> nasmGenerateTimes var e1 e2
              TACDivide -> nasmGenerateDivide var e1 e2
     --nasmGenerateInstructions (TACUnary var TACUnaryOperator TACExpression) = 
-    --nasmGenerateInstructions (TACCopy var TACExpression) = 
+    nasmGenerateInstructions (TACCopy var ex) = nasmGenerateMove var ex
     --nasmGenerateInstructions (TACArrayDecl var [TACExpression]) = 
     --nasmGenerateInstructions (TACArrayAccess var TACExpression) = 
     --nasmGenerateInstructions (TACArrayModif TACExpression TACExpression) = 
