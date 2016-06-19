@@ -425,7 +425,8 @@ main = hspec $ do
             let ast = scan_parse_check code
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [5],NASMData "b" DD [2],NASMData "c" DD [4],NASMData "d" DD [3]] [LABEL "tiny",SUB4 (Register SP DWORD) 4,CALL "_exit"]
+            putStrLn $ nasmShow $ nasmGenerate tac st
+            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [5],NASMData "b" DD [2],NASMData "c" DD [4],NASMData "d" DD [3]] [LABEL "tiny",SUB4 (Register SP DWORD) 4,MOV1 DWORD SI A,IMUL4 SI C,MOV1 DWORD DI C,SUB1 DWORD DI D,PUSH1 A,MOV1 DWORD A SI,IDIV1 DI,MOV1 DWORD SI A,POP1 A,MOV1 DWORD DI B,IMUL4 DI A,MOV1 DWORD B D,IMUL4 B C,ADD1 DWORD DI B,PUSH1 A,MOV1 DWORD A SI,IDIV1 DI,MOV1 DWORD SI A,POP1 A,MOV1 DWORD A A,IMUL4 A D,SUB1 DWORD C B,IDIV1 C,ADD1 DWORD A SI,CALL "_exit"]
         it "Generates code for fibonacci.c" $ do
             code <- readFile "test/fixtures/fibonacci.c"
             let ast = scan_parse_check code
