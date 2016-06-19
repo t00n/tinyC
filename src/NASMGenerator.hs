@@ -234,7 +234,13 @@ instance NASMGenerator TACInstruction where
                         (InStack offset) -> Address (Register BP DWORD) 1 offset
                         (InMemory label) -> AddressLabel label 0
         return [MOV2 (Register reg DWORD) addr]
-    --nasmGenerateInstructions (TACStore var) = 
+    nasmGenerateInstructions (TACStore var) = do
+        reg <- varRegister var
+        location <- varLocation var
+        let addr = case location of
+                        (InStack offset) -> Address (Register BP DWORD) 1 offset
+                        (InMemory label) -> AddressLabel label 0
+        return [MOV3 addr (Register reg DWORD)]
     --nasmGenerateInstructions (TACIf TACExpression label) = 
     --nasmGenerateInstructions (TACGoto label) = 
     --nasmGenerateInstructions (TACCall label [TACExpression]) = 
