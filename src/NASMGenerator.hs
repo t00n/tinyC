@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances, OverlappingInstances #-}
 
 module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, nasmShow, NASMProgram(..), NASMData(..), DataSize(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
 
@@ -112,6 +112,9 @@ exitInstructions = [CALL "_exit"]
 varRegister :: Variable -> SRSS RegisterName
 varRegister var = gets (fst . (M.! var))
 
+varLocation :: Variable -> SRSS VariableLocation
+varLocation var = gets (snd . (M.! var))
+
 nasmGenerateMove :: Variable -> TACExpression -> SRSS [NASMInstruction]
 nasmGenerateMove var ex = do
     dest <- varRegister var
@@ -224,7 +227,13 @@ instance NASMGenerator TACInstruction where
     --nasmGenerateInstructions (TACArrayDecl var [TACExpression]) = 
     --nasmGenerateInstructions (TACArrayAccess var TACExpression) = 
     --nasmGenerateInstructions (TACArrayModif TACExpression TACExpression) = 
-    --nasmGenerateInstructions (TACLoad var) = 
+    nasmGenerateInstructions (TACLoad var) = do
+        reg <- varRegister var
+        location <- varLocation var
+        let addr = case location of
+                        (InStack offset) -> Address (Register BP DWORD) 1 offset
+                        (InMemory label) -> AddressLabel label 0
+        return [MOV2 (Register reg DWORD) addr]
     --nasmGenerateInstructions (TACStore var) = 
     --nasmGenerateInstructions (TACIf TACExpression label) = 
     --nasmGenerateInstructions (TACGoto label) = 
@@ -386,6 +395,9 @@ class NASMShow a where
 instance NASMShow a => NASMShow [a] where
     nasmShow = concatMap (\x -> nasmShow x ++ "\n")
 
+instance NASMShow String where
+    nasmShow = (tail . init . show)
+
 instance NASMShow NASMProgram where
     nasmShow (NASMProgram ds is) = build $ do
         "global tiny"
@@ -493,13 +505,10 @@ instance NASMShow AddressSize where
     nasmShow DWORDADDRESS = "byte"
 
 instance NASMShow Address where
-    nasmShow (Address reg mult offset) = "[" ++ nasmShow reg ++ "+" ++ nasmShow mult ++ "*" ++ nasmShow offset ++ "]"
-    nasmShow (AddressBase r1 r2 mult offset) = "[" ++ nasmShow r1 ++ "+" ++ nasmShow r2 ++ "*" ++ nasmShow mult ++ "+" ++ nasmShow offset ++ "]"
-    nasmShow (AddressLabel label offset) = "[" ++ nasmShow label ++ "+" ++ nasmShow offset ++ "]"
+    nasmShow (Address reg mult offset) = "[" ++ nasmShow reg ++ (if offset /= 0 && mult /= 0 then "+" ++ nasmShow mult ++ "*" ++ nasmShow offset ++ "]" else [])
+    nasmShow (AddressBase r1 r2 mult offset) = "[" ++ nasmShow r1 ++ (if mult /= 0 then "+" ++ nasmShow r2 ++ "*" ++ nasmShow mult else []) ++ (if offset /= 0 then "+" ++ nasmShow offset else []) ++ "]"
+    nasmShow (AddressLabel label offset) = "[" ++ nasmShow label ++ (if offset /= 0 then "+" ++ nasmShow offset else []) ++ "]"
 instance NASMShow Multiplier where
-    nasmShow = show
-
-instance NASMShow Char where
     nasmShow = show
 
 instance NASMShow DataSize where
