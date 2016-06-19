@@ -414,7 +414,7 @@ main = hspec $ do
             let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); return d; }"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [0]] [LABEL "tiny",CALL "_exit"]
+            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [0]] [LABEL "tiny",ADD1 DWORD A C,SUB1 DWORD C D,IDIV1 C,CALL "_exit"]
         it "Generates functions with arguments and calling convention" $ do
             let ast = scan_parse_check "int g() {} int tiny() { int a = 2; f(5, a); } int f(int x, int y) { return x + y; }"
             let st = symbolTable ast

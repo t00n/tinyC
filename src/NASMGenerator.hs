@@ -100,7 +100,7 @@ instance NASMGenerator TACFunction where
         pre <- nasmGeneratePreFunction funcName offset
         nasmIS <- (mapM nasmGenerateInstructions (tail is)) >>= return . concat
         post <- nasmGeneratePostFunction funcName
-        return $ pre ++ nasmIS
+        traceShow totalMapping $ return $ pre ++ nasmIS
 
 
 retInstructions :: [NASMInstruction]
@@ -163,19 +163,22 @@ nasmGenerateTimes var e1 e2 = do
 nasmGenerateDivide :: Variable -> TACExpression -> TACExpression -> SRSS [NASMInstruction]
 nasmGenerateDivide var e1 e2 = do
     dest <- varRegister var
+    let predest = if dest == A then [] else [PUSH1 A]
+    let pre src = if src == A then [] else [MOV1 DWORD A src]
+    let postdest = if dest == A then [] else [MOV1 DWORD dest A, POP1 A]
     case e1 of
          (TACInt i1) -> case e2 of
-                             (TACInt i2) -> return [PUSH1 A, PUSH1 B, MOV4 (Register A DWORD) i1, MOV4 (Register B DWORD) i2, IDIV1 B, MOV1 DWORD dest A, POP1 B, POP1 A]
-                             (TACChar c2) -> return [PUSH1 A, PUSH1 B, MOV4 (Register A DWORD) i1, MOV4 (Register B DWORD) (ord c2), IDIV1 B, MOV1 DWORD dest A, POP1 B, POP1 A]
-                             (TACVar v2) -> varRegister v2 >>= \src -> return [PUSH1 A, MOV4 (Register A DWORD) i1, IDIV1 src, MOV1 DWORD dest A, POP1 A]
+                             (TACInt i2) -> return $ predest ++ [PUSH1 B, MOV4 (Register A DWORD) i1, MOV4 (Register B DWORD) i2, IDIV1 B, POP1 B] ++ postdest
+                             (TACChar c2) -> return $ predest ++ [PUSH1 B, MOV4 (Register A DWORD) i1, MOV4 (Register B DWORD) (ord c2), IDIV1 B, POP1 B] ++ postdest
+                             (TACVar v2) -> varRegister v2 >>= \src -> return $ predest ++ [MOV4 (Register A DWORD) i1, IDIV1 src] ++ postdest
          (TACChar c1) -> case e2 of
-                             (TACInt i2) -> return [PUSH1 A, PUSH1 B, MOV4 (Register A DWORD) (ord c1), MOV4 (Register B DWORD) i2, IDIV1 B, MOV1 DWORD dest A, POP1 B, POP1 A]
-                             (TACChar c2) -> return [PUSH1 A, PUSH1 B, MOV4 (Register A DWORD) (ord c1), MOV4 (Register B DWORD) (ord c2), IDIV1 B, MOV1 DWORD dest A, POP1 B, POP1 A]
-                             (TACVar v2) -> varRegister v2 >>= \src -> return [PUSH1 A, MOV4 (Register A DWORD) (ord c1), IDIV1 src, MOV1 DWORD dest A, POP1 A]
+                             (TACInt i2) -> return $ predest ++ [PUSH1 B, MOV4 (Register A DWORD) (ord c1), MOV4 (Register B DWORD) i2, IDIV1 B, POP1 B] ++ postdest
+                             (TACChar c2) -> return $ predest ++ [PUSH1 B, MOV4 (Register A DWORD) (ord c1), MOV4 (Register B DWORD) (ord c2), IDIV1 B, POP1 B] ++ postdest
+                             (TACVar v2) -> varRegister v2 >>= \src -> return $ predest ++ [MOV4 (Register A DWORD) (ord c1), IDIV1 src] ++ postdest
          (TACVar v1) -> case e2 of
-                             (TACInt i2) -> varRegister v1 >>= \src -> return [PUSH1 A, PUSH1 B, MOV1 DWORD A src, MOV4 (Register B DWORD) i2, IDIV1 B, MOV1 DWORD dest A, POP1 B, POP1 A]
-                             (TACChar c2) -> varRegister v1 >>= \src -> return [PUSH1 A, PUSH1 B, MOV1 DWORD A src, MOV4 (Register B DWORD) (ord c2), IDIV1 B, MOV1 DWORD dest A, POP1 B, POP1 A]
-                             (TACVar v2) -> varRegister v1 >>= \src1 -> varRegister v2 >>= \src2 -> return [PUSH1 A, MOV1 DWORD A src1, IDIV1 src2, MOV1 DWORD dest A, POP1 A]
+                             (TACInt i2) -> varRegister v1 >>= \src -> return $ predest ++ pre src ++ [PUSH1 B, MOV4 (Register B DWORD) i2, IDIV1 B, POP1 B] ++ postdest
+                             (TACChar c2) -> varRegister v1 >>= \src -> return $ predest ++ pre src ++ [PUSH1 B, MOV4 (Register B DWORD) (ord c2), IDIV1 B, POP1 B] ++ postdest
+                             (TACVar v2) -> varRegister v1 >>= \src1 -> varRegister v2 >>= \src2 -> return $ predest ++ pre src1 ++ [IDIV1 src2] ++ postdest
 
 
 instance NASMGenerator TACInstruction where
