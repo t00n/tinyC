@@ -50,7 +50,7 @@ consumeST :: ESSS ()
 consumeST = do
     next <- gets nextDF
     if next /= Nothing
-        then traceShow (fromJust next) $ put $ fromJust next
+        then put $ fromJust next
     else error "No symbol table anymore ????"
 
 instance Checkable Declaration where
@@ -213,7 +213,7 @@ getExpressionScalarity expr = do
 run ::Program -> (Either SemanticError Program, SymbolTable)
 run prog = (runState . runExceptT) (do
     st <- ExceptT $ return $ constructST prog
-    trace (drawTree $ fmap show $ SymbolTable.unzip st) $ put st
+    put st
     entryPointExists prog >>= check)
     (zipper emptyST)
 

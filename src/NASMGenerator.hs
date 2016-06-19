@@ -100,7 +100,7 @@ instance NASMGenerator TACFunction where
         pre <- nasmGeneratePreFunction funcName offset
         nasmIS <- (mapM nasmGenerateInstructions (tail is)) >>= return . concat
         post <- nasmGeneratePostFunction funcName
-        traceShow totalMapping $ return $ pre ++ nasmIS
+        return $ pre ++ nasmIS
 
 
 retInstructions :: [NASMInstruction]
