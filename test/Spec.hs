@@ -431,7 +431,7 @@ main = hspec $ do
             let ast = scan_parse_check code
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [] []
+            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "fibonacci",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,LABEL "l1",POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l2",LABEL "l4",MOV4 (Register A DWORD) 0,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l5",LABEL "l7",MOV4 (Register A DWORD) 1,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l8",POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l9",LABEL "l6",LABEL "l3",POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "tiny",LABEL "l10",LABEL "l12",LABEL "l11",CALL "_exit"]
     describe "Tests live variable analysis" $ do
         it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"

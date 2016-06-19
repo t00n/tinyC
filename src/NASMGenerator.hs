@@ -109,8 +109,37 @@ retInstructions = [POP1 DI, POP1 SI, POP1 B, MOV1 DWORD SP BP, POP1 BP, RET]
 exitInstructions :: [NASMInstruction]
 exitInstructions = [CALL "_exit"]
 
+nasmGenerateMove :: Variable -> TACExpression -> SRSS [NASMInstruction]
+nasmGenerateMove var ex = do
+    dest <- gets (fst . (M.! var))
+    case ex of
+         (TACInt i) -> return [MOV4 (Register dest DWORD) i]
+         (TACChar c) -> return [MOV4 (Register dest LSB) (ord c)]
+         (TACVar v) -> gets (fst . (M.! v)) >>= \reg -> if dest /= reg 
+                                                            then return [MOV1 DWORD dest reg]
+                                                        else return []
+
+nasmGenerateOperation :: Variable -> TACBinaryOperator -> TACExpression -> SRSS [NASMInstruction]
+nasmGenerateOperation var op ex = do
+    dest <- gets (fst . (M.! var))
+    case ex of
+         (TACInt i) -> case op of
+                            TACPlus -> return [ADD4 (Register dest DWORD) i]
+                            TACMinus -> return [SUB4 (Register dest DWORD) i]
+         (TACChar c) -> case op of
+                            TACPlus -> return [ADD4 (Register dest LSB) (ord c)]
+                            TACMinus -> return [SUB4 (Register dest LSB) (ord c)]
+         (TACVar v) -> gets (fst . (M.! v)) >>= \reg -> case op of
+                                                             TACPlus -> return [ADD1 DWORD dest reg]
+                                                             TACMinus -> return [SUB1 DWORD dest reg]
+                                                             TACTimes -> return [IMUL1 dest reg]
+
 instance NASMGenerator TACInstruction where
-    --nasmGenerateInstructions (TACBinary var TACExpression TACBinaryOperator TACExpression) = 
+    nasmGenerateInstructions (TACBinary var e1 op e2) = do
+        dest <- gets (fst . (M.! var))
+        move <- nasmGenerateMove var e1
+        operation <- nasmGenerateOperation var op e2
+        return $ move ++ operation
     --nasmGenerateInstructions (TACUnary var TACUnaryOperator TACExpression) = 
     --nasmGenerateInstructions (TACCopy var TACExpression) = 
     --nasmGenerateInstructions (TACArrayDecl var [TACExpression]) = 
