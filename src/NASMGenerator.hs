@@ -109,9 +109,12 @@ retInstructions = [POP1 DI, POP1 SI, POP1 B, MOV1 DWORD SP BP, POP1 BP, RET]
 exitInstructions :: [NASMInstruction]
 exitInstructions = [CALL "_exit"]
 
+destRegister :: Variable -> SRSS RegisterName
+destRegister var = gets (fst . (M.! var))
+
 nasmGenerateMove :: Variable -> TACExpression -> SRSS [NASMInstruction]
 nasmGenerateMove var ex = do
-    dest <- gets (fst . (M.! var))
+    dest <- destRegister var
     case ex of
          (TACInt i) -> return [MOV4 (Register dest DWORD) i]
          (TACChar c) -> return [MOV4 (Register dest LSB) (ord c)]
@@ -119,9 +122,9 @@ nasmGenerateMove var ex = do
                                                             then return [MOV1 DWORD dest reg]
                                                         else return []
 
-nasmGenerateOperation :: Variable -> TACBinaryOperator -> TACExpression -> SRSS [NASMInstruction]
-nasmGenerateOperation var op ex = do
-    dest <- gets (fst . (M.! var))
+nasmGeneratePlusMinus :: Variable -> TACBinaryOperator -> TACExpression -> SRSS [NASMInstruction]
+nasmGeneratePlusMinus var op ex = do
+    dest <- destRegister var
     case ex of
          (TACInt i) -> case op of
                             TACPlus -> return [ADD4 (Register dest DWORD) i]
@@ -132,14 +135,41 @@ nasmGenerateOperation var op ex = do
          (TACVar v) -> gets (fst . (M.! v)) >>= \reg -> case op of
                                                              TACPlus -> return [ADD1 DWORD dest reg]
                                                              TACMinus -> return [SUB1 DWORD dest reg]
-                                                             TACTimes -> return [IMUL1 dest reg]
+
+nasmGenerateTimes :: Variable -> TACExpression -> TACExpression -> SRSS [NASMInstruction]
+nasmGenerateTimes var e1 e2 = do
+    dest <- destRegister var
+    case e1 of
+         (TACInt i1) -> case e2 of
+                             (TACInt i2) -> return [MOV4 (Register dest DWORD) i1, IMUL3 dest i2]
+                             (TACChar c2) -> return [MOV4 (Register dest DWORD) i1, IMUL3 dest (ord c2)]
+                             (TACVar v2) -> if v2 == var then return [IMUL3 dest i1]
+                                            else destRegister v2 >>= \src -> return [IMUL6 dest src i1]
+         (TACChar c1) -> case e2 of
+                             (TACInt i2) -> return [MOV4 (Register dest DWORD) (ord c1), IMUL3 dest i2]
+                             (TACChar c2) -> return [MOV4 (Register dest DWORD) (ord c1), IMUL3 dest (ord c2)]
+                             (TACVar v2) -> if v2 == var then return [IMUL3 dest (ord c1)]
+                                            else destRegister v2 >>= \src -> return [IMUL6 dest src (ord c1)]
+         (TACVar v1) -> case e2 of
+                             (TACInt i2) -> if v1 == var then return [IMUL3 dest i2]
+                                            else destRegister v1 >>= \src -> return [IMUL6 dest src i2]
+                             (TACChar c2) -> if v1 == var then return [IMUL3 dest (ord c2)]
+                                             else destRegister v1 >>= \src -> return [IMUL6 dest src (ord c2)]
+                             (TACVar v2) -> if v1 == var then destRegister v2 >>= \src -> return [IMUL4 dest src]
+                                            else if v2 == var then destRegister v1 >>= \src -> return [IMUL4 dest src]
+                                            else destRegister v1 >>= \src1 -> destRegister v2 >>= \src2 -> return [MOV1 DWORD dest src1, IMUL4 dest src2]
+
+
+nasmGenerateDivide :: Variable -> TACExpression -> TACExpression -> SRSS [NASMInstruction]
+nasmGenerateDivide var e1 e2 = return []
 
 instance NASMGenerator TACInstruction where
-    nasmGenerateInstructions (TACBinary var e1 op e2) = do
-        dest <- gets (fst . (M.! var))
-        move <- nasmGenerateMove var e1
-        operation <- nasmGenerateOperation var op e2
-        return $ move ++ operation
+    nasmGenerateInstructions (TACBinary var e1 op e2) =
+        case op of
+             TACPlus -> liftM2 (++) (nasmGenerateMove var e1) (nasmGeneratePlusMinus var op e2)
+             TACMinus -> liftM2 (++) (nasmGenerateMove var e1) (nasmGeneratePlusMinus var op e2)
+             TACTimes -> nasmGenerateTimes var e1 e2
+             TACDivide -> nasmGenerateDivide var e1 e2
     --nasmGenerateInstructions (TACUnary var TACUnaryOperator TACExpression) = 
     --nasmGenerateInstructions (TACCopy var TACExpression) = 
     --nasmGenerateInstructions (TACArrayDecl var [TACExpression]) = 
@@ -200,6 +230,7 @@ data NASMInstruction = LABEL Label
                      | MOV3 Address Register
                      | MOV4 Register Constant
                      | MOV5 AddressSize Address Constant
+                     | XCHG1 RegisterName -- Exchange register with eax
                      | PUSH1 RegisterName -- Only 32-bit register
                      | PUSH2 Address
                      | PUSH3 Constant -- 32-bit constant
@@ -220,10 +251,13 @@ data NASMInstruction = LABEL Label
                      | INC2 Address
                      | DEC1 Register
                      | DEC2 Address
-                     | IMUL1 RegisterName RegisterName -- Only 32-bit register
-                     | IMUL2 RegisterName Address -- Only 32-bit register
-                     | IMUL3 RegisterName RegisterName Constant -- Only 32-bit register
-                     | IMUL4 RegisterName Address Constant -- Only 32-bit register
+                     | IMUL1 Register -- Multiplied by A (depending on size) and stored in A
+                     | IMUL2 AddressSize Address
+                     | IMUL3 RegisterName Constant -- Only 32-bit register
+                     | IMUL4 RegisterName RegisterName -- Only 32-bit register
+                     | IMUL5 RegisterName Address -- Only 32-bit register
+                     | IMUL6 RegisterName RegisterName Constant -- Only 32-bit register
+                     | IMUL7 RegisterName Address Constant -- Only 32-bit register
                      -- divide the contents of EDX:EAX by the contents of the parameter. Place the quotient in EAX and the remainder in EDX.
                      | IDIV1 RegisterName -- Only 32-bit register
                      | IDIV2 Address
@@ -329,6 +363,7 @@ instance NASMShow NASMInstruction where
     nasmShow (MOV3 addr reg) = instShow "mov" [nasmShow addr, nasmShow reg]
     nasmShow (MOV4 reg cst) = instShow "mov" [nasmShow reg, nasmShow cst]
     nasmShow (MOV5 size addr cst) = "mov " ++ nasmShow size ++ " " ++ nasmShow addr ++ "," ++ nasmShow cst
+    nasmShow (XCHG1 reg) = instShow "xchg" [nasmShow reg, nasmShow (Register A DWORD)]
     nasmShow (PUSH1 rname ) = instShow "push" [nasmShow (Register rname DWORD)]
     nasmShow (PUSH2 addr) = instShow "push" [nasmShow addr]
     nasmShow (PUSH3 cst) = instShow "push" [nasmShow cst]
@@ -349,10 +384,13 @@ instance NASMShow NASMInstruction where
     nasmShow (INC2 addr) = instShow "inc" [nasmShow addr]
     nasmShow (DEC1 reg) = instShow "dec" [nasmShow reg]
     nasmShow (DEC2 addr) = instShow "dec" [nasmShow addr]
-    nasmShow (IMUL1 r1 r2) = instShow "imul" [nasmShow (Register r1 DWORD), nasmShow (Register r2 DWORD)]
-    nasmShow (IMUL2 rname addr ) = instShow "imul" [nasmShow (Register rname DWORD), nasmShow addr]
-    nasmShow (IMUL3 r1 r2 cst ) = instShow "imul" [nasmShow (Register r1 DWORD), nasmShow (Register r2 DWORD), nasmShow cst]
-    nasmShow (IMUL4 rname addr cst ) = instShow "imul" [nasmShow (Register rname DWORD), nasmShow addr, nasmShow cst]
+    nasmShow (IMUL1 reg) = instShow "imul" [nasmShow reg]
+    nasmShow (IMUL2 size addr) = "imul " ++ nasmShow size ++ " " ++ nasmShow addr
+    nasmShow (IMUL3 r1 cst) = instShow "imul" [nasmShow (Register r1 DWORD), nasmShow cst]
+    nasmShow (IMUL4 r1 r2) = instShow "imul" [nasmShow (Register r1 DWORD), nasmShow (Register r2 DWORD)]
+    nasmShow (IMUL5 rname addr) = instShow "imul" [nasmShow (Register rname DWORD), nasmShow addr]
+    nasmShow (IMUL6 r1 r2 cst) = instShow "imul" [nasmShow (Register r1 DWORD), nasmShow (Register r2 DWORD), nasmShow cst]
+    nasmShow (IMUL7 rname addr cst) = instShow "imul" [nasmShow (Register rname DWORD), nasmShow addr, nasmShow cst]
     nasmShow (IDIV1 rname ) = instShow "idiv" [nasmShow (Register rname DWORD)]
     nasmShow (IDIV2 addr) = instShow "idiv" [nasmShow addr]
     nasmShow (AND1 size r1 r2) = instShow "and" [nasmShow (Register r1 size), nasmShow (Register r2 size)]
