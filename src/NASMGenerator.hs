@@ -215,7 +215,11 @@ instance NASMGenerator TACInstruction where
              TACMinus -> nasmGenerateMinus var e1 e2
              TACTimes -> nasmGenerateTimes var e1 e2
              TACDivide -> nasmGenerateDivide var e1 e2
-    --nasmGenerateInstructions (TACUnary var TACUnaryOperator TACExpression) = 
+    nasmGenerateInstructions (TACUnary var op ex) = do
+        let applyOp = varRegister var >>= \reg -> case op of
+                                                       TACNeg -> return [NEG1 (Register reg DWORD)]
+                                                       TACNot -> return [NOT1 (Register reg DWORD)]
+        liftM2 (++) (nasmGenerateMove var ex) applyOp
     nasmGenerateInstructions (TACCopy var ex) = nasmGenerateMove var ex
     --nasmGenerateInstructions (TACArrayDecl var [TACExpression]) = 
     --nasmGenerateInstructions (TACArrayAccess var TACExpression) = 
