@@ -435,8 +435,7 @@ instance NASMShow NASMProgram where
         literal $ nasmShow is
         "_exit:"
         "mov eax, 1"
-        "push dword 0"
-        "push eax"
+        "mov ebx, 0"
         "int 0x80"
  
 instance NASMShow NASMData where
