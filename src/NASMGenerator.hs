@@ -78,6 +78,12 @@ foldParam rMapping var (mapping, offset) = do
     let newoffset = offset + (if t == IntType then 4 else 1)
     return (M.insert var (rMapping M.! var, InStack offset) mapping, newoffset)
 
+modifyInstructions :: [Variable] -> [Variable] -> [Variable] -> TACFunction -> TACFunction
+modifyInstructions registers params globals is = 
+    let paramsToLoad = registers `intersect` params
+        globalsToLoad = registers `intersect` globals
+    in map TACLoad paramsToLoad ++ is
+
 instance NASMGenerator TACFunction where
     nasmGenerateInstructions xs = do
         st <- lift get
