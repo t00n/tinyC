@@ -82,7 +82,19 @@ modifyInstructions :: [Variable] -> [Variable] -> [Variable] -> TACFunction -> T
 modifyInstructions registers params globals is = 
     let paramsToLoad = registers `intersect` params
         globalsToLoad = registers `intersect` globals
-    in map TACLoad paramsToLoad ++ is
+        use v i = let (u, _) = usedAndDefinedVariables i
+                  in v `elem` u
+        def v i = let (_, d) = usedAndDefinedVariables i
+                  in v `elem` d
+        splitAtFirstUse v is = break (use v) is
+        splitAtLastDef v is = let (one, two) = break (def v) (reverse is) 
+                              in (reverse two, reverse one)
+        addLoad v is = let (one, two) = splitAtFirstUse v is
+                       in one ++ [TACLoad v] ++ two
+        addStore v is = let (one, two) = splitAtLastDef v is
+                        in  if one == [] || last one == TACLoad v then one ++ two
+                            else one ++ [TACStore v] ++ two
+    in map TACLoad paramsToLoad ++ foldr addLoad (foldr addStore is globalsToLoad) globalsToLoad
 
 instance NASMGenerator TACFunction where
     nasmGenerateInstructions xs = do
