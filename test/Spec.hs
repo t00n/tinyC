@@ -404,34 +404,34 @@ main = hspec $ do
             let ast = scan_and_parse "int tiny() {}"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerateText tac st `shouldBe` [LABEL "tiny",CALL "_exit"]
+            nasmGenerateText tac st `shouldBe` [LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,CALL "_exit"]
         it "Generates two simple functions" $ do
             let ast = scan_and_parse "int tiny() {} int f() {}"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerateText tac st `shouldBe` [LABEL "tiny",CALL "_exit",LABEL "f",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET]
+            nasmGenerateText tac st `shouldBe` [LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,CALL "_exit",LABEL "f",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET]
         it "Generates a few declarations and computations" $ do
             let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); return d; }"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram[NASMData "a" DD [0]] [LABEL "tiny",MOV4 (Register C DWORD) 2,MOV4 (Register D DWORD) 3,ADD1 DWORD A C,SUB1 DWORD C D,PUSH1 D,XOR1 DWORD D D,IDIV1 C,POP1 D,CALL "_exit"]
+            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [0]] [LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,MOV4 (Register C DWORD) 2,MOV4 (Register D DWORD) 3,MOV2 (Register A DWORD) (AddressLabel "a" 0),ADD1 DWORD A C,SUB1 DWORD C D,PUSH1 D,XOR1 DWORD D D,IDIV1 C,POP1 D,CALL "_exit"]
         it "Generates functions with arguments and calling convention" $ do
             let ast = scan_parse_check "int g() {} int tiny() { int a = 2; f(5, a); } int f(int x, int y) { return x + y; }"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "g",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "tiny",CALL "_exit",LABEL "f",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET]
+            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "g",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,MOV4 (Register A DWORD) 2,CALL "_exit",LABEL "f",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,MOV2 (Register A DWORD) (Address (Register BP DWORD) 1 8),MOV2 (Register C DWORD) (Address (Register BP DWORD) 1 12),ADD1 DWORD A C,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET]
         it "Generates code for bigprogram.c" $ do
             code <- readFile "test/fixtures/bigprogram.c"
             let ast = scan_parse_check code
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [5],NASMData "b" DD [2],NASMData "c" DD [4],NASMData "d" DD [3]] [LABEL "tiny",SUB4 (Register SP DWORD) 4,MOV1 DWORD SI A,IMUL4 SI C,MOV1 DWORD DI C,SUB1 DWORD DI D,PUSH1 D,XOR1 DWORD D D,PUSH1 A,MOV1 DWORD A SI,IDIV1 DI,MOV1 DWORD SI A,POP1 A,POP1 D,MOV2 (Register B DWORD) (AddressLabel "d" 0),MOV1 DWORD DI B,IMUL4 DI A,MOV1 DWORD B D,IMUL4 B C,MOV3 (Address (Register BP DWORD) 1 (-4)) (Register B DWORD),MOV2 (Register B DWORD) (Address (Register BP DWORD) 1 (-4)),ADD1 DWORD DI B,PUSH1 D,XOR1 DWORD D D,PUSH1 A,MOV1 DWORD A SI,IDIV1 DI,MOV1 DWORD SI A,POP1 A,POP1 D,MOV1 DWORD A A,IMUL4 A D,MOV2 (Register B DWORD) (AddressLabel "d" 0),SUB1 DWORD C B,PUSH1 D,XOR1 DWORD D D,IDIV1 C,POP1 D,ADD1 DWORD A SI,CALL "_exit"]
+            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [5],NASMData "b" DD [2],NASMData "c" DD [4],NASMData "d" DD [3]] [LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,SUB4 (Register SP DWORD) 4,MOV2 (Register C DWORD) (AddressLabel "b" 0),MOV2 (Register A DWORD) (AddressLabel "a" 0),MOV1 DWORD SI A,IMUL4 SI C,MOV2 (Register D DWORD) (AddressLabel "c" 0),MOV1 DWORD DI C,SUB1 DWORD DI D,PUSH1 D,XOR1 DWORD D D,PUSH1 A,MOV1 DWORD A SI,IDIV1 DI,MOV1 DWORD SI A,POP1 A,POP1 D,MOV2 (Register B DWORD) (AddressLabel "d" 0),MOV1 DWORD DI B,IMUL4 DI A,MOV1 DWORD B D,IMUL4 B C,MOV3 (Address (Register BP DWORD) 1 (-4)) (Register B DWORD),MOV2 (Register B DWORD) (Address (Register BP DWORD) 1 (-4)),ADD1 DWORD DI B,PUSH1 D,XOR1 DWORD D D,PUSH1 A,MOV1 DWORD A SI,IDIV1 DI,MOV1 DWORD SI A,POP1 A,POP1 D,MOV1 DWORD A A,IMUL4 A D,MOV2 (Register B DWORD) (AddressLabel "d" 0),SUB1 DWORD C B,PUSH1 D,XOR1 DWORD D D,IDIV1 C,POP1 D,ADD1 DWORD A SI,CALL "_exit"]
         it "Generates code for fibonacci.c" $ do
             code <- readFile "test/fixtures/fibonacci.c"
             let ast = scan_parse_check code
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "fibonacci",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,LABEL "l1",POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l2",LABEL "l4",MOV4 (Register A DWORD) 0,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l5",LABEL "l7",MOV4 (Register A DWORD) 1,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l8",POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l9",LABEL "l6",LABEL "l3",POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "tiny",LABEL "l10",LABEL "l12",LABEL "l11",CALL "_exit"]
+            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "fibonacci",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,MOV2 (Register A DWORD) (Address (Register BP DWORD) 1 8),LABEL "l1",MOV4 (Register A DWORD) 1,NEG1 (Register A DWORD),POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l2",LABEL "l4",MOV4 (Register A DWORD) 0,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l5",LABEL "l7",MOV4 (Register A DWORD) 1,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l8",MOV1 DWORD C A,SUB4 (Register C DWORD) 1,SUB4 (Register A DWORD) 2,ADD1 DWORD A C,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l9",LABEL "l6",LABEL "l3",POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,MOV4 (Register A DWORD) 0,LABEL "l10",LABEL "l12",ADD4 (Register A DWORD) 1,LABEL "l11",CALL "_exit"]
     describe "Tests live variable analysis" $ do
         it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"
