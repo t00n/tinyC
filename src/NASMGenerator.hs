@@ -50,10 +50,11 @@ class Show a => NASMGenerator a where
 nasmGeneratePreFunction :: Label -> Offset -> SRSS [NASMInstruction]
 nasmGeneratePreFunction name offset = do
     info <- lift $ gets $ unsafeGetSymbolInfo name
+    let commonBeg = [LABEL name, PUSH1 BP, MOV1 DWORD BP SP]
     let allocateLocal = if offset == 0 then [] else [SUB4 (Register SP DWORD) (-offset)]
     if name == "tiny" 
-        then (lift $ lift $ put (Flags True)) >> return (LABEL name:allocateLocal)
-    else return $ [LABEL name, PUSH1 BP, MOV1 DWORD BP SP] ++ allocateLocal ++ [PUSH1 B, PUSH1 SI, PUSH1 DI]
+        then (lift $ lift $ put (Flags True)) >> return (commonBeg ++ allocateLocal)
+    else return $ commonBeg ++ allocateLocal ++ [PUSH1 B, PUSH1 SI, PUSH1 DI]
 
 nasmGeneratePostFunction :: Label -> SRSS ()
 nasmGeneratePostFunction "tiny" = lift $ lift $ put (Flags False)
