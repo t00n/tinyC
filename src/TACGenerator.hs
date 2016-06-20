@@ -112,8 +112,13 @@ instance TACGenerator Statement where
         (t, lines) <- tacExpression (Var n)
         return $ lines ++ [TACRead t]
     tacGenerateInstructions (Expr e) = do
-        (_, lines) <- tacExpression e
-        return lines
+        (t, lines) <- tacExpression e
+        let newlines = if lines /= [] then
+                            case last lines of
+                                (TACCall label args _) -> init lines ++ [TACCall label args Nothing]
+                                _ -> lines
+                        else lines
+        return newlines
 
 tacRelExpression :: Expression -> SSNSS (TACExpression, [TACInstruction])
 tacRelExpression ex@(BinOp e1 op e2) = 
@@ -248,7 +253,7 @@ instance TACPrint TACInstruction where
     tacPrint (TACStore s) = "store " ++ s
     tacPrint (TACIf e l) = "if " ++ tacPrint e ++ " goto " ++ l
     tacPrint (TACGoto l) = "goto " ++ l
-    tacPrint (TACCall l es _) = intercalate "\n" (map (((++) "param ") . tacPrint) es) ++ "\ncall " ++ l
+    tacPrint (TACCall l es ret) = intercalate "\n" (map (((++) "param ") . tacPrint) es) ++ "\ncall " ++ l ++ " -> " ++ show ret
     tacPrint (TACReturn Nothing) = "return"
     tacPrint (TACReturn (Just e)) = "return " ++ tacPrint e
     tacPrint (TACLabel l) = l ++ ":"

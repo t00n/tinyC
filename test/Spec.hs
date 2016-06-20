@@ -348,7 +348,7 @@ main = hspec $ do
             tacGenerate ast `shouldBe` ([TACCopy "a" (TACInt 5)],[[TACLabel "tiny",TACBinary "t1" (TACVar "a") TACMinus (TACInt 5),TACUnary "t2" TACNeg (TACVar "t1"),TACCopy "b" (TACVar "t2"),TACReturn Nothing]])
         it "Generates function calls" $ do
             let ast = scan_parse_check "int f(int a, int b) { int c = 1; f(c, 2); } int tiny() {}"
-            tacGenerate ast `shouldBe` ([],[[TACLabel "f",TACCopy "c" (TACInt 1),TACCall "f" [TACVar "c",TACInt 2] (Just $ TACVar "t1"),TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]])
+            tacGenerate ast `shouldBe` ([],[[TACLabel "f",TACCopy "c" (TACInt 1),TACCall "f" [TACVar "c",TACInt 2] Nothing,TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]])
             let ast = scan_parse_check "int f(int a, int b) { int c = f(2 + 3, 1); } int tiny() {}"
             tacGenerate ast `shouldBe`  ([],[[TACLabel "f",TACBinary "t1" (TACInt 2) TACPlus (TACInt 3),TACCall "f" [TACVar "t1",TACInt 1] (Just $ TACVar "t2"),TACCopy "c" (TACVar "t2"),TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]])
         it "Generates assignments" $ do
@@ -419,7 +419,7 @@ main = hspec $ do
             let ast = scan_parse_check "int g() {} int tiny() { int a = 2; f(5, a); } int f(int x, int y) { return x + y; }"
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "g",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,MOV4 (Register A DWORD) 2,CALL "_exit",LABEL "f",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,MOV2 (Register A DWORD) (Address (Register BP DWORD) 1 8),MOV2 (Register C DWORD) (Address (Register BP DWORD) 1 12),ADD1 DWORD A C,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET]
+            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "g",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,MOV4 (Register A DWORD) 2,PUSH1 A,PUSH1 C,PUSH1 D,PUSH1 A,PUSH3 5,CALL "f",ADD4 (Register SP DWORD) 8,POP1 D,POP1 C,POP1 A,CALL "_exit",LABEL "f",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,MOV2 (Register A DWORD) (Address (Register BP DWORD) 1 8),MOV2 (Register C DWORD) (Address (Register BP DWORD) 1 12),ADD1 DWORD A C,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET]
         it "Generates code for bigprogram.c" $ do
             code <- readFile "test/fixtures/bigprogram.c"
             let ast = scan_parse_check code
@@ -431,7 +431,7 @@ main = hspec $ do
             let ast = scan_parse_check code
             let st = symbolTable ast
             let tac = tacGenerate ast
-            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "fibonacci",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,MOV2 (Register A DWORD) (Address (Register BP DWORD) 1 8),LABEL "l1",MOV4 (Register A DWORD) 1,NEG1 (Register A DWORD),POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l2",LABEL "l4",MOV4 (Register A DWORD) 0,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l5",LABEL "l7",MOV4 (Register A DWORD) 1,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l8",MOV1 DWORD C A,SUB4 (Register C DWORD) 1,SUB4 (Register A DWORD) 2,ADD1 DWORD A C,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l9",LABEL "l6",LABEL "l3",POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,MOV4 (Register A DWORD) 0,LABEL "l10",LABEL "l12",ADD4 (Register A DWORD) 1,LABEL "l11",CALL "_exit"]
+            nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "fibonacci",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,MOV2 (Register A DWORD) (Address (Register BP DWORD) 1 8),LABEL "l1",MOV4 (Register A DWORD) 1,NEG1 (Register A DWORD),POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l2",LABEL "l4",MOV4 (Register A DWORD) 0,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l5",LABEL "l7",MOV4 (Register A DWORD) 1,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l8",MOV1 DWORD C A,SUB4 (Register C DWORD) 1,PUSH1 A,PUSH1 C,PUSH1 D,PUSH1 C,CALL "fibonacci",ADD4 (Register SP DWORD) 4,MOV1 DWORD C A,POP1 D,POP1 A,SUB4 (Register A DWORD) 2,PUSH1 A,PUSH1 C,PUSH1 D,PUSH1 A,CALL "fibonacci",ADD4 (Register SP DWORD) 4,MOV1 DWORD A A,POP1 D,POP1 C,ADD1 DWORD A C,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l9",LABEL "l6",LABEL "l3",POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,MOV4 (Register A DWORD) 0,LABEL "l10",LABEL "l12",PUSH1 A,PUSH1 C,PUSH1 D,PUSH1 A,CALL "fibonacci",ADD4 (Register SP DWORD) 4,MOV1 DWORD C A,POP1 D,POP1 A,PUSH1 A,PUSH1 C,PUSH1 D,PUSH1 C,CALL "_writeint",ADD4 (Register SP DWORD) 4,POP1 D,POP1 C,POP1 A,ADD4 (Register A DWORD) 1,LABEL "l11",CALL "_exit"]
     describe "Tests live variable analysis" $ do
         it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"
