@@ -94,6 +94,7 @@ instance NASMGenerator TACFunction where
         let (varIntMap, spilled, is) = mapVariablesToRegisters xs (length registers)
         let varRegMap = M.map (\v -> registers !! v) varIntMap `M.union` M.fromList (map (\x -> (x, last registers)) spilled)
         let variables = M.keys varRegMap
+        let inRegisters = variables \\ spilled
         st <- lift get
         params <- lift (gets (M.keys . infoParams . (unsafeGetSymbolInfo funcName)))
         let globals = filter (flip nameInParent st) variables
@@ -104,7 +105,7 @@ instance NASMGenerator TACFunction where
         let totalMapping = M.unions $ (fst paramMapping:localMapping:[globalMapping])
         put totalMapping
         pre <- nasmGeneratePreFunction funcName offset
-        nasmIS <- (mapM nasmGenerateInstructions (tail is)) >>= return . concat
+        nasmIS <- (mapM nasmGenerateInstructions (modifyInstructions inRegisters params globals (tail is))) >>= return . concat
         post <- nasmGeneratePostFunction funcName
         return $ pre ++ nasmIS
 
