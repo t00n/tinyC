@@ -163,7 +163,7 @@ tacExpression (Call n es) = do
     let params = map fst reducedES
     let lines = concatMap snd reducedES
     t <- lift popVariable
-    return (TACVar t, lines ++ [TACCall (nameToString n) (params  ++ [TACVar t])])
+    return (TACVar t, lines ++ [TACCall (nameToString n) params (Just $ TACVar t)])
 tacExpression (Length n) = undefined
 tacExpression (Var (Name n)) = return (TACVar n, [])
 tacExpression (Var (NameSubscription n e)) = do
@@ -202,7 +202,7 @@ data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpres
                      -- | TACDeRefA TACExpression TACExpression
                     | TACIf TACExpression String
                     | TACGoto String
-                    | TACCall String [TACExpression]
+                    | TACCall String [TACExpression] (Maybe TACExpression)
                     | TACReturn (Maybe TACExpression)
                     | TACLabel String
                     | TACWrite TACExpression
@@ -248,7 +248,7 @@ instance TACPrint TACInstruction where
     tacPrint (TACStore s) = "store " ++ s
     tacPrint (TACIf e l) = "if " ++ tacPrint e ++ " goto " ++ l
     tacPrint (TACGoto l) = "goto " ++ l
-    tacPrint (TACCall l es) = intercalate "\n" (map (((++) "param ") . tacPrint) es) ++ "\ncall " ++ l
+    tacPrint (TACCall l es _) = intercalate "\n" (map (((++) "param ") . tacPrint) es) ++ "\ncall " ++ l
     tacPrint (TACReturn Nothing) = "return"
     tacPrint (TACReturn (Just e)) = "return " ++ tacPrint e
     tacPrint (TACLabel l) = l ++ ":"

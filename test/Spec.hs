@@ -348,9 +348,9 @@ main = hspec $ do
             tacGenerate ast `shouldBe` ([TACCopy "a" (TACInt 5)],[[TACLabel "tiny",TACBinary "t1" (TACVar "a") TACMinus (TACInt 5),TACUnary "t2" TACNeg (TACVar "t1"),TACCopy "b" (TACVar "t2"),TACReturn Nothing]])
         it "Generates function calls" $ do
             let ast = scan_parse_check "int f(int a, int b) { int c = 1; f(c, 2); } int tiny() {}"
-            tacGenerate ast `shouldBe` ([],[[TACLabel "f",TACCopy "c" (TACInt 1),TACCall "f" [TACVar "c",TACInt 2,TACVar "t1"],TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]])
+            tacGenerate ast `shouldBe` ([],[[TACLabel "f",TACCopy "c" (TACInt 1),TACCall "f" [TACVar "c",TACInt 2] (Just $ TACVar "t1"),TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]])
             let ast = scan_parse_check "int f(int a, int b) { int c = f(2 + 3, 1); } int tiny() {}"
-            tacGenerate ast `shouldBe`  ([],[[TACLabel "f",TACBinary "t1" (TACInt 2) TACPlus (TACInt 3),TACCall "f" [TACVar "t1",TACInt 1,TACVar "t2"],TACCopy "c" (TACVar "t2"),TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]])
+            tacGenerate ast `shouldBe`  ([],[[TACLabel "f",TACBinary "t1" (TACInt 2) TACPlus (TACInt 3),TACCall "f" [TACVar "t1",TACInt 1] (Just $ TACVar "t2"),TACCopy "c" (TACVar "t2"),TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]])
         it "Generates assignments" $ do
             let ast = scan_parse_check "int tiny() { int a; a = (a + 5) * 3; }"
             tacGenerate ast `shouldBe` ([],[[TACLabel "tiny",TACCopy "a" (TACInt 0),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "t1") TACTimes (TACInt 3),TACCopy "a" (TACVar "t2"),TACReturn Nothing]])

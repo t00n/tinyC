@@ -277,7 +277,12 @@ instance NASMGenerator TACInstruction where
         return [MOV3 addr (Register reg DWORD)]
     --nasmGenerateInstructions (TACIf TACExpression label) = 
     --nasmGenerateInstructions (TACGoto label) = 
-    --nasmGenerateInstructions (TACCall label [TACExpression]) = 
+    nasmGenerateInstructions (TACCall label args ret) = do
+        case ret of 
+             Nothing -> nasmCall label args Nothing
+             Just x -> case x of
+                            (TACVar v) -> nasmCall label args (Just v)
+                            _ -> error $ "Return expression " ++ show ret ++ " is not a variable in " ++ show (TACCall label args ret)
     nasmGenerateInstructions (TACReturn Nothing) = do
         (Flags tiny) <- lift $ lift get
         if tiny then return exitInstructions

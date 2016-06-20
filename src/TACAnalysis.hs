@@ -70,7 +70,9 @@ usedAndDefinedVariables inst =
         (TACArrayAccess s e) -> (expressionsToSet [e], S.fromList[s])
         (TACArrayModif e1 e2) -> (expressionsToSet [e1], expressionsToSet [e2])
         (TACIf e _) -> (expressionsToSet [e], S.empty)
-        (TACCall _ es) -> (expressionsToSet (init es), expressionsToSet [last es])
+        (TACCall _ es ret) -> case ret of
+                                   Nothing -> (expressionsToSet es, S.empty)
+                                   (Just x) -> (expressionsToSet es, expressionsToSet [x])
         (TACReturn Nothing) -> (S.empty, S.empty)
         (TACReturn (Just e)) -> (expressionsToSet [e], S.empty)
         (TACWrite e) -> (expressionsToSet [e], S.empty)
