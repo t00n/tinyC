@@ -231,16 +231,19 @@ nasmGenerateDivide var e1 e2 = do
                              (TACVar v2) -> varRegister v1 >>= \src1 -> varRegister v2 >>= \src2 -> return $ predest ++ pre src1 ++ [IDIV1 src2] ++ postdest
 
 
-nasmCall :: Label -> [TACExpression] -> SRSS [NASMInstruction]
-nasmCall label args = do
+nasmCall :: Label -> [TACExpression] -> (Maybe Variable) -> SRSS [NASMInstruction]
+nasmCall label args ret = do
     let f arg = case arg of
                      (TACInt i) -> return $ PUSH3 i
                      (TACChar c) -> return $ PUSH3 (ord c)
                      (TACVar v) -> varRegister v >>= \reg -> return $ PUSH1 reg
-    let pre = [PUSH1 A, PUSH1 C, PUSH1 D]
+    let saveregs = [PUSH1 A, PUSH1 C, PUSH1 D]
     pushargs <- mapM f (reverse args)
-    let post = [ADD4 (Register SP DWORD) (length args * 4), POP1 D, POP1 C, POP1 A]
-    return $ pre ++ pushargs ++ [CALL label] ++ post
+    let popargs = [ADD4 (Register SP DWORD) (length args * 4)]
+    restoreregs <- case ret of
+                        Nothing -> return $ map POP1 [D, C, A]
+                        (Just x) -> varRegister x >>= \reg -> return $ [MOV1 DWORD reg A] ++ ((map POP1) . filter ((/=) reg)) [D, C, A]
+    return $ saveregs ++ pushargs ++ [CALL label] ++ popargs ++ restoreregs
 
 instance NASMGenerator TACInstruction where
     nasmGenerateInstructions (TACBinary var e1 op e2) =
@@ -293,7 +296,7 @@ instance NASMGenerator TACInstruction where
         let ret = if tiny then exitInstructions else retInstructions
         return $ retValue ++ ret
     nasmGenerateInstructions (TACLabel label) = return [LABEL label]
-    --nasmGenerateInstructions (TACWrite TACExpression) = 
+    nasmGenerateInstructions (TACWrite ex) = nasmCall "_writeint" [ex] Nothing
     --nasmGenerateInstructions (TACRead TACExpression) = 
     nasmGenerateInstructions _ = return []
 
