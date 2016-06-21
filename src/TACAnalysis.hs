@@ -57,12 +57,11 @@ controlFlowGraph is =
 usedAndDefinedVariables :: TACInstruction -> (S.Set String, S.Set String)
 usedAndDefinedVariables inst = 
     let
-        isVariable (TACVar _) = True
-        isVariable (TACArray _ _) = True
-        isVariable _ = False
-        variableName (TACVar n) = n
-        variableName (TACArray n _) = n
-        expressionsToSet es = S.fromList $ map variableName $ filter isVariable es
+        variableName (TACVar n) = [n]
+        variableName (TACArray n _) = [n]
+        variableName (TACExpr e1 _ e2) = concatMap variableName [e1, e2]
+        variableName _ = []
+        expressionsToSet es = S.fromList $ concatMap variableName es
     in
     case inst of 
         (TACBinary v e1 _ e2) -> (expressionsToSet [e1, e2], S.fromList [v])
