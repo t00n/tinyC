@@ -1,4 +1,4 @@
-module TACGenerator (tacGenerate, TACProgram(..), TACFunction(..), TACInstruction(..), TACBinaryOperator(..), TACUnaryOperator(..), TACExpression(..), TACPrint(..)) where
+module TACGenerator (tacGenerate, TACProgram(..), TACFunction(..), TACInstruction(..), TACBinaryOperator(..), TACUnaryOperator(..), TACExpression(..), TACPrint(..), tacData, tacCode) where
 
 import Control.Monad.Trans.State (StateT(..), evalStateT)
 import Control.Monad.Trans (lift)
@@ -18,7 +18,7 @@ infiniteNames :: String -> [String]
 infiniteNames s = [s ++ show i | i <- [1..]]
 
 tacGenerate :: [Declaration] -> TACProgram
-tacGenerate = (,) <$> tacGenerateData <*> tacGenerateText
+tacGenerate = TACProgram <$> tacGenerateData <*> tacGenerateText
 
 tacGenerateData :: [Declaration] -> [TACInstruction]
 tacGenerateData xs = evalNames (evalStateT (tacGenerateInstructions xs) (zipper emptyST)) (infiniteNames "t") (infiniteNames "l")
@@ -190,7 +190,14 @@ tacUnaryOperator :: UnaryOperator -> TACUnaryOperator
 tacUnaryOperator Not = TACNot
 tacUnaryOperator Neg = TACNeg
 
-type TACProgram = ([TACInstruction], [TACFunction])
+data TACProgram = TACProgram [TACInstruction] [TACFunction]
+    deriving (Eq, Show)
+
+tacData :: TACProgram -> [TACInstruction]
+tacData (TACProgram ds _) = ds
+
+tacCode :: TACProgram -> [TACFunction]
+tacCode (TACProgram _ is) = is
 
 type TACFunction = [TACInstruction]
 
@@ -241,6 +248,9 @@ class TACPrint a where
 instance TACPrint a => TACPrint [a] where
     tacPrint [] = ""
     tacPrint (x:xs) = tacPrint x ++ "\n" ++ tacPrint xs
+
+instance TACPrint TACProgram where
+    tacPrint (TACProgram ds is) = tacPrint ds ++ tacPrint (concat is)
 
 instance TACPrint TACInstruction where
     tacPrint (TACBinary var e1 op e2) = var ++ " = " ++ tacPrint e1 ++ tacPrint op ++ tacPrint e2

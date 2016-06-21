@@ -27,10 +27,10 @@ nasmGenerate :: TACProgram -> SymbolTable -> NASMProgram
 nasmGenerate p = NASMProgram <$> nasmGenerateData p <*> nasmGenerateText p
 
 nasmGenerateData :: TACProgram -> SymbolTable -> [NASMData]
-nasmGenerateData p st = evalState (evalStateT (evalStateT (nasmGenerateDataReal (fst p)) M.empty) st) (Flags False)
+nasmGenerateData p st = evalState (evalStateT (evalStateT (nasmGenerateDataReal (tacData p)) M.empty) st) (Flags False)
 
 nasmGenerateText :: TACProgram -> SymbolTable -> [NASMInstruction]
-nasmGenerateText p st = evalState (evalStateT (evalStateT (nasmGenerateTextReal (snd p)) M.empty) st) (Flags False)
+nasmGenerateText p st = evalState (evalStateT (evalStateT (nasmGenerateTextReal (tacCode p)) M.empty) st) (Flags False)
 
 nasmGenerateDataReal :: [TACInstruction] -> SRSS [NASMData]
 nasmGenerateDataReal = return . (map decl)
