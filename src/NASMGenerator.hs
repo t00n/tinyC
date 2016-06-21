@@ -596,13 +596,13 @@ instance NASMShow AddressSize where
 
 showOffsetMult :: Offset -> Multiplier -> String
 showOffsetMult offset mult = if offset /= 0 && mult /= 0 then 
-                                 "+" ++ if mult /= 1 then show offset ++ "*" ++ show mult
-                                        else show offset
+                                 "+" ++ if mult /= 1 then nasmShow offset ++ "*" ++ nasmShow mult
+                                        else nasmShow offset
                              else ""
 
 showOffsetRegisterMult :: Offset -> Register -> Multiplier -> String
-showOffsetRegisterMult offset reg mult = (if offset /= 0 then "+" ++ show offset else "")
-                                      ++ (if mult /= 0 then "+" ++ show reg ++ 
+showOffsetRegisterMult offset reg mult = (if offset /= 0 then "+" ++ nasmShow offset else "")
+                                      ++ (if mult /= 0 then "+" ++ nasmShow reg ++ 
                                               (if mult /= 1 then "*" ++ show mult else "")
                                           else "")
 
