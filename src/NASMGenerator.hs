@@ -120,9 +120,9 @@ instance NASMGenerator TACFunction where
         let globals = filter (flip nameInParent st) variables
         let locals = (variables \\ globals) \\ params
         (localMapping, offset) <- foldrM (foldLocal spilled varRegMap) (M.empty, 0) locals
-        paramMapping <- foldrM (foldParam varRegMap) (M.empty, 8) (reverse params)
+        (paramMapping, _) <- foldrM (foldParam varRegMap) (M.empty, 8) (reverse params)
         let globalMapping = M.fromList $ map (\x -> (x, (varRegMap M.! x, InMemory x))) globals
-        let totalMapping = M.unions $ (fst paramMapping:localMapping:[globalMapping])
+        let totalMapping = M.unions $ ([paramMapping, localMapping, globalMapping])
         put totalMapping
         pre <- nasmGeneratePreFunction funcName offset
         nasmIS <- (mapM nasmGenerateInstructions (modifyInstructions inRegisters params globals (tail is))) >>= return . concat
