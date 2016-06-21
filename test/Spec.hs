@@ -17,6 +17,7 @@ import SymbolTable
 import SemanticError
 import TACAnalysis
 import Graph
+import NASMAnalysis
 
 scan_and_parse = parse . alexScanTokens
 
@@ -487,3 +488,10 @@ main = hspec $ do
             let rig = registerInterferenceGraph dfg
             writeFile "rig2.dot" (toDot rig)
             findRegisters nodes rig 5 `shouldBe` M.fromList [("a",0),("b",1),("c",2),("t1",3),("t10",0),("t11",0),("t2",4),("t3",3),("t4",4),("t6",4),("t7",3),("t8",0),("t9",1)]
+    describe "Tests nasm analysis and optimization" $ do
+        it "Tests negative constraints on register allocation" $ do
+            code <- readFile "test/fixtures/bigprogram.c"
+            let ast = scan_parse_check code
+            let st = symbolTable ast
+            let (tacData, tacCode) = tacGenerate ast
+            negativeConstraints (concat tacCode) `shouldBe` M.fromList [("t2",S.fromList [A,D]),("t6",S.fromList [A,D]),("t9",S.fromList [A,D])]
