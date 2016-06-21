@@ -141,7 +141,7 @@ nasmGenerateMove var ex = do
     case ex of
          (TACInt i) -> return [MOV4 (Register dest DWORD) i]
          (TACChar c) -> return [MOV4 (Register dest LSB) (ord c)]
-         (TACVar v) -> gets (fst . (M.! v)) >>= \reg -> if dest /= reg 
+         (TACVar v) -> varRegister v >>= \reg -> if dest /= reg 
                                                             then return [MOV1 DWORD dest reg]
                                                         else return []
 
@@ -237,12 +237,11 @@ nasmCall label args ret = do
                      (TACInt i) -> return $ PUSH3 i
                      (TACChar c) -> return $ PUSH3 (ord c)
                      (TACVar v) -> varRegister v >>= \reg -> return $ PUSH1 reg
-    let saveregs = [PUSH1 A, PUSH1 C, PUSH1 D]
     pushargs <- mapM f (reverse args)
     let popargs = [ADD4 (Register SP DWORD) (length args * 4)]
-    restoreregs <- case ret of
-                        Nothing -> return $ map POP1 [D, C, A]
-                        (Just x) -> varRegister x >>= \reg -> return $ [MOV1 DWORD reg A] ++ ((map POP1) . filter ((/=) reg)) [D, C, A]
+    (saveregs, restoreregs) <- case ret of
+                        Nothing -> return (map PUSH1 [A, C, D], map POP1 [D, C, A])
+                        (Just x) -> varRegister x >>= \reg -> return (((map PUSH1) . (filter ((/=) reg))) [A, C, D], [MOV1 DWORD reg A] ++ ((map POP1) . filter ((/=) reg)) [D, C, A])
     return $ saveregs ++ pushargs ++ [CALL label] ++ popargs ++ restoreregs
 
 instance NASMGenerator TACInstruction where
@@ -275,8 +274,29 @@ instance NASMGenerator TACInstruction where
                         (InStack offset) -> Address (Register BP DWORD) 1 offset
                         (InMemory label) -> AddressLabel label 0
         return [MOV3 addr (Register reg DWORD)]
-    --nasmGenerateInstructions (TACIf TACExpression label) = 
-    --nasmGenerateInstructions (TACGoto label) = 
+    nasmGenerateInstructions (TACIf (TACExpr e1 op e2) label) = do
+        cmp <- case e1 of
+                    (TACInt i1) -> case e2 of
+                                        (TACInt i2) -> return [PUSH1 A, MOV4 (Register A DWORD) i1, CMP4 (Register A DWORD) i2, POP1 A]
+                                        (TACChar c2) -> return [PUSH1 A, MOV4 (Register A DWORD) i1, CMP4 (Register A DWORD) (ord c2), POP1 A]
+                                        (TACVar v2) -> varRegister v2 >>= \r2 -> return [PUSH1 A, MOV4 (Register A DWORD) i1, CMP1 (Register A DWORD) (Register r2 DWORD), POP1 A]
+                    (TACChar c1) -> case e2 of
+                                        (TACInt i2) -> return [PUSH1 A, MOV4 (Register A DWORD) (ord c1), CMP4 (Register A DWORD) i2, POP1 A]
+                                        (TACChar c2) -> return [PUSH1 A, MOV4 (Register A DWORD) (ord c1), CMP4 (Register A DWORD) (ord c2), POP1 A]
+                                        (TACVar v2) -> varRegister v2 >>= \r2 -> return [PUSH1 A, MOV4 (Register A DWORD) (ord c1), CMP1 (Register A DWORD) (Register r2 DWORD), POP1 A]
+                    (TACVar v1) -> varRegister v1 >>= \r1 -> case e2 of
+                                                                  (TACInt i2) -> return [CMP4 (Register r1 DWORD) i2]
+                                                                  (TACChar c2) -> return [CMP4 (Register r1 DWORD) (ord c2)]
+                                                                  (TACVar v2) -> varRegister v2 >>= \r2 -> return [CMP1 (Register r1 DWORD) (Register r2 DWORD)]
+        let jmp = case op of
+                       TACEqual -> [JE label]
+                       TACNotEqual -> [JNE label]
+                       TACGreater -> [JG label]
+                       TACLess -> [JL label]
+        return $ cmp ++ jmp
+
+    nasmGenerateInstructions (TACIf _ _) = error "This TACIf is not implemented"
+    nasmGenerateInstructions (TACGoto label) = return [JMP label]
     nasmGenerateInstructions (TACCall label args ret) = do
         case ret of 
              Nothing -> nasmCall label args Nothing
