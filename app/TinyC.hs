@@ -14,7 +14,9 @@ main = do
     let infile = args !! 0
     let outfile = args !! 1
     cCode <- readFile infile
-    let ast = (parse . alexScanTokens) cCode
+    let ast = case (checkSemantics . parse . alexScanTokens) cCode of
+                   Left x -> error $ show x
+                   Right x -> x
     let st = symbolTable ast
     let tac = tacGenerate ast
     let nasm = nasmGenerate tac st
