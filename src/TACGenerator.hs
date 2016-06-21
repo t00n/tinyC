@@ -174,7 +174,7 @@ tacExpression (Var (Name n)) = return (TACVar n, [])
 tacExpression (Var (NameSubscription n e)) = do
     (t, lines) <- tacExpression e
     newvar <- lift popVariable
-    return (TACVar newvar, [TACArrayAccess newvar (TACArray n t)] ++ lines)
+    return (TACVar newvar, lines ++ [TACArrayAccess newvar (TACArray n t)])
 
 tacBinaryOperator :: BinaryOperator -> TACBinaryOperator
 tacBinaryOperator Plus = TACPlus
