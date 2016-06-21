@@ -23,9 +23,10 @@ data Register = Register RegisterName RegisterSize
 data AddressSize = BYTEADDRESS | WORDADDRESS | DWORDADDRESS
     deriving (Eq, Show)
 
-data Address = Address Register Multiplier Offset
-             | AddressBase Register Register Multiplier Offset
-             | AddressLabel Label Offset
+data Address = AddressRegisterOffset Register Offset Multiplier
+             | AddressRegisterRegister Register Offset Register Multiplier
+             | AddressLabelOffset Label Offset Multiplier
+             | AddressLabelRegister Label Register Multiplier
     deriving (Eq, Show)
 
 type Constant = Int

@@ -137,6 +137,22 @@ varRegister var = gets (fst . (M.! var))
 varLocation :: Variable -> SRSS VariableLocation
 varLocation var = gets (snd . (M.! var))
 
+arrayAddress :: TACExpression -> SRSS Address
+arrayAddress (TACArray var ex) = do
+    loc <- varLocation var
+    vartype <- lift $ gets (infoType . (unsafeGetSymbolInfo var))
+    let multiplier = if vartype == IntType then 4 else 1
+    case ex of
+         (TACInt i) -> case loc of
+                            (InMemory mem) -> return $ AddressLabelOffset mem i multiplier
+                            (InStack offset) -> return $ AddressRegisterOffset (Register SP DWORD) i multiplier
+         (TACChar c) -> case loc of
+                            (InMemory mem) -> return $ AddressLabelOffset mem (ord c) multiplier
+                            (InStack offset) -> return $ AddressRegisterOffset (Register SP DWORD) (ord c) multiplier
+         (TACVar v) -> varRegister v >>= \reg -> case loc of
+                                                      (InMemory mem) -> return $ AddressLabelRegister mem (Register reg DWORD) multiplier
+                                                      (InStack offset) -> return $ AddressRegisterRegister (Register SP DWORD) offset (Register reg DWORD) multiplier
+
 nasmGenerateMove :: Variable -> TACExpression -> SRSS [NASMInstruction]
 nasmGenerateMove var ex = do
     dest <- varRegister var
@@ -167,6 +183,7 @@ nasmGeneratePlus var e1 e2 = do
                             (TACInt i2) -> return $ mov1 ++ [ADD4 (Register dest DWORD) i2]
                             (TACChar c2) -> return $ mov1 ++ [ADD4 (Register dest DWORD) (ord c2)]
                             (TACVar v2) -> varRegister v2 >>= \r2 -> return $ if r1 == dest then [ADD1 DWORD dest r2] else if r2 == dest then [ADD1 DWORD dest r1] else mov1 ++ [ADD1 DWORD dest r2]
+
 nasmGenerateMinus :: Variable -> TACExpression -> TACExpression -> SRSS [NASMInstruction]
 nasmGenerateMinus var e1 e2 = do
     dest <- varRegister var
@@ -259,22 +276,19 @@ instance NASMGenerator TACInstruction where
                                                        TACNot -> return [NOT1 (Register reg DWORD)]
         liftM2 (++) (nasmGenerateMove var ex) applyOp
     nasmGenerateInstructions (TACCopy var ex) = nasmGenerateMove var ex
-    --nasmGenerateInstructions (TACArrayDecl var [TACExpression]) = 
-    --nasmGenerateInstructions (TACArrayAccess var TACExpression) = 
-    --nasmGenerateInstructions (TACArrayModif TACExpression TACExpression) = 
     nasmGenerateInstructions (TACLoad var) = do
         reg <- varRegister var
         location <- varLocation var
         let addr = case location of
-                        (InStack offset) -> Address (Register BP DWORD) 1 offset
-                        (InMemory label) -> AddressLabel label 0
+                        (InStack offset) -> AddressRegisterOffset (Register BP DWORD) offset 1
+                        (InMemory label) -> AddressLabelOffset label 0 1
         return [MOV2 (Register reg DWORD) addr]
     nasmGenerateInstructions (TACStore var) = do
         reg <- varRegister var
         location <- varLocation var
         let addr = case location of
-                        (InStack offset) -> Address (Register BP DWORD) 1 offset
-                        (InMemory label) -> AddressLabel label 0
+                        (InStack offset) -> AddressRegisterOffset (Register BP DWORD) offset 1
+                        (InMemory label) -> AddressLabelOffset label 0 1
         return [MOV3 addr (Register reg DWORD)]
     nasmGenerateInstructions (TACIf (TACExpr e1 op e2) label) = do
         cmp <- case e1 of
@@ -325,6 +339,9 @@ instance NASMGenerator TACInstruction where
     nasmGenerateInstructions (TACLabel label) = return [LABEL label]
     nasmGenerateInstructions (TACWrite ex) = nasmCall "_writeint" [ex] Nothing
     --nasmGenerateInstructions (TACRead TACExpression) = 
+    --nasmGenerateInstructions (TACArrayDecl var es) = 
+    --nasmGenerateInstructions (TACArrayAccess var TACExpression) = 
+    --nasmGenerateInstructions (TACArrayModif TACExpression TACExpression) = 
     nasmGenerateInstructions _ = return []
 
 type SRSS = StateT RegisterState (StateT SymbolTable (State Flags))
@@ -568,10 +585,23 @@ instance NASMShow AddressSize where
     nasmShow WORDADDRESS = "word"
     nasmShow DWORDADDRESS = "byte"
 
+showOffsetMult :: Offset -> Multiplier -> String
+showOffsetMult offset mult = if offset /= 0 && mult /= 0 then 
+                                 "+" ++ if mult /= 1 then show offset ++ "*" ++ show mult
+                                        else show offset
+                             else ""
+
+showOffsetRegisterMult :: Offset -> Register -> Multiplier -> String
+showOffsetRegisterMult offset reg mult = (if offset /= 0 then "+" ++ show offset else "")
+                                      ++ (if mult /= 0 then "+" ++ show reg ++ 
+                                              (if mult /= 1 then "*" ++ show mult else "")
+                                          else "")
+
 instance NASMShow Address where
-    nasmShow (Address reg mult offset) = "[" ++ nasmShow reg ++ (if offset /= 0 && mult /= 0 then "+" ++ nasmShow mult ++ "*" ++ nasmShow offset ++ "]" else [])
-    nasmShow (AddressBase r1 r2 mult offset) = "[" ++ nasmShow r1 ++ (if mult /= 0 then "+" ++ nasmShow r2 ++ "*" ++ nasmShow mult else []) ++ (if offset /= 0 then "+" ++ nasmShow offset else []) ++ "]"
-    nasmShow (AddressLabel label offset) = "[" ++ nasmShow label ++ (if offset /= 0 then "+" ++ nasmShow offset else []) ++ "]"
+    nasmShow (AddressRegisterOffset reg offset mult) = "[" ++ nasmShow reg ++ showOffsetMult offset mult ++ "]"
+    nasmShow (AddressRegisterRegister r1 offset r2 mult) = "[" ++ nasmShow r1 ++ showOffsetRegisterMult offset r2 mult ++ "]"
+    nasmShow (AddressLabelOffset label offset mult) = "[" ++ nasmShow label ++ showOffsetMult offset mult ++ "]"
+    nasmShow (AddressLabelRegister label register mult) = "[" ++ nasmShow label ++ showOffsetRegisterMult 0 register mult ++ "]"
 instance NASMShow Multiplier where
     nasmShow = show
 
