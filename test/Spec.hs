@@ -439,10 +439,6 @@ main = hspec $ do
             let st = symbolTable ast
             let tac = tacGenerate ast
             let (vMap, spilled, is) = mapVariablesToRegisters (concat $ tacCode tac) 6 M.empty
-            putStrLn $ show vMap
-            putStrLn $ show spilled
-            putStrLn $ tacPrint $ tacData tac
-            putStrLn $ tacPrint is
             putStrLn $ nasmShow $ nasmGenerate tac st
     describe "Tests live variable analysis" $ do
         it "tests graphs creation" $ do

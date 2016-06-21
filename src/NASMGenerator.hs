@@ -127,7 +127,7 @@ instance NASMGenerator TACFunction where
         pre <- nasmGeneratePreFunction funcName offset
         nasmIS <- (mapM nasmGenerateInstructions (modifyInstructions inRegisters params globals (tail is))) >>= return . concat
         post <- nasmGeneratePostFunction funcName
-        traceShow totalMapping $ return $ pre ++ nasmIS
+        return $ pre ++ nasmIS
 
 
 retInstructions :: [NASMInstruction]
@@ -167,6 +167,10 @@ nasmGenerateMove var ex = do
          (TACVar v) -> varRegister v >>= \reg -> if dest /= reg 
                                                             then return [MOV1 DWORD dest reg]
                                                         else return []
+
+nasmWrapNoRegister :: [RegisterName] -> [RegisterName -> NASMInstruction] -> [NASMInstruction]
+nasmWrapNoRegister toKeep inst = let pick = head [x | x <- registers, not (x `elem` toKeep)]
+                                 in [PUSH1 pick] ++ map ($ pick) inst ++ [POP1 pick]
 
 nasmGeneratePlus :: Variable -> TACExpression -> TACExpression -> SRSS [NASMInstruction]
 nasmGeneratePlus var e1 e2 = do
@@ -250,8 +254,8 @@ nasmGenerateDivide var e1 e2 = do
                              (TACChar c2) -> return $ predest ++ [PUSH1 B, MOV4 (Register A DWORD) (ord c1), MOV4 (Register B DWORD) (ord c2), IDIV1 B, POP1 B] ++ postdest
                              (TACVar v2) -> varRegister v2 >>= \src -> return $ predest ++ [MOV4 (Register A DWORD) (ord c1), IDIV1 src] ++ postdest
          (TACVar v1) -> case e2 of
-                             (TACInt i2) -> varRegister v1 >>= \src -> return $ predest ++ pre src ++ [PUSH1 B, MOV4 (Register B DWORD) i2, IDIV1 B, POP1 B] ++ postdest
-                             (TACChar c2) -> varRegister v1 >>= \src -> return $ predest ++ pre src ++ [PUSH1 B, MOV4 (Register B DWORD) (ord c2), IDIV1 B, POP1 B] ++ postdest
+                             (TACInt i2) -> varRegister v1 >>= \src -> return $ predest ++ pre src ++ nasmWrapNoRegister [src, A, D] [\x -> MOV4 (Register x DWORD) i2, \x -> IDIV1 x] ++ postdest
+                             (TACChar c2) -> varRegister v1 >>= \src -> return $ predest ++ pre src ++ nasmWrapNoRegister [src, A, D] [\x -> MOV4 (Register x DWORD) (ord c2), \x -> IDIV1 x] ++ postdest
                              (TACVar v2) -> varRegister v1 >>= \src1 -> varRegister v2 >>= \src2 -> return $ predest ++ pre src1 ++ [IDIV1 src2] ++ postdest
 
 
