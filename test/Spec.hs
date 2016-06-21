@@ -443,6 +443,7 @@ main = hspec $ do
             putStrLn $ show spilled
             putStrLn $ tacPrint $ tacData tac
             putStrLn $ tacPrint is
+            putStrLn $ nasmShow $ nasmGenerate tac st
     describe "Tests live variable analysis" $ do
         it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"

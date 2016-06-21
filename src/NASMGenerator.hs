@@ -69,15 +69,20 @@ foldLocal spilled rMapping var (mapping, offset) = do
     info <- lift (gets (getSymbolInfo var))
     let newoffset = case info of
             Nothing -> offset - 4
-            (Just x) -> offset - (if (infoType x) == IntType then 4 else 1)
+            (Just x) -> let t = infoType x
+                            scalarity = infoScalarity x
+                            size = infoSize x
+                        in offset - (if (infoType x) == IntType then 4 else 1) * size
     if var `elem` spilled
         then return (M.insert var (rMapping M.! var, InStack newoffset) mapping, newoffset)
     else return (M.insert var (rMapping M.! var, InRegister (rMapping M.! var)) mapping, offset)
 
 foldParam :: M.Map String RegisterName -> Variable -> (M.Map String (RegisterName, VariableLocation), Offset) -> SRSS (M.Map String (RegisterName, VariableLocation), Offset)
 foldParam rMapping var (mapping, offset) = do
-    t <- lift (gets (infoType . (unsafeGetSymbolInfo var)))
-    let newoffset = offset + (if t == IntType then 4 else 1)
+    info <- lift (gets (unsafeGetSymbolInfo var))
+    let t = infoType info
+    let scalarity = infoScalarity info
+    let newoffset = offset + (if t == IntType || scalarity == Array then 4 else 1)
     return (M.insert var (rMapping M.! var, InStack offset) mapping, newoffset)
 
 modifyInstructions :: [Variable] -> [Variable] -> [Variable] -> TACFunction -> TACFunction
@@ -122,7 +127,7 @@ instance NASMGenerator TACFunction where
         pre <- nasmGeneratePreFunction funcName offset
         nasmIS <- (mapM nasmGenerateInstructions (modifyInstructions inRegisters params globals (tail is))) >>= return . concat
         post <- nasmGeneratePostFunction funcName
-        return $ pre ++ nasmIS
+        traceShow totalMapping $ return $ pre ++ nasmIS
 
 
 retInstructions :: [NASMInstruction]
