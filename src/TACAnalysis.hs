@@ -24,6 +24,7 @@ type RegisterInterferenceGraph = G.Graph Variable
 type K = Int
 type RegisterNo = Int
 type RegisterMapping = M.Map Variable RegisterNo
+type RegisterConstraintsInt = M.Map Variable (S.Set RegisterNo)
 
 -- map labels to instruction
 constructLabelKey :: TACFunction -> LabelInstructionMapping
@@ -120,19 +121,19 @@ simplifyRIG2 xs spills g k =
 simplifyRIG :: RegisterInterferenceGraph -> K -> (Variables, Spilled)
 simplifyRIG = simplifyRIG2 [] []
 
-findRegister :: Variable -> Variables -> K -> RegisterMapping -> Int
-findRegister node neigh k mapping = 
+findRegister :: Variable -> Variables -> K -> RegisterMapping -> RegisterConstraintsInt -> Int
+findRegister node neigh k mapping negConstraints = 
     let registersUsed = M.elems $ M.filterWithKey (\k v -> k `elem` neigh) mapping
-    in head $ [x | x <- [0..(k-1)], not (x `elem` registersUsed)]
+    in head $ [x | x <- [0..(k-1)], not (x `elem` registersUsed), node `M.notMember` negConstraints || x `S.notMember` (negConstraints M.! node)]
 
-findRegisters2 :: Variables -> RegisterInterferenceGraph -> K -> RegisterMapping -> RegisterMapping
-findRegisters2 [] _ _ mapping = mapping
-findRegisters2 (n:ns) g k mapping = 
-    let register = findRegister n (map (flip G.unsafeLookup g) $ S.toList $ G.neighbours (G.find n g) g) k mapping
-    in findRegisters2 ns g k (M.insert n register mapping)
+findRegisters2 :: Variables -> RegisterInterferenceGraph -> K -> RegisterMapping -> RegisterConstraintsInt -> RegisterMapping
+findRegisters2 [] _ _ mapping _ = mapping
+findRegisters2 (n:ns) g k mapping negConstraints = 
+    let register = findRegister n (map (flip G.unsafeLookup g) $ S.toList $ G.neighbours (G.find n g) g) k mapping negConstraints
+    in findRegisters2 ns g k (M.insert n register mapping) negConstraints
 
-findRegisters :: Variables -> RegisterInterferenceGraph -> K -> RegisterMapping
-findRegisters nodes g k = findRegisters2 nodes g k M.empty
+findRegisters :: Variables -> RegisterInterferenceGraph -> K -> RegisterConstraintsInt -> RegisterMapping
+findRegisters nodes g k negConstraints = findRegisters2 nodes g k M.empty negConstraints
 
 fixInstructions :: TACFunction -> Spilled -> TACFunction
 fixInstructions is spilled = concatMap f is
@@ -141,8 +142,8 @@ fixInstructions is spilled = concatMap f is
                   load = foldr (\x acc -> if S.member x used then (TACLoad x:acc) else acc) [] spilled
                   store = foldr (\x acc -> if S.member x def then (TACStore x:acc) else acc) [] spilled
 
-mapVariablesToRegisters :: TACFunction -> K -> (RegisterMapping, Spilled, TACFunction)
-mapVariablesToRegisters is k = 
+mapVariablesToRegisters :: TACFunction -> K -> RegisterConstraintsInt -> (RegisterMapping, Spilled, TACFunction)
+mapVariablesToRegisters is k negConstraints = 
     let cfg = controlFlowGraph is
         df = dataFlowGraph cfg
         rig = registerInterferenceGraph df
@@ -152,5 +153,5 @@ mapVariablesToRegisters is k =
         newrig = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) newis
     in
     if spilled == []
-        then (findRegisters nodes rig k, [], is)
-    else (findRegisters newnodes newrig (k-1), newspilled, newis)
+        then (findRegisters nodes rig k negConstraints, [], is)
+    else (findRegisters newnodes newrig (k-1) negConstraints, newspilled, newis)

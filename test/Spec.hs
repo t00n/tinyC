@@ -458,7 +458,7 @@ main = hspec $ do
             rig `shouldBe` Graph (M.fromList [(0,"a"),(1,"b"),(2,"c"),(3,"t1"),(4,"t2"),(5,"t3")]) (S.fromList [(0,1),(0,2),(1,0),(1,2),(1,3),(2,0),(2,1),(2,3),(3,1),(3,2),(3,4),(4,3)])
             let (nodes, spilled) = simplifyRIG rig 3
             (nodes, spilled) `shouldBe` (["a","b","c","t1","t2","t3"],[])
-            findRegisters nodes rig 3 `shouldBe` M.fromList [("a",0),("b",1),("c",2),("t1",0),("t2",1),("t3",0)]
+            findRegisters nodes rig 3 M.empty `shouldBe` M.fromList [("a",0),("b",1),("c",2),("t1",0),("t2",1),("t3",0)]
         it "tests register allocation with enough registers on real program" $ do
             code <- readFile "test/fixtures/fibonacci.c"
             let ast = scan_and_parse code
@@ -469,7 +469,7 @@ main = hspec $ do
             let rig = registerInterferenceGraph df
             let (nodes, spilled) = simplifyRIG rig 3
             (nodes, spilled) `shouldBe` (["i","n","t1","t2","t3","t4","t5","t6","t7","t8"],[])
-            findRegisters nodes rig 3 `shouldBe` M.fromList [("i",0),("n",0),("t1",0),("t2",1),("t3",1),("t4",0),("t5",0),("t6",0),("t7",1),("t8",0)]
+            findRegisters nodes rig 3 M.empty `shouldBe` M.fromList [("i",0),("n",0),("t1",0),("t2",1),("t3",1),("t4",0),("t5",0),("t6",0),("t7",1),("t8",0)]
         it "tests register alloction with not enough registers" $ do
             code <- readFile "test/fixtures/bigprogram.c"
             let ast = scan_and_parse code
@@ -487,7 +487,7 @@ main = hspec $ do
             let dfg = dataFlowGraph cfg
             let rig = registerInterferenceGraph dfg
             writeFile "rig2.dot" (toDot rig)
-            findRegisters nodes rig 5 `shouldBe` M.fromList [("a",0),("b",1),("c",2),("t1",3),("t10",0),("t11",0),("t2",4),("t3",3),("t4",4),("t6",4),("t7",3),("t8",0),("t9",1)]
+            findRegisters nodes rig 5 M.empty `shouldBe` M.fromList [("a",0),("b",1),("c",2),("t1",3),("t10",0),("t11",0),("t2",4),("t3",3),("t4",4),("t6",4),("t7",3),("t8",0),("t9",1)]
     describe "Tests nasm analysis and optimization" $ do
         it "Tests negative constraints on register allocation" $ do
             code <- readFile "test/fixtures/bigprogram.c"

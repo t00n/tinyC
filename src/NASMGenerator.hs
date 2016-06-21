@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances, OverlappingInstances #-}
 
-module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, nasmShow, NASMProgram(..), NASMData(..), DataSize(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..)) where
+module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText, nasmShow, NASMProgram(..), NASMData(..), DataSize(..), NASMInstruction(..), RegisterName(..), RegisterSize(..), Register(..), Address(..), AddressSize(..), registers) where
 
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -21,6 +21,7 @@ import SymbolTable
 import TACAnalysis
 import Graph
 import Parser (Type(..))
+import NASMAnalysis
 
 nasmGenerate :: TACProgram -> SymbolTable -> NASMProgram
 nasmGenerate p = NASMProgram <$> nasmGenerateData p <*> nasmGenerateText p
@@ -104,7 +105,8 @@ instance NASMGenerator TACFunction where
             Nothing -> lift $ put st
             (Just x) -> lift $ put x
         let funcName = (labelToName . head) xs
-        let (varIntMap, spilled, is) = mapVariablesToRegisters xs (length registers)
+        let negConstraints = (constraintsRegisterNameToInt . negativeConstraints) xs
+        let (varIntMap, spilled, is) = mapVariablesToRegisters xs (length registers) negConstraints
         let varRegMap = M.map (\v -> registers !! v) varIntMap `M.union` M.fromList (map (\x -> (x, last registers)) spilled)
         let variables = M.keys varRegMap
         let inRegisters = variables \\ spilled
@@ -331,13 +333,6 @@ data Flags = Flags {
     inTiny :: Bool
 }
 
-type RegisterState = M.Map String (RegisterName, VariableLocation)
-
-data VariableLocation = InRegister RegisterName
-                      | InMemory Label
-                      | InStack Offset
-    deriving (Eq, Show)
-
 data NASMProgram = NASMProgram [NASMData] [NASMInstruction]
     deriving (Eq, Show)
 
@@ -427,32 +422,6 @@ data NASMInstruction = LABEL Label
                      | RET
                      | INTERRUPT Constant
     deriving (Eq, Show)
-
-data RegisterSize = LSB | MSB | WORD | DWORD
-    deriving (Eq, Show)
-
-data RegisterName = A | B | C | D | SI | DI | SP | BP
-    deriving (Eq, Show, Ord)
-
-registers :: [RegisterName]
-registers = [A, C, D, SI, DI, B]
-
-data Register = Register RegisterName RegisterSize
-    deriving (Eq, Show)
-
-data AddressSize = BYTEADDRESS | WORDADDRESS | DWORDADDRESS
-    deriving (Eq, Show)
-
-data Address = Address Register Multiplier Offset
-             | AddressBase Register Register Multiplier Offset
-             | AddressLabel Label Offset
-    deriving (Eq, Show)
-
-type Constant = Int
-
-type Multiplier = Int
-
-type Offset = Int
 
 class NASMShow a where
     nasmShow :: a -> String
