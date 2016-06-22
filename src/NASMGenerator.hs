@@ -384,11 +384,14 @@ instance NASMGenerator TACInstruction where
         case ex of
             (TACVar v2) -> varAddress v2 >>= \addr -> return [MOV2 (Register reg DWORD) addr]
     nasmGenerateInstructions (TACDeRefA var ex) = do
-        addr <- varAddress var
-        case ex of
-            (TACInt i2) -> return [MOV5 DWORDADDRESS addr i2]
-            (TACChar c2) -> return [MOV5 BYTEADDRESS addr (ord c2)]
-            (TACVar v2) -> varRegister v2 >>= \reg -> return [MOV3 addr (Register reg DWORD)]
+        info <- gets (M.lookup var)
+        case info of
+            Nothing -> return []
+            Just _ -> varAddress var >>= \addr -> 
+                            case ex of
+                                (TACInt i2) -> return [MOV5 DWORDADDRESS addr i2]
+                                (TACChar c2) -> return [MOV5 BYTEADDRESS addr (ord c2)]
+                                (TACVar v2) -> varRegister v2 >>= \reg -> return [MOV3 addr (Register reg DWORD)]
     nasmGenerateInstructions _ = return []
 
 type SRSS = StateT RegisterState (StateT SymbolTable (State Flags))
