@@ -154,13 +154,16 @@ arrayAddress var ex = do
 
 nasmGenerateMove :: Variable -> TACExpression -> SRSS [NASMInstruction]
 nasmGenerateMove var ex = do
-    dest <- varRegister var
-    case ex of
-         (TACInt i) -> return [MOV4 (Register dest DWORD) i]
-         (TACChar c) -> return [MOV4 (Register dest LSB) (ord c)]
-         (TACVar v) -> varRegister v >>= \reg -> if dest /= reg 
-                                                            then return [MOV1 DWORD dest reg]
-                                                        else return []
+    info <- gets (M.lookup var)
+    case info of 
+        Nothing -> return []
+        (Just (dest, _)) -> 
+            case ex of
+                 (TACInt i) -> return [MOV4 (Register dest DWORD) i]
+                 (TACChar c) -> return [MOV4 (Register dest LSB) (ord c)]
+                 (TACVar v) -> varRegister v >>= \reg -> if dest /= reg 
+                                                                    then return [MOV1 DWORD dest reg]
+                                                                else return []
 
 nasmWrapNoRegister :: [RegisterName] -> [RegisterName -> NASMInstruction] -> [NASMInstruction]
 nasmWrapNoRegister toKeep inst = let pick = head [x | x <- registers, not (x `elem` toKeep)]
