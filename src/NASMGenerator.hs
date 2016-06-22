@@ -353,7 +353,14 @@ instance NASMGenerator TACInstruction where
         addr <- arrayAddress array index
         if t == IntType then return [MOV2 (Register reg DWORD) addr]
         else return [XOR1 DWORD reg reg, MOV2 (Register reg LSB) addr]
-    --nasmGenerateInstructions (TACArrayModif TACExpression TACExpression) = 
+    nasmGenerateInstructions (TACArrayModif array index ex) = do
+        addr <- arrayAddress array index
+        t <- lift $ gets (infoType . (unsafeGetSymbolInfo array))
+        let size = if t == IntType then DWORDADDRESS else BYTEADDRESS
+        case ex of
+             (TACInt i) -> return [MOV5 size addr i]
+             (TACChar c) -> return [MOV5 size addr (ord c)]
+             (TACVar v) -> varRegister v >>= \reg -> return [MOV3 addr (Register reg DWORD)]
     nasmGenerateInstructions _ = return []
 
 type SRSS = StateT RegisterState (StateT SymbolTable (State Flags))
