@@ -11,6 +11,7 @@ import Text.Printf (printf)
 
 %token
     int             { TokenWrapper (INT) (_, _, _) }
+    '&'             { TokenWrapper (ADDR) (_, _, _) }
     if              { TokenWrapper (IF) (_, _, _) }
     else            { TokenWrapper (ELSE) (_, _, _) }
     '!='            { TokenWrapper (NEQUAL) (_, _, _) }
@@ -49,6 +50,7 @@ import Text.Printf (printf)
 %left '+' '-'
 %left '*' '/'
 %right '!' NEG
+%right '&'
 %left '[' ']' '(' ')' '{' '}'
 %%
 
@@ -135,6 +137,7 @@ expr : number                                     { Int $1 }
      | '!' expr                                   { UnOp Not $2 }
      | name '(' args ')'                          { Call (Name $1) (reverse $3) }
      | length var                                 { Length $2 }
+     | '&' var                                    { Address $2 }
 
 type :: { Type }
 type : int                                        { IntType }
@@ -187,6 +190,7 @@ data Expression = Int Int
                 | Call Name [Expression]
                 | Length Name
                 | Var Name
+                | Address Name
     deriving (Eq, Show)
 
 data Name = Name String

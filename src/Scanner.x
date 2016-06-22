@@ -11,6 +11,7 @@ tokens :-
     $white+         ; -- spaces etc
     \/\/.*          ; -- comments
     int             { tokenWrapper (\s -> INT) }
+    &               { tokenWrapper (\s -> ADDR) }
     if              { tokenWrapper (\s -> IF) }
     else            { tokenWrapper (\s -> ELSE) }
     !=              { tokenWrapper (\s -> NEQUAL) }
@@ -57,7 +58,7 @@ data Token = INT | IF | ELSE | NEQUAL
            | TIMES_OR_PTR | DIVIDE | EQUAL | CHAR
            | WRITE | READ | GREATER | LESS
            | NOT | LENGTH | WHILE
-           | NAME String | NUMBER Int | QCHAR Char | QSTRING String
+           | NAME String | NUMBER Int | QCHAR Char | QSTRING String | ADDR
            deriving (Eq)
 
 instance Show Token where
@@ -92,4 +93,5 @@ instance Show Token where
     show (NUMBER i) = show i
     show (QCHAR c) = show c
     show (QSTRING s) = s
+    show ADDR = "&"
 }
