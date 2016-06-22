@@ -21,10 +21,10 @@ tacGenerate :: [Declaration] -> TACProgram
 tacGenerate = TACProgram <$> tacGenerateData <*> tacGenerateText
 
 tacGenerateData :: [Declaration] -> [TACInstruction]
-tacGenerateData xs = evalNames (evalStateT (tacGenerateInstructions xs) (zipper emptyST)) (infiniteNames "_t") (infiniteNames "_l")
+tacGenerateData xs = evalNames (evalStateT (tacGenerateInstructions xs) (zipper emptyST)) (infiniteNames "t") (infiniteNames "l")
 
 tacGenerateText :: [Declaration] -> [[TACInstruction]]
-tacGenerateText xs = evalNames (evalStateT (tacGenerateAllFunctions xs) (zipper emptyST)) (infiniteNames "_t") (infiniteNames "_l")
+tacGenerateText xs = evalNames (evalStateT (tacGenerateAllFunctions xs) (zipper emptyST)) (infiniteNames "t") (infiniteNames "l")
 
 class TACGenerator a where
     tacGenerateInstructions :: a -> SSNSS [TACInstruction]
