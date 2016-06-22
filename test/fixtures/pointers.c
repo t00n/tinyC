@@ -7,10 +7,12 @@ int tiny() {
     int xs[5];
     xs[0] = 10;
     xs[1] = 15;
+    xs[2] = 20;
     b = &xs[2];
+    write *b;
     a = b;
     *a = 5;
-    *a = x;
+    b = a;
     write *b;
     b = xs;
     write *b;
