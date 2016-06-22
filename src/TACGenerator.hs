@@ -291,6 +291,8 @@ instance TACPrint TACInstruction where
     tacPrint (TACLabel l) = l ++ ":"
     tacPrint (TACWrite _ v) = "write " ++ tacPrint v
     tacPrint (TACRead _ e) = "read " ++ tacPrint e
+    tacPrint (TACAddress v e) = v ++ " = &" ++ tacPrint e
+    tacPrint (TACDeRef v e) = v ++ " = *" ++ tacPrint e
 
 instance TACPrint TACBinaryOperator where
     tacPrint TACPlus = "+"
@@ -310,4 +312,5 @@ instance TACPrint TACExpression where
     tacPrint (TACInt i) = show i
     tacPrint (TACChar c) = show c
     tacPrint (TACVar s) = s 
+    tacPrint (TACArray v e) = v ++ "[" ++ tacPrint e ++ "]"
     tacPrint (TACExpr e1 op e2) = (tacPrint e1) ++ (tacPrint op) ++ (tacPrint e2)

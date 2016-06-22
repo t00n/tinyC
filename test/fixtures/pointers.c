@@ -1,7 +1,7 @@
 
-int * a;
 
 int tiny() {
+    int * a;
     int x = 5;
     int * b;
     int xs[5];

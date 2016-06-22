@@ -142,6 +142,11 @@ varRegister var = gets (fst . (M.! var))
 varLocation :: Variable -> SRSS VariableLocation
 varLocation var = gets (snd . (M.! var))
 
+varAddress :: String -> SRSS Address
+varAddress var = do
+    reg <- varRegister var
+    traceShow var $ return $ AddressRegisterOffset (Register reg DWORD) 0 1
+
 arrayAddress :: String -> TACExpression -> SRSS Address
 arrayAddress var ex = do
     reg <- varRegister var
@@ -374,6 +379,10 @@ instance NASMGenerator TACInstruction where
         case ex of
             (TACArray name index) -> arrayAddress name index >>= \addr -> return [LEA reg addr]
             _ -> return []
+    nasmGenerateInstructions (TACDeRef var ex) = do
+        reg <- varRegister var
+        case ex of
+            (TACVar v2) -> varAddress v2 >>= \addr -> return [MOV2 (Register reg DWORD) addr]
     nasmGenerateInstructions _ = return []
 
 type SRSS = StateT RegisterState (StateT SymbolTable (State Flags))

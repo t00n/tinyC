@@ -473,7 +473,7 @@ main = hspec $ do
             let st = symbolTable ast
             let tac = tacGenerate st ast
             let nasm = nasmGenerate tac st
-            putStrLn $ show st
+            putStrLn $ tacPrint $ tacCode tac
             nasm `shouldBe` NASMProgram [] []
         it "Generates code for pointersbad.c" $ do
             code <- readFile "test/fixtures/pointersbad.c"
