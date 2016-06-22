@@ -600,9 +600,9 @@ instance NASMShow NASMInstruction where
     nasmShow (INTERRUPT cst) = instShow "int" [showHex cst ""]
 
 instance NASMShow AddressSize where
-    nasmShow BYTEADDRESS = "dword"
+    nasmShow BYTEADDRESS = "byte"
     nasmShow WORDADDRESS = "word"
-    nasmShow DWORDADDRESS = "byte"
+    nasmShow DWORDADDRESS = "dword"
 
 showOffsetMult :: Offset -> Multiplier -> String
 showOffsetMult offset mult = if offset /= 0 && mult /= 0 then 
