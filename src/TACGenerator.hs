@@ -75,7 +75,7 @@ instance TACGenerator Statement where
     tacGenerateInstructions (Assignment (NameSubscription n i) e) = do
         (t1, lines1) <- tacExpression i
         (t2, lines2) <- tacExpression e
-        return $ lines1 ++ lines2 ++ [TACArrayModif (TACArray n t1) t2]
+        return $ lines1 ++ lines2 ++ [TACArrayModif n t1 t2]
     tacGenerateInstructions (If e stmt) = do
         (t, lines) <- tacRelExpression e
         labelYes <- lift popLabel
@@ -174,7 +174,7 @@ tacExpression (Var (Name n)) = return (TACVar n, [])
 tacExpression (Var (NameSubscription n e)) = do
     (t, lines) <- tacExpression e
     newvar <- lift popVariable
-    return (TACVar newvar, lines ++ [TACArrayAccess newvar (TACArray n t)])
+    return (TACVar newvar, lines ++ [TACArrayAccess newvar n t])
 
 tacBinaryOperator :: BinaryOperator -> TACBinaryOperator
 tacBinaryOperator Plus = TACPlus
@@ -205,8 +205,8 @@ data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpres
                     | TACUnary String TACUnaryOperator TACExpression
                     | TACCopy String TACExpression
                     | TACArrayDecl String [TACExpression]
-                    | TACArrayAccess String TACExpression
-                    | TACArrayModif TACExpression TACExpression
+                    | TACArrayAccess String String TACExpression
+                    | TACArrayModif String TACExpression TACExpression
                     | TACLoad String
                     | TACStore String
                      -- | TACAddress TACExpression TACExpression
@@ -237,13 +237,15 @@ data TACUnaryOperator = TACNeg | TACNot
 data TACExpression = TACInt Int
                    | TACChar Char
                    | TACVar String
-                   | TACArray String TACExpression
                    | TACExpr TACExpression TACBinaryOperator TACExpression
     deriving (Eq, Show, Ord)
 
 
 class TACPrint a where
     tacPrint :: a -> String
+
+tacShowArray :: String -> TACExpression -> String
+tacShowArray array ex = array ++ "[" ++ tacPrint ex ++ "]"
 
 instance TACPrint a => TACPrint [a] where
     tacPrint [] = ""
@@ -257,8 +259,8 @@ instance TACPrint TACInstruction where
     tacPrint (TACUnary var op e) = var ++ " = " ++ tacPrint op ++ tacPrint e
     tacPrint (TACCopy var e) = var ++ " = " ++ tacPrint e
     tacPrint (TACArrayDecl s xs) = s ++ " = { " ++ concatMap (\x -> tacPrint x ++ " ") xs ++ " }"
-    tacPrint (TACArrayAccess e1 e2) = e1 ++ " = " ++ tacPrint e2
-    tacPrint (TACArrayModif e1 e2) = tacPrint e1 ++ " = " ++ tacPrint e2
+    tacPrint (TACArrayAccess var array ex) = var ++ " = " ++ tacShowArray array ex 
+    tacPrint (TACArrayModif array index ex) = tacShowArray array index ++ " = " ++ tacPrint ex
     tacPrint (TACLoad s) = "load " ++ s
     tacPrint (TACStore s) = "store " ++ s
     tacPrint (TACIf e l) = "if " ++ tacPrint e ++ " goto " ++ l
@@ -288,5 +290,4 @@ instance TACPrint TACExpression where
     tacPrint (TACInt i) = show i
     tacPrint (TACChar c) = show c
     tacPrint (TACVar s) = s 
-    tacPrint (TACArray s e) = s ++ "[" ++ tacPrint e ++ "]"
     tacPrint (TACExpr e1 op e2) = (tacPrint e1) ++ (tacPrint op) ++ (tacPrint e2)

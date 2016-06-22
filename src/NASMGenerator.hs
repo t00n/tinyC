@@ -142,8 +142,8 @@ varRegister var = gets (fst . (M.! var))
 varLocation :: Variable -> SRSS VariableLocation
 varLocation var = gets (snd . (M.! var))
 
-arrayAddress :: TACExpression -> SRSS Address
-arrayAddress (TACArray var ex) = do
+arrayAddress :: String -> TACExpression -> SRSS Address
+arrayAddress var ex = do
     loc <- varLocation var
     vartype <- lift $ gets (infoType . (unsafeGetSymbolInfo var))
     let multiplier = if vartype == IntType then 4 else 1
@@ -342,7 +342,6 @@ instance NASMGenerator TACInstruction where
                                 let reg = fst (mapping M.! var) 
                                 in  if reg == A then []
                                     else [MOV1 DWORD A reg]
-                            -- TACArray TODO
         let ret = if tiny then exitInstructions else retInstructions
         return $ retValue ++ ret
     nasmGenerateInstructions (TACLabel label) = return [LABEL label]
@@ -354,7 +353,8 @@ instance NASMGenerator TACInstruction where
         let mult = if infoType info == IntType then 4 else 1
         let size = infoSize info
         return [ADD4 (Register SP DWORD) (mult * size), MOV1 DWORD reg SP]
-    --nasmGenerateInstructions (TACArrayAccess var TACExpression) = 
+    --nasmGenerateInstructions (TACArrayAccess var ex) = do
+    --    reg <- varRegister var
     --nasmGenerateInstructions (TACArrayModif TACExpression TACExpression) = 
     nasmGenerateInstructions _ = return []
 

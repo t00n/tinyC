@@ -58,7 +58,6 @@ usedAndDefinedVariables :: TACInstruction -> (S.Set String, S.Set String)
 usedAndDefinedVariables inst = 
     let
         variableName (TACVar n) = [n]
-        variableName (TACArray n e) = n:variableName e
         variableName (TACExpr e1 _ e2) = concatMap variableName [e1, e2]
         variableName _ = []
         expressionsToSet es = S.fromList $ concatMap variableName es
@@ -68,8 +67,8 @@ usedAndDefinedVariables inst =
         (TACUnary s _ e) -> (expressionsToSet [e], S.fromList [s])
         (TACCopy s e) -> (expressionsToSet [e], S.fromList [s])
         (TACArrayDecl var ex) -> (expressionsToSet ex, S.fromList [var])
-        (TACArrayAccess s e) -> (expressionsToSet [e], S.fromList[s])
-        (TACArrayModif e1 e2) -> (expressionsToSet [e2], expressionsToSet [e1])
+        (TACArrayAccess var array ex) -> (expressionsToSet [TACVar array, ex], S.fromList [var])
+        (TACArrayModif array index ex) -> (expressionsToSet [index, ex], S.fromList [array])
         (TACIf e _) -> (expressionsToSet [e], S.empty)
         (TACCall _ es ret) -> case ret of
                                    Nothing -> (expressionsToSet es, S.empty)

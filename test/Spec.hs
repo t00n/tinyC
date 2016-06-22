@@ -356,11 +356,11 @@ main = hspec $ do
             let ast = scan_parse_check "int tiny() { int a; a = (a + 5) * 3; }"
             tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 0),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "t1") TACTimes (TACInt 3),TACCopy "a" (TACVar "t2"),TACReturn Nothing]]
             let ast = scan_parse_check "int a[5]; int b = a[2]; int tiny() {}"
-            tacGenerate ast `shouldBe` TACProgram [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACCopy "b" (TACVar "t1")] [[TACLabel "tiny",TACReturn Nothing]]
+            tacGenerate ast `shouldBe` TACProgram [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" "a" (TACInt 2),TACCopy "b" (TACVar "t1")] [[TACLabel "tiny",TACReturn Nothing]]
             let ast = scan_parse_check "int a[5]; int tiny() { a[2] = 5; }"
-            tacGenerate ast `shouldBe` TACProgram [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0]] [[TACLabel "tiny",TACArrayModif (TACArray "a" (TACInt 2)) (TACInt 5),TACReturn Nothing]]
+            tacGenerate ast `shouldBe` TACProgram [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0]] [[TACLabel "tiny",TACArrayModif "a" (TACInt 2) (TACInt 5),TACReturn Nothing]]
             let ast = scan_parse_check "int a[5]; int b[5]; int tiny() { a[2] = b[3]; }"
-            tacGenerate ast `shouldBe` TACProgram [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayDecl "b" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0]] [[TACLabel "tiny",TACArrayAccess "t1" (TACArray "b" (TACInt 3)),TACArrayModif (TACArray "a" (TACInt 2)) (TACVar "t1"),TACReturn Nothing]]
+            tacGenerate ast `shouldBe` TACProgram [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayDecl "b" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0]] [[TACLabel "tiny",TACArrayAccess "t1" "b" (TACInt 3),TACArrayModif "a" (TACInt 2) (TACVar "t1"),TACReturn Nothing]]
         it "Generates if" $ do
             let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 5; a = 3; } }"
             tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 5),TACCopy "a" (TACInt 3),TACLabel "l2",TACReturn Nothing]]
@@ -382,12 +382,12 @@ main = hspec $ do
             let ast = scan_parse_check "int tiny() { int a = 2; write a; }"
             tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 2),TACWrite (TACVar "a"),TACReturn Nothing]]
             let ast = scan_parse_check "int tiny() { int a[5]; write a[2]; }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACWrite (TACVar "t1"),TACReturn Nothing]]
+            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" "a" (TACInt 2),TACWrite (TACVar "t1"),TACReturn Nothing]]
         it "Generates reads" $ do
             let ast = scan_parse_check "int tiny() { int a; read a; }"
             tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 0),TACRead (TACVar "a"),TACReturn Nothing]]
             let ast = scan_parse_check "int tiny() { int a[5]; read a[2]; }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" (TACArray "a" (TACInt 2)),TACRead (TACVar "t1"),TACReturn Nothing]]
+            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" "a" (TACInt 2),TACRead (TACVar "t1"),TACReturn Nothing]]
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]
