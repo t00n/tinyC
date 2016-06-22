@@ -127,7 +127,7 @@ instance NASMGenerator TACFunction where
         pre <- nasmGeneratePreFunction funcName offset
         nasmIS <- (mapM nasmGenerateInstructions (modifyInstructions inRegisters params globals (tail is))) >>= return . concat
         post <- nasmGeneratePostFunction funcName
-        return $ pre ++ nasmIS
+        traceShow (totalMapping, spilled) $ return $ pre ++ nasmIS
 
 
 retInstructions :: [NASMInstruction]
@@ -339,7 +339,10 @@ instance NASMGenerator TACInstruction where
         let ret = if tiny then exitInstructions else retInstructions
         return $ retValue ++ ret
     nasmGenerateInstructions (TACLabel label) = return [LABEL label]
-    nasmGenerateInstructions (TACWrite ex) = nasmCall "_writeint" [ex] Nothing
+    nasmGenerateInstructions (TACWrite ex) = 
+        case ex of
+            (TACVar x) -> nasmCall "_writeint" [ex] Nothing
+            (TACChar c) -> nasmCall "_writechar" [ex] Nothing
     --nasmGenerateInstructions (TACRead TACExpression) = 
     nasmGenerateInstructions (TACArrayDecl var es) = do
         reg <- varRegister var
@@ -481,6 +484,18 @@ instance NASMShow NASMProgram where
         "mov eax, 1"
         "mov ebx, 0"
         "int 0x80"
+        "_writechar:"
+        "push ebp"
+        "mov ebp, esp"
+        "push ebx"
+        "push esi"
+        "push edi"
+        "mov edx,1     ; arg3, length of string to print"
+        "lea ecx,[ebp+8]     ; arg2, pointer to string"
+        "mov ebx,1       ; arg1, where to write, screen"
+        "mov eax,4       ; write sysout command to int 80 hex"
+        "int 0x80        ; interrupt 80 hex, call kernel"
+        "ret"
         "_writeint:"
         "push ebp"
         "mov ebp, esp"

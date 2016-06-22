@@ -439,7 +439,9 @@ main = hspec $ do
             let st = symbolTable ast
             let tac = tacGenerate ast
             let (vMap, spilled, is) = mapVariablesToRegisters (concat $ tacCode tac) 6 M.empty
-            putStrLn $ nasmShow $ nasmGenerate tac st
+            writeFile "cfg.dot" (((toDotWith tacPrint) . controlFlowGraph . concat . tacCode) tac)
+            putStrLn $ tacPrint $ tacCode tac
+            nasmGenerate tac st `shouldBe` NASMProgram [] []
     describe "Tests live variable analysis" $ do
         it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"

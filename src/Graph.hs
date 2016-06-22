@@ -81,11 +81,14 @@ removeDuplicateEdges = S.foldr (\(x, y) acc -> if not ((y, x) `S.member` acc) &&
 escape :: String -> String
 escape = map (\x -> if x == '"' then ' ' else x)
 
-toDotNodes :: (Show a, Show b) => [(a, b)] -> String
-toDotNodes = concatMap (\(x, y) -> show x ++ " [label=\"" ++ (escape . show) y ++ "\"];\n")
+toDotNodes :: Show k => (a -> String) -> [(k, a)] -> String
+toDotNodes showF = concatMap (\(x, y) -> show x ++ " [label=\"" ++ (escape . showF) y ++ "\"];\n")
 
 toDotEdges :: Show a => [(a, a)] -> String
 toDotEdges = concatMap (\(x, y) -> show x ++ " -- " ++ show y ++ ";\n")
 
 toDot :: (Show a, Ord a) => Graph a -> String
-toDot (Graph nodes edges) = "graph { \n" ++ toDotNodes (M.toList nodes) ++ (toDotEdges (S.toList $ removeDuplicateEdges edges)) ++ "}\n"
+toDot = toDotWith show
+
+toDotWith :: Ord a => (a -> String) -> Graph a -> String
+toDotWith showF (Graph nodes edges) = "graph { \n" ++ toDotNodes showF (M.toList nodes) ++ (toDotEdges (S.toList $ removeDuplicateEdges edges)) ++ "}\n"

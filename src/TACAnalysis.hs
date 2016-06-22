@@ -67,8 +67,8 @@ usedAndDefinedVariables inst =
         (TACUnary s _ e) -> (expressionsToSet [e], S.fromList [s])
         (TACCopy s e) -> (expressionsToSet [e], S.fromList [s])
         (TACArrayDecl var ex) -> (expressionsToSet ex, S.fromList [var])
-        (TACArrayAccess var array ex) -> (expressionsToSet [TACVar array, ex], S.fromList [var])
-        (TACArrayModif array index ex) -> (expressionsToSet [index, ex], S.fromList [array])
+        (TACArrayAccess var array ex) -> (expressionsToSet [ex], S.fromList [var])
+        (TACArrayModif array index ex) -> (expressionsToSet [index, ex], S.empty)
         (TACIf e _) -> (expressionsToSet [e], S.empty)
         (TACCall _ es ret) -> case ret of
                                    Nothing -> (expressionsToSet es, S.empty)
