@@ -92,8 +92,10 @@ instance Checkable Expression where
                         >> return expr
             Var name -> checkNameDeclared name >>
                 case name of
+                    (NamePointer n) -> checkNameIsValue name >> return expr
                     (NameSubscription n e) -> checkNameIsValue name >> check e >> checkExpressionIsValue e >> return expr
                     _ -> return expr
+            Address name -> checkNameDeclared name >> checkNameIsValue name >> return expr
             _ -> return expr
 
 instance Checkable Parameter where
@@ -214,6 +216,7 @@ getExpressionKind expr = do
                 return s1
         (UnOp _ e) -> getExpressionKind e
         (Var name) -> getNameKind name
+        (Address name) -> return Pointer
         _ -> return Value
 
 -- API

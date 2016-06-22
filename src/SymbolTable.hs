@@ -115,7 +115,7 @@ symbolIsFunction s st =
 -- Declaration data
 nameToKind :: Name -> SymbolKind
 nameToKind (Name _) = Value
-nameToKind (NameSubscription _ _) = Pointer
+nameToKind _ = Pointer
 
 nameToSize :: Name -> Either SemanticError SymbolSize
 nameToSize (Name _) = Right 1
