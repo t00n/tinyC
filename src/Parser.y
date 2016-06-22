@@ -171,7 +171,7 @@ data Statement = Assignment Name Expression
     deriving (Eq, Show)
 
 data Type = IntType | CharType
-    deriving (Eq, Show)
+    deriving (Eq, Show, Ord)
 
 data BinaryOperator = Plus | Minus | Times | Divide | Equal | Greater | Less | NotEqual
     deriving (Eq, Show)

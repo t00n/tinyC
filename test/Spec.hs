@@ -28,8 +28,6 @@ scan_parse_check xs =
     if check == Right ast then ast
     else error $ show check
 
-scan_to_tac s = tacGenerate . scan_parse_check
-
 testTokens s r = do
     it ("Tokenizes " ++ s) $ do
         s <- readFile ("test/fixtures/" ++ s)
@@ -335,59 +333,80 @@ main = hspec $ do
     describe "The generation of three-address-code" $ do
         it "Generates a few declarations" $ do
             let ast = scan_parse_check "int a; int b; int tiny() {}"
-            tacGenerate ast `shouldBe` TACProgram [TACCopy "a" (TACInt 0),TACCopy "b" (TACInt 0)] [[TACLabel "tiny",TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [TACCopy "a" (TACInt 0),TACCopy "b" (TACInt 0)] [[TACLabel "tiny",TACReturn Nothing]]
         it "Generates declarations with complex binary expressions" $ do
             let ast = scan_parse_check "int a = 5; int tiny() { int b = (a+5)/(a-2); }"
-            tacGenerate ast `shouldBe` TACProgram [TACCopy "a" (TACInt 5)] [[TACLabel "tiny",TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "a") TACMinus (TACInt 2),TACBinary "t3" (TACVar "t1") TACDivide (TACVar "t2"),TACCopy "b" (TACVar "t3"),TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [TACCopy "a" (TACInt 5)] [[TACLabel "tiny",TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "a") TACMinus (TACInt 2),TACBinary "t3" (TACVar "t1") TACDivide (TACVar "t2"),TACCopy "b" (TACVar "t3"),TACReturn Nothing]]
         it "Generates function declarations" $ do
             let ast = scan_parse_check "int tiny() {}"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACReturn Nothing]]
             let ast = scan_parse_check "int f(int a, int b) {int c = 4;} int tiny() { }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "f",TACCopy "c" (TACInt 4),TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "f",TACCopy "c" (TACInt 4),TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]]
         it "Generates declarations with complex unary expressions" $ do
             let ast = scan_parse_check "int a = 5; int tiny() { int b = -(a - 5); }"
-            tacGenerate ast `shouldBe` TACProgram [TACCopy "a" (TACInt 5)] [[TACLabel "tiny",TACBinary "t1" (TACVar "a") TACMinus (TACInt 5),TACUnary "t2" TACNeg (TACVar "t1"),TACCopy "b" (TACVar "t2"),TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [TACCopy "a" (TACInt 5)] [[TACLabel "tiny",TACBinary "t1" (TACVar "a") TACMinus (TACInt 5),TACUnary "t2" TACNeg (TACVar "t1"),TACCopy "b" (TACVar "t2"),TACReturn Nothing]]
         it "Generates function calls" $ do
             let ast = scan_parse_check "int f(int a, int b) { int c = 1; f(c, 2); } int tiny() {}"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "f",TACCopy "c" (TACInt 1),TACCall "f" [TACVar "c",TACInt 2] Nothing,TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "f",TACCopy "c" (TACInt 1),TACCall "f" [TACVar "c",TACInt 2] Nothing,TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]]
             let ast = scan_parse_check "int f(int a, int b) { int c = f(2 + 3, 1); } int tiny() {}"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "f",TACBinary "t1" (TACInt 2) TACPlus (TACInt 3),TACCall "f" [TACVar "t1",TACInt 1] (Just $ TACVar "t2"),TACCopy "c" (TACVar "t2"),TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "f",TACBinary "t1" (TACInt 2) TACPlus (TACInt 3),TACCall "f" [TACVar "t1",TACInt 1] (Just $ TACVar "t2"),TACCopy "c" (TACVar "t2"),TACReturn Nothing],[TACLabel "tiny",TACReturn Nothing]]
         it "Generates assignments" $ do
             let ast = scan_parse_check "int tiny() { int a; a = (a + 5) * 3; }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 0),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "t1") TACTimes (TACInt 3),TACCopy "a" (TACVar "t2"),TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 0),TACBinary "t1" (TACVar "a") TACPlus (TACInt 5),TACBinary "t2" (TACVar "t1") TACTimes (TACInt 3),TACCopy "a" (TACVar "t2"),TACReturn Nothing]]
             let ast = scan_parse_check "int a[5]; int b = a[2]; int tiny() {}"
-            tacGenerate ast `shouldBe` TACProgram [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" "a" (TACInt 2),TACCopy "b" (TACVar "t1")] [[TACLabel "tiny",TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" "a" (TACInt 2),TACCopy "b" (TACVar "t1")] [[TACLabel "tiny",TACReturn Nothing]]
             let ast = scan_parse_check "int a[5]; int tiny() { a[2] = 5; }"
-            tacGenerate ast `shouldBe` TACProgram [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0]] [[TACLabel "tiny",TACArrayModif "a" (TACInt 2) (TACInt 5),TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0]] [[TACLabel "tiny",TACArrayModif "a" (TACInt 2) (TACInt 5),TACReturn Nothing]]
             let ast = scan_parse_check "int a[5]; int b[5]; int tiny() { a[2] = b[3]; }"
-            tacGenerate ast `shouldBe` TACProgram [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayDecl "b" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0]] [[TACLabel "tiny",TACArrayAccess "t1" "b" (TACInt 3),TACArrayModif "a" (TACInt 2) (TACVar "t1"),TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayDecl "b" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0]] [[TACLabel "tiny",TACArrayAccess "t1" "b" (TACInt 3),TACArrayModif "a" (TACInt 2) (TACVar "t1"),TACReturn Nothing]]
         it "Generates if" $ do
             let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 5; a = 3; } }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 5),TACCopy "a" (TACInt 3),TACLabel "l2",TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 5),TACCopy "a" (TACInt 3),TACLabel "l2",TACReturn Nothing]]
         it "Generates if else" $ do
             let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 5; } else { int b = 5; } }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 5),TACGoto "l3",TACLabel "l2",TACCopy "b" (TACInt 5),TACLabel "l3",TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 5),TACGoto "l3",TACLabel "l2",TACCopy "b" (TACInt 5),TACLabel "l3",TACReturn Nothing]]
         it "Generates several if else" $ do
             let ast = scan_parse_check "int tiny() { if (1 > 2) { int a = 1; } else if (2 > 3) { int b = 2; } else { int c = 3; } }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 1),TACGoto "l3",TACLabel "l2",TACIf (TACExpr (TACInt 2) TACGreater (TACInt 3)) "l4",TACGoto "l5",TACLabel "l4",TACCopy "b" (TACInt 2),TACGoto "l6",TACLabel "l5",TACCopy "c" (TACInt 3),TACLabel "l6",TACLabel "l3",TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACIf (TACExpr (TACInt 1) TACGreater (TACInt 2)) "l1",TACGoto "l2",TACLabel "l1",TACCopy "a" (TACInt 1),TACGoto "l3",TACLabel "l2",TACIf (TACExpr (TACInt 2) TACGreater (TACInt 3)) "l4",TACGoto "l5",TACLabel "l4",TACCopy "b" (TACInt 2),TACGoto "l6",TACLabel "l5",TACCopy "c" (TACInt 3),TACLabel "l6",TACLabel "l3",TACReturn Nothing]]
         it "Generates a while" $ do
             let ast = scan_parse_check "int tiny() { int a = 2; while ( a > 1) { a = a - 1; } }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 2),TACLabel "l1",TACIf (TACExpr (TACVar "a") TACGreater (TACInt 1)) "l3",TACGoto "l2",TACLabel "l3",TACBinary "t1" (TACVar "a") TACMinus (TACInt 1),TACCopy "a" (TACVar "t1"),TACGoto "l1",TACLabel "l2",TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 2),TACLabel "l1",TACIf (TACExpr (TACVar "a") TACGreater (TACInt 1)) "l3",TACGoto "l2",TACLabel "l3",TACBinary "t1" (TACVar "a") TACMinus (TACInt 1),TACCopy "a" (TACVar "t1"),TACGoto "l1",TACLabel "l2",TACReturn Nothing]]
         it "Generates a return" $ do
             let ast = scan_parse_check "int tiny() { int a = 2; return a; }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 2),TACReturn (Just (TACVar "a"))]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 2),TACReturn (Just (TACVar "a"))]]
             let ast = scan_parse_check "int tiny() { return 3 + 4 / 5; }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACBinary "t1" (TACInt 4) TACDivide (TACInt 5),TACBinary "t2" (TACInt 3) TACPlus (TACVar "t1"),TACReturn (Just (TACVar "t2"))]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACBinary "t1" (TACInt 4) TACDivide (TACInt 5),TACBinary "t2" (TACInt 3) TACPlus (TACVar "t1"),TACReturn (Just (TACVar "t2"))]]
         it "Generates a write" $ do
             let ast = scan_parse_check "int tiny() { int a = 2; write a; }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 2),TACWrite (TACVar "a"),TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 2),TACWrite (TACVar "a"),TACReturn Nothing]]
             let ast = scan_parse_check "int tiny() { int a[5]; write a[2]; }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" "a" (TACInt 2),TACWrite (TACVar "t1"),TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" "a" (TACInt 2),TACWrite (TACVar "t1"),TACReturn Nothing]]
         it "Generates reads" $ do
             let ast = scan_parse_check "int tiny() { int a; read a; }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 0),TACRead (TACVar "a"),TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 0),TACRead (TACVar "a"),TACReturn Nothing]]
             let ast = scan_parse_check "int tiny() { int a[5]; read a[2]; }"
-            tacGenerate ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" "a" (TACInt 2),TACRead (TACVar "t1"),TACReturn Nothing]]
+            let st = symbolTable ast
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" "a" (TACInt 2),TACRead (TACVar "t1"),TACReturn Nothing]]
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]
@@ -395,56 +414,56 @@ main = hspec $ do
         it "Generates data" $ do
             let ast = scan_and_parse "int a; int b = 2; char c = 'a'; int v[5]; int tiny() {}"
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             nasmGenerateData tac st `shouldBe` [NASMData "a" DD [0],NASMData "b" DD [2],NASMData "c" DB [97],NASMData "v" DD [0,0,0,0,0]]
             let ast = scan_and_parse "int a; int tiny() { int b; } int c;"
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             nasmGenerateData tac st `shouldBe` [NASMData "a" DD [0],NASMData "c" DD [0]]
         it "Generates a simple tiny function" $ do
             let ast = scan_and_parse "int tiny() {}"
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             nasmGenerateText tac st `shouldBe` [LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,CALL "_exit"]
         it "Generates two simple functions" $ do
             let ast = scan_and_parse "int tiny() {} int f() {}"
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             nasmGenerateText tac st `shouldBe` [LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,CALL "_exit",LABEL "f",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET]
         it "Generates a few declarations and computations" $ do
             let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); return d; }"
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [0]] [LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,MOV4 (Register C DWORD) 2,MOV4 (Register D DWORD) 3,MOV2 (Register A DWORD) (AddressLabelOffset "a" 0 1),ADD1 DWORD A C,SUB1 DWORD C D,PUSH1 D,XOR1 DWORD D D,IDIV1 C,POP1 D,CALL "_exit"]
         it "Generates functions with arguments and calling convention" $ do
             let ast = scan_parse_check "int g() {} int tiny() { int a = 2; f(5, a); } int f(int x, int y) { return x + y; }"
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "g",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,MOV4 (Register A DWORD) 2,PUSH1 A,PUSH1 C,PUSH1 D,PUSH1 A,PUSH3 5,CALL "f",ADD4 (Register SP DWORD) 8,POP1 D,POP1 C,POP1 A,CALL "_exit",LABEL "f",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,MOV2 (Register A DWORD) (AddressRegisterOffset (Register BP DWORD) 8 1),MOV2 (Register C DWORD) (AddressRegisterOffset (Register BP DWORD) 12 1),ADD1 DWORD A C,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET]
         it "Generates code for bigprogram.c" $ do
             code <- readFile "test/fixtures/bigprogram.c"
             let ast = scan_parse_check code
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [5],NASMData "b" DD [2],NASMData "c" DD [4],NASMData "d" DD [3]] [LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,SUB4 (Register SP DWORD) 4,MOV2 (Register C DWORD) (AddressLabelOffset "b" 0 1),MOV2 (Register A DWORD) (AddressLabelOffset "a" 0 1),MOV1 DWORD SI A,IMUL4 SI C,MOV2 (Register D DWORD) (AddressLabelOffset "c" 0 1),MOV1 DWORD DI C,SUB1 DWORD DI D,PUSH1 D,XOR1 DWORD D D,PUSH1 A,MOV1 DWORD A SI,IDIV1 DI,MOV1 DWORD SI A,POP1 A,POP1 D,MOV2 (Register B DWORD) (AddressLabelOffset "d" 0 1),MOV1 DWORD DI B,IMUL4 DI A,MOV1 DWORD B D,IMUL4 B C,MOV3 (AddressRegisterOffset (Register BP DWORD) (-4) 1) (Register B DWORD),MOV2 (Register B DWORD) (AddressRegisterOffset (Register BP DWORD) (-4) 1),ADD1 DWORD DI B,PUSH1 D,XOR1 DWORD D D,PUSH1 A,MOV1 DWORD A SI,IDIV1 DI,MOV1 DWORD SI A,POP1 A,POP1 D,MOV1 DWORD A A,IMUL4 A D,MOV2 (Register B DWORD) (AddressLabelOffset "d" 0 1),SUB1 DWORD C B,PUSH1 D,XOR1 DWORD D D,IDIV1 C,POP1 D,ADD1 DWORD A SI,CALL "_exit"]
         it "Generates code for fibonacci.c" $ do
             code <- readFile "test/fixtures/fibonacci.c"
             let ast = scan_parse_check code
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "fibonacci",PUSH1 BP,MOV1 DWORD BP SP,PUSH1 B,PUSH1 SI,PUSH1 DI,MOV2 (Register A DWORD) (AddressRegisterOffset (Register BP DWORD) 8 1),CMP4 (Register A DWORD) 0,JL "l1",JMP "l2",LABEL "l1",MOV4 (Register A DWORD) 1,NEG1 (Register A DWORD),POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,JMP "l3",LABEL "l2",CMP4 (Register A DWORD) 1,JL "l4",JMP "l5",LABEL "l4",MOV4 (Register A DWORD) 0,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,JMP "l6",LABEL "l5",CMP4 (Register A DWORD) 2,JL "l7",JMP "l8",LABEL "l7",MOV4 (Register A DWORD) 1,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,JMP "l9",LABEL "l8",MOV1 DWORD C A,SUB4 (Register C DWORD) 1,PUSH1 A,PUSH1 D,PUSH1 C,CALL "fibonacci",ADD4 (Register SP DWORD) 4,MOV1 DWORD C A,POP1 D,POP1 A,SUB4 (Register A DWORD) 2,PUSH1 C,PUSH1 D,PUSH1 A,CALL "fibonacci",ADD4 (Register SP DWORD) 4,MOV1 DWORD A A,POP1 D,POP1 C,ADD1 DWORD A C,POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "l9",LABEL "l6",LABEL "l3",POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,MOV4 (Register A DWORD) 0,LABEL "l10",CMP4 (Register A DWORD) 10,JL "l12",JMP "l11",LABEL "l12",PUSH1 A,PUSH1 D,PUSH1 A,CALL "fibonacci",ADD4 (Register SP DWORD) 4,MOV1 DWORD C A,POP1 D,POP1 A,PUSH1 A,PUSH1 C,PUSH1 D,PUSH1 C,CALL "_writeint",ADD4 (Register SP DWORD) 4,POP1 D,POP1 C,POP1 A,ADD4 (Register A DWORD) 1,JMP "l10",LABEL "l11",CALL "_exit"]
         it "Generates code for quicksort.c" $ do
             code <- readFile "test/fixtures/quicksort.c"
             let ast = scan_parse_check code
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             let (vMap, spilled, is) = mapVariablesToRegisters (concat $ tacCode tac) 6 M.empty
             nasmGenerate tac st `shouldBe` NASMProgram [] [LABEL "quicksort",PUSH1 BP,MOV1 DWORD BP SP,SUB4 (Register SP DWORD) 12,PUSH1 B,PUSH1 SI,PUSH1 DI,MOV2 (Register A DWORD) (AddressRegisterOffset (Register BP DWORD) 8 1),MOV2 (Register D DWORD) (AddressRegisterOffset (Register BP DWORD) 12 1),MOV2 (Register B DWORD) (AddressRegisterOffset (Register BP DWORD) 16 1),MOV1 DWORD C B,SUB1 DWORD C D,CMP4 (Register C DWORD) 0,JG "l1",JMP "l2",LABEL "l1",MOV2 (Register B DWORD) (AddressRegisterOffset (Register BP DWORD) 16 1),MOV1 DWORD C B,ADD1 DWORD C D,PUSH1 D,XOR1 DWORD D D,PUSH1 A,MOV1 DWORD A C,PUSH1 SI,MOV4 (Register SI DWORD) 2,IDIV1 SI,POP1 SI,MOV1 DWORD C A,POP1 A,POP1 D,MOV1 DWORD B C,MOV3 (AddressRegisterOffset (Register BP DWORD) (-12) 1) (Register B DWORD),MOV2 (Register B DWORD) (AddressRegisterOffset (Register BP DWORD) (-12) 1),MOV2 (Register C DWORD) (AddressRegisterRegister (Register A DWORD) 0 (Register B DWORD) 4),MOV1 DWORD B C,MOV3 (AddressRegisterOffset (Register BP DWORD) (-8) 1) (Register B DWORD),MOV1 DWORD C D,MOV2 (Register B DWORD) (AddressRegisterOffset (Register BP DWORD) 16 1),MOV1 DWORD SI B,LABEL "l3",CMP1 (Register C DWORD) (Register SI DWORD),JL "l5",JMP "l4",LABEL "l5",MOV4 (Register B DWORD) 0,MOV3 (AddressRegisterOffset (Register BP DWORD) (-4) 1) (Register B DWORD),LABEL "l6",MOV2 (Register DI DWORD) (AddressRegisterRegister (Register A DWORD) 0 (Register C DWORD) 4),MOV2 (Register B DWORD) (AddressRegisterOffset (Register BP DWORD) (-8) 1),CMP1 (Register DI DWORD) (Register B DWORD),JL "l8",JMP "l7",LABEL "l8",ADD4 (Register C DWORD) 1,JMP "l6",LABEL "l7",LABEL "l9",MOV2 (Register DI DWORD) (AddressRegisterRegister (Register A DWORD) 0 (Register SI DWORD) 4),MOV2 (Register B DWORD) (AddressRegisterOffset (Register BP DWORD) (-8) 1),CMP1 (Register DI DWORD) (Register B DWORD),JG "l11",JMP "l10",LABEL "l11",SUB4 (Register SI DWORD) 1,JMP "l9",LABEL "l10",CMP1 (Register C DWORD) (Register SI DWORD),JL "l12",JMP "l13",LABEL "l12",MOV2 (Register DI DWORD) (AddressRegisterRegister (Register A DWORD) 0 (Register C DWORD) 4),MOV1 DWORD B DI,MOV3 (AddressRegisterOffset (Register BP DWORD) (-4) 1) (Register B DWORD),MOV2 (Register DI DWORD) (AddressRegisterRegister (Register A DWORD) 0 (Register SI DWORD) 4),MOV3 (AddressRegisterRegister (Register A DWORD) 0 (Register C DWORD) 4) (Register DI DWORD),MOV2 (Register B DWORD) (AddressRegisterOffset (Register BP DWORD) (-4) 1),MOV3 (AddressRegisterRegister (Register A DWORD) 0 (Register SI DWORD) 4) (Register B DWORD),ADD4 (Register C DWORD) 1,SUB4 (Register SI DWORD) 1,JMP "l14",LABEL "l13",CMP1 (Register C DWORD) (Register SI DWORD),JE "l15",JMP "l16",LABEL "l15",MOV2 (Register DI DWORD) (AddressRegisterRegister (Register A DWORD) 0 (Register C DWORD) 4),MOV1 DWORD B DI,MOV3 (AddressRegisterOffset (Register BP DWORD) (-4) 1) (Register B DWORD),MOV2 (Register DI DWORD) (AddressRegisterRegister (Register A DWORD) 0 (Register SI DWORD) 4),MOV3 (AddressRegisterRegister (Register A DWORD) 0 (Register C DWORD) 4) (Register DI DWORD),MOV2 (Register B DWORD) (AddressRegisterOffset (Register BP DWORD) (-4) 1),MOV3 (AddressRegisterRegister (Register A DWORD) 0 (Register SI DWORD) 4) (Register B DWORD),ADD4 (Register C DWORD) 1,SUB4 (Register SI DWORD) 1,LABEL "l16",LABEL "l14",JMP "l3",LABEL "l4",MOV2 (Register B DWORD) (AddressRegisterOffset (Register BP DWORD) (-12) 1),PUSH1 A,PUSH1 C,PUSH1 D,PUSH1 B,PUSH1 D,PUSH1 A,CALL "quicksort",ADD4 (Register SP DWORD) 12,POP1 D,POP1 C,POP1 A,MOV2 (Register B DWORD) (AddressRegisterOffset (Register BP DWORD) (-12) 1),MOV1 DWORD C B,ADD4 (Register C DWORD) 1,MOV2 (Register B DWORD) (AddressRegisterOffset (Register BP DWORD) 16 1),PUSH1 A,PUSH1 C,PUSH1 D,PUSH1 B,PUSH1 C,PUSH1 A,CALL "quicksort",ADD4 (Register SP DWORD) 12,POP1 D,POP1 C,POP1 A,LABEL "l2",POP1 DI,POP1 SI,POP1 B,MOV1 DWORD SP BP,POP1 BP,RET,LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,ADD4 (Register SP DWORD) 20,MOV1 DWORD A SP,MOV4 (Register C DWORD) 0,MOV5 DWORDADDRESS (AddressRegisterOffset (Register A DWORD) 0 4) 5,MOV5 DWORDADDRESS (AddressRegisterOffset (Register A DWORD) 1 4) 2,MOV5 DWORDADDRESS (AddressRegisterOffset (Register A DWORD) 2 4) 3,MOV5 DWORDADDRESS (AddressRegisterOffset (Register A DWORD) 3 4) 1,MOV5 DWORDADDRESS (AddressRegisterOffset (Register A DWORD) 4 4) 4,LABEL "l17",CMP4 (Register C DWORD) 5,JL "l19",JMP "l18",LABEL "l19",MOV2 (Register D DWORD) (AddressRegisterRegister (Register A DWORD) 0 (Register C DWORD) 4),PUSH1 A,PUSH1 C,PUSH1 D,PUSH1 D,CALL "_writeint",ADD4 (Register SP DWORD) 4,POP1 D,POP1 C,POP1 A,ADD4 (Register C DWORD) 1,JMP "l17",LABEL "l18",MOV4 (Register C DWORD) 0,PUSH1 A,PUSH1 C,PUSH1 D,PUSH3 4,PUSH3 0,PUSH1 A,CALL "quicksort",ADD4 (Register SP DWORD) 12,POP1 D,POP1 C,POP1 A,LABEL "l20",CMP4 (Register C DWORD) 5,JL "l22",JMP "l21",LABEL "l22",MOV2 (Register D DWORD) (AddressRegisterRegister (Register A DWORD) 0 (Register C DWORD) 4),PUSH1 A,PUSH1 C,PUSH1 D,PUSH1 D,CALL "_writeint",ADD4 (Register SP DWORD) 4,POP1 D,POP1 C,POP1 A,ADD4 (Register C DWORD) 1,JMP "l20",LABEL "l21",CALL "_exit"]
         it "Generates code for testchar.c" $ do
             code <- readFile "test/fixtures/testchar.c"
             let ast = scan_parse_check code
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             let nasm = nasmGenerate tac st
             putStrLn $ tacPrint $ tacCode tac
             nasm `shouldBe` NASMProgram [] []
@@ -452,11 +471,11 @@ main = hspec $ do
         it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             constructLabelKey ((tacCode tac) !! 0) `shouldBe` M.fromList [("l1",3),("l2",5),("l3",6),("tiny",0)]
             let ast = scan_and_parse "int a; int tiny() { int a = 5; if (a) { int b = 1 + a; } else { int c = 3; } } int f() { int a = 3 + 4; return a; } int b = 3;"
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             let cfg = controlFlowGraph (concat (tacCode tac))
             let dfg = dataFlowGraph cfg
             let rig = registerInterferenceGraph dfg
@@ -466,7 +485,7 @@ main = hspec $ do
         it "tests register allocation with enough registers" $ do
             let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); }"
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             let cfg = controlFlowGraph ((concat . tacCode) tac)
             let df = dataFlowGraph cfg
             let rig = registerInterferenceGraph df
@@ -478,7 +497,7 @@ main = hspec $ do
             code <- readFile "test/fixtures/fibonacci.c"
             let ast = scan_and_parse code
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             let cfg = controlFlowGraph ((concat . tacCode) tac)
             let df = dataFlowGraph cfg
             let rig = registerInterferenceGraph df
@@ -489,7 +508,7 @@ main = hspec $ do
             code <- readFile "test/fixtures/bigprogram.c"
             let ast = scan_and_parse code
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             let cfg = controlFlowGraph (concat $ tacCode tac)
             let dfg = dataFlowGraph cfg
             let rig = registerInterferenceGraph dfg
@@ -508,5 +527,5 @@ main = hspec $ do
             code <- readFile "test/fixtures/bigprogram.c"
             let ast = scan_parse_check code
             let st = symbolTable ast
-            let tac = tacGenerate ast
+            let tac = tacGenerate st ast
             negativeConstraints (concat $ tacCode tac) `shouldBe` M.fromList [("t2",S.fromList [A,D]),("t6",S.fromList [A,D]),("t9",S.fromList [A,D])]

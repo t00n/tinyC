@@ -18,6 +18,6 @@ main = do
                    Left x -> error $ show x
                    Right x -> x
     let st = symbolTable ast
-    let tac = tacGenerate ast
+    let tac = tacGenerate st ast
     let nasm = nasmGenerate tac st
     writeFile outfile $ nasmShow nasm

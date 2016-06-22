@@ -18,14 +18,14 @@ type SSNSS = StateT SymbolTable (Names String String)
 infiniteNames :: String -> [String]
 infiniteNames s = [s ++ show i | i <- [1..]]
 
-tacGenerate :: [Declaration] -> TACProgram
-tacGenerate = TACProgram <$> tacGenerateData <*> tacGenerateText
+tacGenerate :: SymbolTable -> [Declaration] -> TACProgram
+tacGenerate st = TACProgram <$> tacGenerateData st <*> tacGenerateText st
 
-tacGenerateData :: [Declaration] -> [TACInstruction]
-tacGenerateData xs = evalNames (evalStateT (tacGenerateInstructions xs) (zipper emptyST)) (infiniteNames "t") (infiniteNames "l")
+tacGenerateData :: SymbolTable -> [Declaration] -> [TACInstruction]
+tacGenerateData st xs = evalNames (evalStateT (tacGenerateInstructions xs) st) (infiniteNames "t") (infiniteNames "l")
 
-tacGenerateText :: [Declaration] -> [[TACInstruction]]
-tacGenerateText xs = evalNames (evalStateT (tacGenerateAllFunctions xs) (zipper emptyST)) (infiniteNames "t") (infiniteNames "l")
+tacGenerateText :: SymbolTable -> [Declaration] -> [[TACInstruction]]
+tacGenerateText st xs = evalNames (evalStateT (tacGenerateAllFunctions xs) st) (infiniteNames "t") (infiniteNames "l")
 
 class TACGenerator a where
     tacGenerateInstructions :: a -> SSNSS [TACInstruction]
@@ -152,6 +152,7 @@ tacExpression (Char i) = return (TACChar i, [])
 tacExpression (BinOp e1 op e2) = do
     (t1, lines1) <- tacExpression e1
     (t2, lines2) <- tacExpression e2
+    --t <-
     var <- lift popVariable
     let newline = TACBinary var t1 (tacBinaryOperator op) t2
     return (TACVar var, lines1 ++ lines2 ++ [newline])           
