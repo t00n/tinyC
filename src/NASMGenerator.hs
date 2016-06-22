@@ -144,19 +144,13 @@ varLocation var = gets (snd . (M.! var))
 
 arrayAddress :: String -> TACExpression -> SRSS Address
 arrayAddress var ex = do
-    loc <- varLocation var
+    reg <- varRegister var
     vartype <- lift $ gets (infoType . (unsafeGetSymbolInfo var))
     let multiplier = if vartype == IntType then 4 else 1
     case ex of
-         (TACInt i) -> case loc of
-                            (InMemory mem) -> return $ AddressLabelOffset mem i multiplier
-                            (InStack offset) -> return $ AddressRegisterOffset (Register SP DWORD) i multiplier
-         (TACChar c) -> case loc of
-                            (InMemory mem) -> return $ AddressLabelOffset mem (ord c) multiplier
-                            (InStack offset) -> return $ AddressRegisterOffset (Register SP DWORD) (ord c) multiplier
-         (TACVar v) -> varRegister v >>= \reg -> case loc of
-                                                      (InMemory mem) -> return $ AddressLabelRegister mem (Register reg DWORD) multiplier
-                                                      (InStack offset) -> return $ AddressRegisterRegister (Register SP DWORD) offset (Register reg DWORD) multiplier
+         (TACInt i) -> return $ AddressRegisterOffset (Register reg DWORD) i multiplier
+         (TACChar c) -> return $ AddressRegisterOffset (Register reg DWORD) (ord c) multiplier
+         (TACVar v) -> varRegister v >>= \r2 -> return $ AddressRegisterRegister (Register reg DWORD) 0 (Register r2 DWORD) multiplier
 
 nasmGenerateMove :: Variable -> TACExpression -> SRSS [NASMInstruction]
 nasmGenerateMove var ex = do
@@ -353,8 +347,12 @@ instance NASMGenerator TACInstruction where
         let mult = if infoType info == IntType then 4 else 1
         let size = infoSize info
         return [ADD4 (Register SP DWORD) (mult * size), MOV1 DWORD reg SP]
-    --nasmGenerateInstructions (TACArrayAccess var ex) = do
-    --    reg <- varRegister var
+    nasmGenerateInstructions (TACArrayAccess var array index) = do
+        reg <- varRegister var
+        t <- lift $ gets (infoType . (unsafeGetSymbolInfo array))
+        addr <- arrayAddress array index
+        if t == IntType then return [MOV2 (Register reg DWORD) addr]
+        else return [XOR1 DWORD reg reg, MOV2 (Register reg LSB) addr]
     --nasmGenerateInstructions (TACArrayModif TACExpression TACExpression) = 
     nasmGenerateInstructions _ = return []
 
