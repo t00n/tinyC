@@ -127,7 +127,7 @@ instance NASMGenerator TACFunction where
         pre <- nasmGeneratePreFunction funcName offset
         nasmIS <- (mapM nasmGenerateInstructions (modifyInstructions inRegisters params globals (tail is))) >>= return . concat
         post <- nasmGeneratePostFunction funcName
-        traceShow (totalMapping, spilled) $ return $ pre ++ nasmIS
+        return $ pre ++ nasmIS
 
 
 retInstructions :: [NASMInstruction]
@@ -343,6 +343,7 @@ instance NASMGenerator TACInstruction where
         case ex of
             (TACVar x) -> nasmCall "_writeint" [ex] Nothing
             (TACChar c) -> nasmCall "_writechar" [ex] Nothing
+            (TACInt i) -> nasmCall "_writeint" [ex] Nothing
     --nasmGenerateInstructions (TACRead TACExpression) = 
     nasmGenerateInstructions (TACArrayDecl var es) = do
         reg <- varRegister var
