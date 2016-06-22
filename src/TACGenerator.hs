@@ -186,13 +186,13 @@ tacExpression (Var (NameSubscription n e)) = do
 tacExpression (Var (NamePointer n)) = do
     newvar <- lift popVariable
     typ <- gets (unsafeSymbolType n)
-    return (typ, TACVar newvar, [TACDeRef (TACVar newvar) (TACVar n)])
+    return (typ, TACVar newvar, [TACDeRef newvar (TACVar n)])
 tacExpression (Address name) = do
     newvar <- lift popVariable
     typ <- gets (unsafeSymbolType (nameToString name))
     case name of
-        NameSubscription n e -> tacExpression e >>= \(_, t, lines) -> return (typ, TACVar newvar, lines ++ [TACAddress (TACVar newvar) (TACArray n t)])
-        n -> return (typ, TACVar newvar, [TACAddress (TACVar newvar) (TACVar (nameToString n))])
+        NameSubscription n e -> tacExpression e >>= \(_, t, lines) -> return (typ, TACVar newvar, lines ++ [TACAddress newvar (TACArray n t)])
+        n -> return (typ, TACVar newvar, [TACAddress newvar (TACVar (nameToString n))])
 
 
 tacBinaryOperator :: BinaryOperator -> TACBinaryOperator
@@ -228,8 +228,8 @@ data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpres
                     | TACArrayModif String TACExpression TACExpression
                     | TACLoad String
                     | TACStore String
-                    | TACAddress TACExpression TACExpression
-                    | TACDeRef TACExpression TACExpression
+                    | TACAddress String TACExpression
+                    | TACDeRef String TACExpression
                      -- | TACDeRefA TACExpression TACExpression
                     | TACIf TACExpression String
                     | TACGoto String

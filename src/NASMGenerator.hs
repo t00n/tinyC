@@ -369,6 +369,8 @@ instance NASMGenerator TACInstruction where
              (TACInt i) -> return [MOV5 size addr i]
              (TACChar c) -> return [MOV5 size addr (ord c)]
              (TACVar v) -> varRegister v >>= \reg -> return [MOV3 addr (Register reg DWORD)]
+    --nasmGenerateInstructions (TACAddress v1 v2) = do
+        --
     nasmGenerateInstructions _ = return []
 
 type SRSS = StateT RegisterState (StateT SymbolTable (State Flags))
