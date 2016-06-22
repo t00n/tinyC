@@ -26,7 +26,7 @@ import Text.Printf (printf)
     ','             { TokenWrapper (COMMA) (_, _, _) }
     '+'             { TokenWrapper (PLUS) (_, _, _) }
     '-'             { TokenWrapper (MINUS) (_, _, _) }
-    '*'             { TokenWrapper (TIMES) (_, _, _) }
+    '*'             { TokenWrapper (TIMES_OR_PTR) (_, _, _) }
     '/'             { TokenWrapper (DIVIDE) (_, _, _) }
     '=='            { TokenWrapper (EQUAL) (_, _, _) }
     char            { TokenWrapper (CHAR) (_, _, _) }
@@ -143,6 +143,7 @@ type : int                                        { IntType }
 var :: { Name }
 var : name                                        { Name $1 }
     | name '[' expr ']'                           { NameSubscription $1 $3 }
+    | '*' name                                    { NamePointer $2 }
 
 {
 
@@ -170,7 +171,7 @@ data Statement = Assignment Name Expression
                | Expr Expression
     deriving (Eq, Show)
 
-data Type = IntType | CharType
+data Type = IntType | CharType | PtrType
     deriving (Eq, Show, Ord)
 
 data BinaryOperator = Plus | Minus | Times | Divide | Equal | Greater | Less | NotEqual
@@ -190,9 +191,11 @@ data Expression = Int Int
 
 data Name = Name String
           | NameSubscription String Expression
+          | NamePointer String
     deriving (Eq, Show)
 
 nameToString :: Name -> String
 nameToString (Name s) = s
 nameToString (NameSubscription s _) = s
+nameToString (NamePointer s) = s
 }

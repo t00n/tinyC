@@ -26,7 +26,7 @@ tokens :-
     \,              { tokenWrapper (\s -> COMMA) }
     \+              { tokenWrapper (\s -> PLUS) }
     \-              { tokenWrapper (\s -> MINUS) }
-    \*              { tokenWrapper (\s -> TIMES) }
+    \*              { tokenWrapper (\s -> TIMES_OR_PTR) }
     \/              { tokenWrapper (\s -> DIVIDE) }
     ==              { tokenWrapper (\s -> EQUAL) }
     char            { tokenWrapper (\s -> CHAR) }
@@ -54,7 +54,7 @@ data Token = INT | IF | ELSE | NEQUAL
            | RETURN | LPAR | RPAR | LBRACE
            | RBRACE | LBRACK | RBRACK | ASSIGN
            | SEMICOLON | COMMA | PLUS | MINUS
-           | TIMES | DIVIDE | EQUAL | CHAR
+           | TIMES_OR_PTR | DIVIDE | EQUAL | CHAR
            | WRITE | READ | GREATER | LESS
            | NOT | LENGTH | WHILE
            | NAME String | NUMBER Int | QCHAR Char | QSTRING String
@@ -77,7 +77,7 @@ instance Show Token where
     show COMMA = ","
     show PLUS = "+"
     show MINUS = "-"
-    show TIMES = "*"
+    show TIMES_OR_PTR = "*"
     show DIVIDE = "/"
     show EQUAL = "=="
     show CHAR = "char"
