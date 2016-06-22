@@ -4,6 +4,7 @@ import Control.Monad.Trans.State (StateT(..), evalStateT)
 import Control.Monad.Trans (lift)
 import Control.Monad (liftM2)
 import Data.Char (chr, ord)
+import Debug.Trace (traceShow)
 
 import Parser
 import MonadNames
@@ -50,21 +51,17 @@ tacGenerateFunction (FuncDeclaration t name params stmt) = do
         return $ TACLabel (nameToString name) : functionBody ++ ret
 
 instance TACGenerator Declaration where
-    tacGenerateInstructions (VarDeclaration IntType (Name n) Nothing) = return $ [TACCopy n (TACInt 0)]
-    tacGenerateInstructions (VarDeclaration CharType (Name n) Nothing) = return $ [TACCopy n (TACChar (chr 0))]
-    tacGenerateInstructions (VarDeclaration IntType (Name n) (Just (Int x))) = return $ [TACCopy n (TACInt x)]
-    tacGenerateInstructions (VarDeclaration CharType (Name n) (Just (Char c))) = return $ [TACCopy n (TACChar c)]
+    tacGenerateInstructions (VarDeclaration t (Name n) Nothing) = 
+        let value = if t == IntType then TACInt 0 else TACChar (chr 0)
+        in return $ [TACCopy n value]
     tacGenerateInstructions (VarDeclaration _ (Name n) (Just e)) = do
         (t, lines) <- tacExpression e
-        return $ lines ++ [TACCopy n t]
-    tacGenerateInstructions (VarDeclaration IntType (NameSubscription n e) _) = 
+        traceShow (t, lines) $ return $ lines ++ [TACCopy n t]
+    tacGenerateInstructions (VarDeclaration t (NameSubscription n e) _) = 
         let size (Int i) = i
             size (Char c) = ord c
-        in return $ [TACArrayDecl n (replicate (size e) (TACInt 0))]
-    tacGenerateInstructions (VarDeclaration CharType (NameSubscription n e) _) = 
-        let size (Int i) = i
-            size (Char c) = ord c
-        in return $ [TACArrayDecl n (replicate (size e) (TACChar (chr 0)))]
+            value = if t == IntType then TACInt 0 else TACChar (chr 0)
+        in return $ [TACArrayDecl n (replicate (size e) value)]
     tacGenerateInstructions _ = return []
 
 
