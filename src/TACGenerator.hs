@@ -77,6 +77,9 @@ instance TACGenerator Statement where
         (_, t1, lines1) <- tacExpression i
         (_, t2, lines2) <- tacExpression e
         return $ lines1 ++ lines2 ++ [TACArrayModif n t1 t2]
+    tacGenerateInstructions (Assignment name _) = do
+        (_, t, lines) <- tacExpression (Var name)
+        return $ lines ++ [TACCopy (nameToString name) t]
     tacGenerateInstructions (If e stmt) = do
         (t, lines) <- tacRelExpression e
         labelYes <- lift popLabel
@@ -180,6 +183,17 @@ tacExpression (Var (NameSubscription n e)) = do
     newvar <- lift popVariable
     typ <- gets (unsafeSymbolType n)
     return (typ, TACVar newvar, lines ++ [TACArrayAccess newvar n t])
+tacExpression (Var (NamePointer n)) = do
+    newvar <- lift popVariable
+    typ <- gets (unsafeSymbolType n)
+    return (typ, TACVar newvar, [TACDeRef (TACVar newvar) (TACVar n)])
+tacExpression (Address name) = do
+    newvar <- lift popVariable
+    typ <- gets (unsafeSymbolType (nameToString name))
+    case name of
+        NameSubscription n e -> tacExpression e >>= \(_, t, lines) -> return (typ, TACVar newvar, lines ++ [TACAddress (TACVar newvar) (TACArray n t)])
+        n -> return (typ, TACVar newvar, [TACAddress (TACVar newvar) (TACVar (nameToString n))])
+
 
 tacBinaryOperator :: BinaryOperator -> TACBinaryOperator
 tacBinaryOperator Plus = TACPlus
@@ -214,8 +228,8 @@ data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpres
                     | TACArrayModif String TACExpression TACExpression
                     | TACLoad String
                     | TACStore String
-                     -- | TACAddress TACExpression TACExpression
-                     -- | TACDeRef TACExpression TACExpression
+                    | TACAddress TACExpression TACExpression
+                    | TACDeRef TACExpression TACExpression
                      -- | TACDeRefA TACExpression TACExpression
                     | TACIf TACExpression String
                     | TACGoto String
@@ -242,6 +256,7 @@ data TACUnaryOperator = TACNeg | TACNot
 data TACExpression = TACInt Int
                    | TACChar Char
                    | TACVar String
+                   | TACArray String TACExpression
                    | TACExpr TACExpression TACBinaryOperator TACExpression
     deriving (Eq, Show, Ord)
 
