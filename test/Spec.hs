@@ -396,17 +396,17 @@ main = hspec $ do
         it "Generates a write" $ do
             let ast = scan_parse_check "int tiny() { int a = 2; write a; }"
             let st = symbolTable ast
-            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 2),TACWrite (TACVar "a"),TACReturn Nothing]]
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 2),TACWrite IntType (TACVar "a"),TACReturn Nothing]]
             let ast = scan_parse_check "int tiny() { int a[5]; write a[2]; }"
             let st = symbolTable ast
-            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" "a" (TACInt 2),TACWrite (TACVar "t1"),TACReturn Nothing]]
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" "a" (TACInt 2),TACWrite IntType (TACVar "t1"),TACReturn Nothing]]
         it "Generates reads" $ do
             let ast = scan_parse_check "int tiny() { int a; read a; }"
             let st = symbolTable ast
-            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 0),TACRead (TACVar "a"),TACReturn Nothing]]
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 0),TACRead IntType (TACVar "a"),TACReturn Nothing]]
             let ast = scan_parse_check "int tiny() { int a[5]; read a[2]; }"
             let st = symbolTable ast
-            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" "a" (TACInt 2),TACRead (TACVar "t1"),TACReturn Nothing]]
+            tacGenerate st ast `shouldBe` TACProgram [] [[TACLabel "tiny",TACArrayDecl "a" [TACInt 0,TACInt 0,TACInt 0,TACInt 0,TACInt 0],TACArrayAccess "t1" "a" (TACInt 2),TACRead IntType (TACVar "t1"),TACReturn Nothing]]
     describe "Do the name generator works ????" $ do
         it "Tests everything" $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]

@@ -339,9 +339,10 @@ instance NASMGenerator TACInstruction where
         let ret = if tiny then exitInstructions else retInstructions
         return $ retValue ++ ret
     nasmGenerateInstructions (TACLabel label) = return [LABEL label]
-    nasmGenerateInstructions (TACWrite ex) = 
+    nasmGenerateInstructions (TACWrite typ ex) = 
         case ex of
-            (TACVar x) -> nasmCall "_writeint" [ex] Nothing
+            (TACVar x) -> if typ == CharType then nasmCall "_writechar" [ex] Nothing
+                          else nasmCall "_writeint" [ex] Nothing
             (TACChar c) -> nasmCall "_writechar" [ex] Nothing
             (TACInt i) -> nasmCall "_writeint" [ex] Nothing
     --nasmGenerateInstructions (TACRead TACExpression) = 

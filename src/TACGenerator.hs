@@ -1,6 +1,6 @@
 module TACGenerator (tacGenerate, TACProgram(..), TACFunction(..), TACInstruction(..), TACBinaryOperator(..), TACUnaryOperator(..), TACExpression(..), TACPrint(..), tacData, tacCode) where
 
-import Control.Monad.Trans.State (StateT(..), evalStateT)
+import Control.Monad.Trans.State (StateT(..), evalStateT, gets, get, put)
 import Control.Monad.Trans (lift)
 import Control.Monad (liftM2)
 import Data.Char (chr, ord)
@@ -43,6 +43,10 @@ tacGenerateAllFunctions (x:xs) =
 
 tacGenerateFunction :: Declaration -> SSNSS [TACInstruction]
 tacGenerateFunction (FuncDeclaration t name params stmt) = do
+        st <- get
+        case nextDF st of
+            Nothing -> put st
+            (Just x) -> put x
         functionBody <- tacGenerateInstructions stmt
         let ret = if functionBody == [] then [TACReturn Nothing] 
             else case last functionBody of
@@ -55,8 +59,8 @@ instance TACGenerator Declaration where
         let value = if t == IntType then TACInt 0 else TACChar (chr 0)
         in return $ [TACCopy n value]
     tacGenerateInstructions (VarDeclaration _ (Name n) (Just e)) = do
-        (t, lines) <- tacExpression e
-        traceShow (t, lines) $ return $ lines ++ [TACCopy n t]
+        (_, t, lines) <- tacExpression e
+        return $ lines ++ [TACCopy n t]
     tacGenerateInstructions (VarDeclaration t (NameSubscription n e) _) = 
         let size (Int i) = i
             size (Char c) = ord c
@@ -67,11 +71,11 @@ instance TACGenerator Declaration where
 
 instance TACGenerator Statement where
     tacGenerateInstructions (Assignment (Name n) e) = do
-        (t, lines) <- tacExpression e
+        (_, t, lines) <- tacExpression e
         return $ lines ++ [TACCopy n t]
     tacGenerateInstructions (Assignment (NameSubscription n i) e) = do
-        (t1, lines1) <- tacExpression i
-        (t2, lines2) <- tacExpression e
+        (_, t1, lines1) <- tacExpression i
+        (_, t2, lines2) <- tacExpression e
         return $ lines1 ++ lines2 ++ [TACArrayModif n t1 t2]
     tacGenerateInstructions (If e stmt) = do
         (t, lines) <- tacRelExpression e
@@ -95,21 +99,20 @@ instance TACGenerator Statement where
         s <- tacGenerateInstructions s
         return $ [TACLabel labelBeg] ++ lines ++ [TACIf t labelYes, TACGoto labelEnd, TACLabel labelYes] ++ s ++ [TACGoto labelBeg, TACLabel labelEnd]
     tacGenerateInstructions (Return e) = do
-        (t, lines) <- tacExpression e
+        (_, t, lines) <- tacExpression e
         return $ lines ++ [TACReturn $ Just t]
     tacGenerateInstructions (Block ds ss) = do
         ds <- tacGenerateInstructions ds
         ss <- tacGenerateInstructions ss
         return $ ds ++ ss
     tacGenerateInstructions (Write e) = do
-        (t, lines) <- tacExpression e
-        return $ lines ++ [TACWrite t]
-    tacGenerateInstructions (Read (Name n)) = return [TACRead (TACVar n)]
+        (typ, t, lines) <- tacExpression e
+        return $ lines ++ [TACWrite typ t]
     tacGenerateInstructions (Read n) = do
-        (t, lines) <- tacExpression (Var n)
-        return $ lines ++ [TACRead t]
+        (typ, t, lines) <- tacExpression (Var n)
+        return $ lines ++ [TACRead typ t]
     tacGenerateInstructions (Expr e) = do
-        (t, lines) <- tacExpression e
+        (_, t, lines) <- tacExpression e
         let newlines = if lines /= [] then
                             case last lines of
                                 (TACCall label args _) -> init lines ++ [TACCall label args Nothing]
@@ -127,11 +130,11 @@ tacRelExpression ex@(BinOp e1 op e2) =
     in
     case isRelOp op of
         False -> do
-            (t, lines) <- tacExpression ex
+            (_, t, lines) <- tacExpression ex
             return (TACExpr t TACNotEqual (TACInt 0), lines)
         True -> do
-            (t1, lines1) <- tacExpression e1
-            (t2, lines2) <- tacExpression e2
+            (_, t1, lines1) <- tacExpression e1
+            (_, t2, lines2) <- tacExpression e2
             return (TACExpr t1 (tacBinaryOperator op) t2, lines1 ++ lines2)
 tacRelExpression (Int i) = return (TACExpr (TACInt i) TACNotEqual (TACInt 0), [])
 tacRelExpression (Char c) = return (TACExpr (TACChar c) TACNotEqual (TACInt 0), [])
@@ -139,40 +142,44 @@ tacRelExpression (UnOp op e) =
     case op of
         Neg -> tacRelExpression e
         Not -> do
-            (t, lines) <- tacExpression e
+            (_, t, lines) <- tacExpression e
             return (TACExpr t TACEqual (TACInt 0), lines)
 tacRelExpression (Var v) = do
-    (t, lines) <- tacExpression (Var v)
+    (_, t, lines) <- tacExpression (Var v)
     return (TACExpr t TACNotEqual (TACInt 0), lines)
-tacRelExpression e = tacExpression e
+tacRelExpression e = do (_, b, c) <- tacExpression e; return (b, c)
 
-tacExpression :: Expression -> SSNSS (TACExpression, [TACInstruction])
-tacExpression (Int i) = return (TACInt i, [])
-tacExpression (Char i) = return (TACChar i, [])
+tacExpression :: Expression -> SSNSS (Type, TACExpression, [TACInstruction])
+tacExpression (Int i) = return (IntType, TACInt i, [])
+tacExpression (Char i) = return (CharType, TACChar i, [])
 tacExpression (BinOp e1 op e2) = do
-    (t1, lines1) <- tacExpression e1
-    (t2, lines2) <- tacExpression e2
-    --t <-
+    (typ1, t1, lines1) <- tacExpression e1
+    (typ2, t2, lines2) <- tacExpression e2
+    let typ = if typ1 == CharType && typ2 == CharType then CharType else IntType
     var <- lift popVariable
     let newline = TACBinary var t1 (tacBinaryOperator op) t2
-    return (TACVar var, lines1 ++ lines2 ++ [newline])           
+    return (typ, TACVar var, lines1 ++ lines2 ++ [newline])           
 tacExpression (UnOp op e) = do
-    (t, lines) <- tacExpression e
+    (typ, t, lines) <- tacExpression e
     var <- lift popVariable
     let newline = TACUnary var (tacUnaryOperator op) t
-    return (TACVar var, lines ++ [newline])
+    return (typ, TACVar var, lines ++ [newline])
 tacExpression (Call n es) = do
     reducedES <- mapM tacExpression es
-    let params = map fst reducedES
-    let lines = concatMap snd reducedES
+    let params = map (\(_, b, c) -> b) reducedES
+    let lines = concatMap (\(_, b, c) -> c) reducedES
     t <- lift popVariable
-    return (TACVar t, lines ++ [TACCall (nameToString n) params (Just $ TACVar t)])
+    typ <- gets (unsafeSymbolType (nameToString n))
+    return (typ, TACVar t, lines ++ [TACCall (nameToString n) params (Just $ TACVar t)])
 tacExpression (Length n) = undefined
-tacExpression (Var (Name n)) = return (TACVar n, [])
+tacExpression (Var (Name n)) = do
+    typ <- gets (unsafeSymbolType n)
+    return (typ, TACVar n, [])
 tacExpression (Var (NameSubscription n e)) = do
-    (t, lines) <- tacExpression e
+    (_, t, lines) <- tacExpression e
     newvar <- lift popVariable
-    return (TACVar newvar, lines ++ [TACArrayAccess newvar n t])
+    typ <- gets (unsafeSymbolType n)
+    return (typ, TACVar newvar, lines ++ [TACArrayAccess newvar n t])
 
 tacBinaryOperator :: BinaryOperator -> TACBinaryOperator
 tacBinaryOperator Plus = TACPlus
@@ -215,8 +222,8 @@ data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpres
                     | TACCall String [TACExpression] (Maybe TACExpression)
                     | TACReturn (Maybe TACExpression)
                     | TACLabel String
-                    | TACWrite TACExpression
-                    | TACRead TACExpression
+                    | TACWrite Type TACExpression
+                    | TACRead Type TACExpression
     deriving (Eq, Show, Ord)
 
 data TACBinaryOperator = TACPlus 
@@ -267,8 +274,8 @@ instance TACPrint TACInstruction where
     tacPrint (TACReturn Nothing) = "return"
     tacPrint (TACReturn (Just e)) = "return " ++ tacPrint e
     tacPrint (TACLabel l) = l ++ ":"
-    tacPrint (TACWrite v) = "write " ++ tacPrint v
-    tacPrint (TACRead e) = "read " ++ tacPrint e
+    tacPrint (TACWrite _ v) = "write " ++ tacPrint v
+    tacPrint (TACRead _ e) = "read " ++ tacPrint e
 
 instance TACPrint TACBinaryOperator where
     tacPrint TACPlus = "+"
