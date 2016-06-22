@@ -81,6 +81,7 @@ usedAndDefinedVariables inst =
         (TACStore s) -> (S.fromList [s], S.empty)
         (TACAddress v e) -> (expressionsToSet [e], S.fromList [v])
         (TACDeRef v e) -> (expressionsToSet [e], S.fromList [v])
+        (TACDeRefA v e) -> (expressionsToSet [e], S.fromList [v])
         (TACGoto _) -> (S.empty, S.empty)
         (TACLabel _) -> (S.empty, S.empty)
 

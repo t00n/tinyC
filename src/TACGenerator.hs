@@ -77,9 +77,9 @@ instance TACGenerator Statement where
         (_, t1, lines1) <- tacExpression i
         (_, t2, lines2) <- tacExpression e
         return $ lines1 ++ lines2 ++ [TACArrayModif n t1 t2]
-    tacGenerateInstructions (Assignment name _) = do
-        (_, t, lines) <- tacExpression (Var name)
-        return $ lines ++ [TACCopy (nameToString name) t]
+    tacGenerateInstructions (Assignment (NamePointer n) e) = do
+        (_, t, lines) <- tacExpression e
+        return $ lines ++ [TACDeRefA n t]
     tacGenerateInstructions (If e stmt) = do
         (t, lines) <- tacRelExpression e
         labelYes <- lift popLabel
@@ -230,7 +230,7 @@ data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpres
                     | TACStore String
                     | TACAddress String TACExpression
                     | TACDeRef String TACExpression
-                     -- | TACDeRefA TACExpression TACExpression
+                    | TACDeRefA String TACExpression
                     | TACIf TACExpression String
                     | TACGoto String
                     | TACCall String [TACExpression] (Maybe TACExpression)
@@ -293,6 +293,7 @@ instance TACPrint TACInstruction where
     tacPrint (TACRead _ e) = "read " ++ tacPrint e
     tacPrint (TACAddress v e) = v ++ " = &" ++ tacPrint e
     tacPrint (TACDeRef v e) = v ++ " = *" ++ tacPrint e
+    tacPrint (TACDeRefA v e) = "*" ++ v ++ " = " ++ tacPrint e
 
 instance TACPrint TACBinaryOperator where
     tacPrint TACPlus = "+"
