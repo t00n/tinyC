@@ -72,7 +72,7 @@ foldLocal spilled rMapping var (mapping, offset) = do
             (Just x) -> let t = infoType x
                             scalarity = infoScalarity x
                             size = infoSize x
-                        in offset - (if (infoType x) == IntType then 4 else 1) * size
+                        in offset - (if t == IntType || scalarity == Array then 4 else 1)
     if var `elem` spilled
         then return (M.insert var (rMapping M.! var, InStack newoffset) mapping, newoffset)
     else return (M.insert var (rMapping M.! var, InRegister (rMapping M.! var)) mapping, offset)
@@ -348,7 +348,12 @@ instance NASMGenerator TACInstruction where
     nasmGenerateInstructions (TACLabel label) = return [LABEL label]
     nasmGenerateInstructions (TACWrite ex) = nasmCall "_writeint" [ex] Nothing
     --nasmGenerateInstructions (TACRead TACExpression) = 
-    --nasmGenerateInstructions (TACArrayDecl var es) = 
+    nasmGenerateInstructions (TACArrayDecl var es) = do
+        reg <- varRegister var
+        info <- lift (gets (unsafeGetSymbolInfo var))
+        let mult = if infoType info == IntType then 4 else 1
+        let size = infoSize info
+        return [ADD4 (Register SP DWORD) (mult * size), MOV1 DWORD reg SP]
     --nasmGenerateInstructions (TACArrayAccess var TACExpression) = 
     --nasmGenerateInstructions (TACArrayModif TACExpression TACExpression) = 
     nasmGenerateInstructions _ = return []

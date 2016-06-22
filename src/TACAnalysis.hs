@@ -67,6 +67,7 @@ usedAndDefinedVariables inst =
         (TACBinary v e1 _ e2) -> (expressionsToSet [e1, e2], S.fromList [v])
         (TACUnary s _ e) -> (expressionsToSet [e], S.fromList [s])
         (TACCopy s e) -> (expressionsToSet [e], S.fromList [s])
+        (TACArrayDecl var ex) -> (expressionsToSet ex, S.fromList [var])
         (TACArrayAccess s e) -> (expressionsToSet [e], S.fromList[s])
         (TACArrayModif e1 e2) -> (expressionsToSet [e2], expressionsToSet [e1])
         (TACIf e _) -> (expressionsToSet [e], S.empty)
