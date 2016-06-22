@@ -466,7 +466,7 @@ main = hspec $ do
             let tac = tacGenerate st ast
             let nasm = nasmGenerate tac st
             putStrLn $ tacPrint $ tacCode tac
-            nasm `shouldBe` NASMProgram [] []
+            nasm `shouldBe` NASMProgram [NASMData "c" DB [104]] [LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,MOV4 (Register C LSB) 101,MOV2 (Register A DWORD) (AddressLabelOffset "c" 0 1),ADD4 (Register A DWORD) 5,PUSH1 A,PUSH1 C,PUSH1 D,PUSH1 A,CALL "_writeint",ADD4 (Register SP DWORD) 4,POP1 D,POP1 C,POP1 A,PUSH1 A,PUSH1 C,PUSH1 D,PUSH1 C,CALL "_writechar",ADD4 (Register SP DWORD) 4,POP1 D,POP1 C,POP1 A,CALL "_exit"]
     describe "Tests live variable analysis" $ do
         it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"
