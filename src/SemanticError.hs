@@ -1,13 +1,12 @@
 module SemanticError where
     
 data ErrorType = NotDeclaredError 
-               | NotAFunctionError 
                | NameExistsError 
-               | NotAnArrayError 
-               | NotAScalarError
-               | NotSameScalarityError
                | NameExistsWarning
-               | NotConstantError
+               | NotAFunctionError 
+               | NotAPointerError 
+               | NotAValueError
+               | NotAConstantError
                | NoTinyFunctionError
     deriving (Eq, Show)
 

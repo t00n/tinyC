@@ -63,13 +63,13 @@ instance Checkable Statement where
     check stmt = 
         case stmt of
             Assignment v e -> checkNameDeclared v >> check e >> checkAssignment v e >> return stmt
-            If e stmt1 -> check e >> checkExpressionIsScalar e >> check stmt1 >> return stmt
-            IfElse e stmt1 stmt2 ->  check e >> checkExpressionIsScalar e >> check stmt1 >> check stmt2 >> return stmt
-            While e stmt1 -> check e >> checkExpressionIsScalar e >> check stmt1 >> return stmt
-            Return e -> check e >> checkExpressionIsScalar e >> return stmt
+            If e stmt1 -> check e >> checkExpressionIsValue e >> check stmt1 >> return stmt
+            IfElse e stmt1 stmt2 ->  check e >> checkExpressionIsValue e >> check stmt1 >> check stmt2 >> return stmt
+            While e stmt1 -> check e >> checkExpressionIsValue e >> check stmt1 >> return stmt
+            Return e -> check e >> checkExpressionIsValue e >> return stmt
             Block decl stmts -> check decl >> check stmts >> return stmt
-            Write e -> check e >> checkExpressionIsScalar e >> return stmt
-            Read v -> checkNameDeclared v >> checkNameIsScalarity v Scalar >> return stmt
+            Write e -> check e >> checkExpressionIsValue e >> return stmt
+            Read v -> checkNameDeclared v >> checkNameIsValue v >> return stmt
             Expr e -> check e >> return stmt
 
 instance Checkable Expression where
@@ -78,21 +78,21 @@ instance Checkable Expression where
         case expr of 
             BinOp e1 _ e2 -> check e1
                         >> check e2 
-                        >> checkExpressionIsScalar e1 
-                        >> checkExpressionIsScalar e2
+                        >> checkExpressionIsValue e1 
+                        >> checkExpressionIsValue e2
                         >> return expr
-            UnOp _ e -> check e >> checkExpressionIsScalar e
+            UnOp _ e -> check e >> checkExpressionIsValue e
                         >> return expr
             Call n args -> checkNameDeclared n
                         >> checkNameIsFunction n
                         >> check args
                         >> checkArguments args n
                         >> return expr
-            Length n -> checkNameDeclared n >> checkNameIsScalarity n Array
+            Length n -> checkNameDeclared n >> checkNameIsPointer n
                         >> return expr
             Var name -> checkNameDeclared name >>
                 case name of
-                    (NameSubscription n e) -> checkNameIsArray name >> check e >> checkExpressionIsScalar e >> return expr
+                    (NameSubscription n e) -> checkNameIsValue name >> check e >> checkExpressionIsValue e >> return expr
                     _ -> return expr
             _ -> return expr
 
@@ -103,26 +103,25 @@ checkNameNotDeclared :: Name -> ESSS ()
 checkNameNotDeclared n = do
     st <- get
     if nameInParent (nameToString n) st
-        then throwE (SemanticError NameExistsWarning (nameToString n))
+        then throwE (SemanticError NameExistsWarning (show n))
     else return ()
 
 checkNameDeclared :: Name -> ESSS ()
 checkNameDeclared n = do
     st <- get
-    if not (nameInScope (nameToString n) st) then throwE (SemanticError NotDeclaredError (nameToString n))
+    if not (nameInScope (nameToString n) st) then throwE (SemanticError NotDeclaredError (show n))
     else return ()
 
-checkNameIsScalarity :: Name -> SymbolScalarity -> ESSS ()
-checkNameIsScalarity n kind = do
-    s <- getNameScalarity n
-    if s /= kind then throwE (SemanticError (scalarityError kind) (nameToString n))
+checkNameIsValue :: Name -> ESSS ()
+checkNameIsValue n = do
+    s <- getNameKind n
+    if s /= Value then throwE (SemanticError NotAValueError (show n))
     else return ()
 
-checkNameIsArray :: Name -> ESSS ()
-checkNameIsArray n = do
-    st <- get
-    let res = unsafeSymbolIsScalarity (nameToString n) Array st 
-    if not res then throwE (SemanticError NotAnArrayError (nameToString n))
+checkNameIsPointer :: Name -> ESSS ()
+checkNameIsPointer n = do
+    s <- getNameKind n
+    if s /= Pointer then throwE (SemanticError NotAPointerError (show n))
     else return ()
 
 checkNameIsFunction :: Name -> ESSS ()
@@ -131,34 +130,41 @@ checkNameIsFunction n = do
     let s = nameToString n
     let info = unsafeGetSymbolInfo s st 
     case info of
-        (VarInfo _ _ _) -> throwE (SemanticError NotAFunctionError s)
+        (VarInfo _ _ _) -> throwE (SemanticError NotAFunctionError (show n))
         (FuncInfo _ _) -> return ()
 
-checkExpressionIsScalar :: Expression -> ESSS ()
-checkExpressionIsScalar expr = do
-    st <- get
-    s <- expressionIsScalar expr
-    if not s
-        then throwE (SemanticError NotAScalarError $ show expr)
+checkExpressionIsValue :: Expression -> ESSS ()
+checkExpressionIsValue expr = do
+    s <- getExpressionKind expr
+    if s /= Value
+        then throwE (SemanticError NotAValueError $ show expr)
+    else return ()
+
+checkExpressionIsPointer :: Expression -> ESSS ()
+checkExpressionIsPointer expr = do
+    s <- getExpressionKind expr
+    if s /= Pointer
+        then throwE (SemanticError NotAPointerError (show expr))
     else return ()
 
 checkAssignment :: Name -> Expression -> ESSS ()
 checkAssignment name expr = do
-    s1 <- getNameScalarity name
-    s2 <- getExpressionScalarity expr
-    if s1 /= s2
-        then throwE (SemanticError NotSameScalarityError (show name ++ " " ++ show expr))
+    s1 <- getNameKind name
+    s2 <- getExpressionKind expr
+    if s1 == Value && s2 /= Value
+        then throwE (SemanticError NotAValueError (show expr))
+    else if s1 == Pointer && s2 /= Pointer
+        then throwE (SemanticError NotAPointerError (show expr))
     else
         return ()
 
 checkArgument :: Expression -> SymbolInfo -> ESSS ()
 checkArgument arg param = do
-    st <- get
-    s <- expressionIsScalar arg
-    if s && infoScalarity param /= Scalar
-        then throwE (SemanticError NotAnArrayError $ show arg)
-    else if (not s) && infoScalarity param /= Array
-        then throwE (SemanticError NotAScalarError $ show arg)
+    s <- getExpressionKind arg
+    if infoKind param == Value && s /= Value
+        then throwE (SemanticError NotAValueError $ show arg)
+    else if infoKind param == Pointer && s /= Pointer 
+        then throwE (SemanticError NotAPointerError $ show arg)
     else return ()
 
 checkArguments :: [Expression] -> Name -> ESSS ()
@@ -180,33 +186,35 @@ entryPointExists ds =
         else return ds
 
 -- Helpers
-expressionIsScalar :: Expression -> ESSS Bool
-expressionIsScalar e = getExpressionScalarity e >>= (return . ((==) (Scalar)))
-
-getNameScalarity :: Name -> ESSS SymbolScalarity
-getNameScalarity n = do
+getNameKind :: Name -> ESSS SymbolKind
+getNameKind n = do
     st <- get
-    let s = unsafeSymbolScalarity (nameToString n) st
+    let s = unsafeSymbolKind (nameToString n) st
     case n of
         (Name _) -> return s
         (NameSubscription _ _) -> 
-            if s == Scalar then throwE (SemanticError NotAnArrayError (show n))
-            else return Scalar
+            if s == Value then throwE (SemanticError NotAPointerError (show n))
+            else return Value
+        (NamePointer n) -> 
+            if s == Value then throwE (SemanticError NotAPointerError (show n))
+            else return Value
             
-getExpressionScalarity :: Expression -> ESSS SymbolScalarity
-getExpressionScalarity expr = do
+getExpressionKind :: Expression -> ESSS SymbolKind
+getExpressionKind expr = do
     st <- get
     case expr of 
         (BinOp e1 _ e2) -> do
-            s1 <- getExpressionScalarity e1
-            s2 <- getExpressionScalarity e2
-            if s1 /= s2
-                then throwE (SemanticError NotSameScalarityError (show e1 ++ " " ++ show e2)) >> return s1
+            s1 <- getExpressionKind e1
+            s2 <- getExpressionKind e2
+            if s1 == Value && s2 /= Value
+                then throwE (SemanticError NotAValueError (show s2))
+            else if s1 == Pointer && s2 /= Pointer
+                then throwE (SemanticError NotAPointerError (show s2))
             else
                 return s1
-        (UnOp _ e) -> getExpressionScalarity e
-        (Var name) -> getNameScalarity name
-        _ -> return Scalar
+        (UnOp _ e) -> getExpressionKind e
+        (Var name) -> getNameKind name
+        _ -> return Value
 
 -- API
 

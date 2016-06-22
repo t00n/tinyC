@@ -151,6 +151,6 @@ mapVariablesToRegisters is k negConstraints =
         newis = fixInstructions is newspilled
         newrig = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) newis
     in
-    traceShow (cfg, df, rig) $ if spilled == []
+    if spilled == []
         then (findRegisters nodes rig k negConstraints, [], is)
     else (findRegisters newnodes newrig (k-1) negConstraints, newspilled, newis)

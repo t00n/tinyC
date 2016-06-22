@@ -34,14 +34,14 @@ nextDF treePos =
     else right treePos
 
 -- Symbols
-data SymbolScalarity = Scalar | Array
+data SymbolKind = Value | Pointer
     deriving (Eq, Show)
 
 type SymbolSize = Int
 
 data SymbolInfo = VarInfo {
     infoType :: Type,
-    infoScalarity :: SymbolScalarity,
+    infoKind :: SymbolKind,
     infoSize :: SymbolSize
 }         | FuncInfo {
     infoType :: Type,
@@ -62,23 +62,12 @@ unsafeGetSymbolInfo s st = let info = getSymbolInfo s st in
 unsafeSymbolType :: String -> SymbolTable -> Type
 unsafeSymbolType = infoType ... unsafeGetSymbolInfo
 
-unsafeSymbolScalarity :: String -> SymbolTable -> SymbolScalarity
-unsafeSymbolScalarity = infoScalarity ... unsafeGetSymbolInfo
+unsafeSymbolKind :: String -> SymbolTable -> SymbolKind
+unsafeSymbolKind = infoKind ... unsafeGetSymbolInfo
 
-unsafeSymbolIsScalarity :: String -> SymbolScalarity -> SymbolTable -> Bool
-unsafeSymbolIsScalarity s k st = (unsafeSymbolScalarity s st) == k
-
-unsafeSymbolIsType :: String -> Type -> SymbolTable -> Bool
-unsafeSymbolIsType s t st = (unsafeSymbolType s st) == t
-
-nameScalarity :: Name -> SymbolScalarity
-nameScalarity (Name _) = Scalar
-nameScalarity (NameSubscription _ _) = Array
-
--- Errors data types
-scalarityError :: SymbolScalarity -> ErrorType
-scalarityError Scalar = NotAScalarError
-scalarityError Array = NotAnArrayError
+nameKind :: Name -> SymbolKind
+nameKind (Name _) = Value
+nameKind (NameSubscription _ _) = Pointer
 
 -- Symbol Table
 type SymbolTable = TreePos Full Symbols
@@ -124,15 +113,16 @@ symbolIsFunction s st =
         _ -> False
 
 -- Declaration data
-nameToScalarity :: Name -> SymbolScalarity
-nameToScalarity (Name _) = Scalar
-nameToScalarity (NameSubscription _ _) = Array
+nameToKind :: Name -> SymbolKind
+nameToKind (Name _) = Value
+nameToKind (NameSubscription _ _) = Pointer
 
 nameToSize :: Name -> Either SemanticError SymbolSize
 nameToSize (Name _) = Right 1
 nameToSize (NameSubscription _ (Int i)) = Right i
 nameToSize (NameSubscription _ (Char c)) = Right $ ord c
-nameToSize x = Left (SemanticError NotConstantError (show x))
+nameToSize (NamePointer _) = Right 1
+nameToSize x = Left (SemanticError NotAConstantError (show x))
 
 declName :: Declaration -> String
 declName (VarDeclaration _ n _) = nameToString n
@@ -145,7 +135,7 @@ paramToDecl (Parameter t n) = VarDeclaration t n Nothing
 paramToInfo :: Parameter -> Either SemanticError SymbolInfo
 paramToInfo (Parameter t n) = do
     size <- nameToSize n
-    Right $ VarInfo t (nameToScalarity n) size
+    Right $ VarInfo t (nameToKind n) size
 
 paramToSymbol :: Parameter -> Either SemanticError (String, SymbolInfo)
 paramToSymbol p@(Parameter t n) = do
@@ -158,7 +148,7 @@ addSymbol d st =
     let declInfo (VarDeclaration t n _) = 
             do
                 size <- nameToSize n
-                Right $ VarInfo t (nameToScalarity n) size
+                Right $ VarInfo t (nameToKind n) size
         declInfo (FuncDeclaration t n ps _) = 
             do
                 infos <- mapM paramToSymbol ps

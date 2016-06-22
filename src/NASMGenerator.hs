@@ -70,9 +70,9 @@ foldLocal spilled rMapping var (mapping, offset) = do
     let newoffset = case info of
             Nothing -> offset - 4
             (Just x) -> let t = infoType x
-                            scalarity = infoScalarity x
+                            kind = infoKind x
                             size = infoSize x
-                        in offset - (if t == IntType || scalarity == Array then 4 else 1)
+                        in offset - (if t == IntType || kind == Pointer then 4 else 1)
     if var `elem` spilled
         then return (M.insert var (rMapping M.! var, InStack newoffset) mapping, newoffset)
     else return (M.insert var (rMapping M.! var, InRegister (rMapping M.! var)) mapping, offset)
@@ -81,8 +81,8 @@ foldParam :: M.Map String RegisterName -> Variable -> (M.Map String (RegisterNam
 foldParam rMapping var (mapping, offset) = do
     info <- lift (gets (unsafeGetSymbolInfo var))
     let t = infoType info
-    let scalarity = infoScalarity info
-    let newoffset = offset + (if t == IntType || scalarity == Array then 4 else 1)
+    let kind = infoKind info
+    let newoffset = offset + (if t == IntType || kind == Pointer then 4 else 1)
     return (M.insert var (rMapping M.! var, InStack offset) mapping, newoffset)
 
 modifyInstructions :: [Variable] -> [Variable] -> [Variable] -> TACFunction -> TACFunction
