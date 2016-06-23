@@ -4,7 +4,7 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Queue as Q
 import qualified Graph as G
-import Data.List (maximumBy)
+import Data.List (maximumBy, nub)
 import Data.Ord
 import Debug.Trace (traceShow, trace)
 
@@ -53,14 +53,17 @@ controlFlowGraph is =
     let graph = foldl (flip G.insertNode) G.empty is
     in controlFlowGraph2 (constructLabelKey is) graph
 
+expressionsNames :: [TACExpression] -> [Variable]
+expressionsNames es = 
+    let
+        expName (TACVar n) = [n]
+        expName (TACExpr e1 _ e2) = concatMap expName [e1, e2]
+        expName _ = []
+    in concatMap expName es
 
 usedAndDefinedVariables :: TACInstruction -> (S.Set String, S.Set String)
 usedAndDefinedVariables inst = 
-    let
-        variableName (TACVar n) = [n]
-        variableName (TACExpr e1 _ e2) = concatMap variableName [e1, e2]
-        variableName _ = []
-        expressionsToSet es = S.fromList $ concatMap variableName es
+    let expressionsToSet = (S.fromList . expressionsNames)
     in
     case inst of 
         (TACBinary v e1 _ e2) -> (expressionsToSet [e1, e2], S.fromList [v])
@@ -145,16 +148,22 @@ fixInstructions is spilled = concatMap f is
                   load = foldr (\x acc -> if S.member x used then (TACLoad x:acc) else acc) [] spilled
                   store = foldr (\x acc -> if S.member x def then (TACStore x:acc) else acc) [] spilled
 
+findAddressedVariables :: TACFunction -> Spilled
+findAddressedVariables = (nub . (concatMap f))
+    where f (TACAddress v e) = expressionsNames [e]
+          f _ = []
+
 mapVariablesToRegisters :: TACFunction -> K -> RegisterConstraintsInt -> (RegisterMapping, Spilled, TACFunction)
-mapVariablesToRegisters is k negConstraints = 
-    let cfg = controlFlowGraph is
-        df = dataFlowGraph cfg
-        rig = registerInterferenceGraph df
+mapVariablesToRegisters function k negConstraints = 
+    let addressedVariables = findAddressedVariables function
+        mkRIG is = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) is
+        rig = foldr G.deleteNode (mkRIG function) addressedVariables
         (nodes, spilled) = simplifyRIG rig k
-        (newnodes, newspilled) = simplifyRIG rig (k-1)
-        newis = fixInstructions is newspilled
-        newrig = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) newis
     in
     if spilled == []
-        then (findRegisters nodes rig k negConstraints, [], is)
-    else (findRegisters newnodes newrig (k-1) negConstraints, newspilled, newis)
+        then let newfunction = fixInstructions function addressedVariables
+             in (findRegisters nodes rig k negConstraints, addressedVariables, newfunction)
+    else let (newnodes, newspilled) = simplifyRIG rig (k-1)
+             newfunction = fixInstructions function (newspilled ++ addressedVariables)
+             newrig = mkRIG newfunction
+         in (findRegisters newnodes newrig (k-1) negConstraints, (newspilled ++ addressedVariables), newfunction)

@@ -12,7 +12,7 @@ int tiny() {
     write *b;
     a = b;
     *a = 5;
-    b = a;
+    b = &x;
     write *b;
     b = xs;
     write *b;

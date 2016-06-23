@@ -48,6 +48,9 @@ delete k (Graph nodes edges) =
         newedges = S.filter (\(a, b) -> a /= k && b /= k) edges
     in Graph newnodes newedges
 
+deleteNode :: Ord a => a -> Graph a -> Graph a
+deleteNode v g = delete (find v g) g
+
 empty :: Graph a
 empty = Graph M.empty S.empty
 

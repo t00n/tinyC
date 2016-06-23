@@ -127,7 +127,7 @@ instance NASMGenerator TACFunction where
         pre <- nasmGeneratePreFunction funcName offset
         nasmIS <- (mapM nasmGenerateInstructions (modifyInstructions inRegisters params globals (tail is))) >>= return . concat
         post <- nasmGeneratePostFunction funcName
-        return $ pre ++ nasmIS
+        traceShow totalMapping $ return $ pre ++ nasmIS
 
 
 retInstructions :: [NASMInstruction]
@@ -142,10 +142,17 @@ varRegister var = gets (fst . (M.! var))
 varLocation :: Variable -> SRSS VariableLocation
 varLocation var = gets (snd . (M.! var))
 
-varAddress :: String -> SRSS Address
-varAddress var = do
+pointerDeRef :: String -> SRSS Address
+pointerDeRef var = do
     reg <- varRegister var
     return $ AddressRegisterOffset (Register reg DWORD) 0 1
+
+varAddress :: String -> SRSS Address
+varAddress var = do
+    loc <- varLocation var
+    case loc of
+         (InStack offset) -> return $ AddressRegisterOffset (Register BP DWORD) offset 1
+         (InMemory label) -> return $ AddressLabelOffset label 0 1
 
 arrayAddress :: String -> TACExpression -> SRSS Address
 arrayAddress var ex = do
@@ -377,17 +384,18 @@ instance NASMGenerator TACInstruction where
     nasmGenerateInstructions (TACAddress var ex) = do
         reg <- varRegister var
         case ex of
+            (TACVar name) -> varAddress name >>= \addr -> return [LEA reg addr]
             (TACArray name index) -> arrayAddress name index >>= \addr -> return [LEA reg addr]
             _ -> return []
     nasmGenerateInstructions (TACDeRef var ex) = do
         reg <- varRegister var
         case ex of
-            (TACVar v2) -> varAddress v2 >>= \addr -> return [MOV2 (Register reg DWORD) addr]
+            (TACVar v2) -> pointerDeRef v2 >>= \addr -> return [MOV2 (Register reg DWORD) addr]
     nasmGenerateInstructions (TACDeRefA var ex) = do
         info <- gets (M.lookup var)
         case info of
             Nothing -> return []
-            Just _ -> varAddress var >>= \addr -> 
+            Just _ -> pointerDeRef var >>= \addr -> 
                             case ex of
                                 (TACInt i2) -> return [MOV5 DWORDADDRESS addr i2]
                                 (TACChar c2) -> return [MOV5 BYTEADDRESS addr (ord c2)]
