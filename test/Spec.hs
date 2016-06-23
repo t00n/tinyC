@@ -480,6 +480,15 @@ main = hspec $ do
             let tac = tacGenerate st ast
             let nasm = nasmGenerate tac st
             nasm `shouldBe` NASMProgram [] []
+        it "Generates code for pointers2.c" $ do
+            code <- readFile "test/fixtures/pointers2.c"
+            let ast = scan_parse_check code
+            let st = symbolTable ast
+            let tac = tacGenerate st ast
+            let nasm = nasmGenerate tac st
+            putStrLn $ show $ tacData tac
+            putStrLn $ tacPrint $ tacCode tac
+            nasm `shouldBe` NASMProgram [] []
     describe "Tests live variable analysis" $ do
         it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"

@@ -99,9 +99,10 @@ modifyInstructions registers params globals is =
         addLoad v is = let (one, two) = splitAtFirstUse v is
                        in one ++ [TACLoad v] ++ two
         addStore v is = let (one, two) = splitAtLastDef v is
-                        in  if one == [] || last one == TACLoad v then one ++ two
+                        in  if one == [] || last one == TACStore v then one ++ two
                             else one ++ [TACStore v] ++ two
-    in map TACLoad paramsToLoad ++ foldr addLoad (foldr addStore is globalsToLoad) globalsToLoad
+        newis = foldr addLoad (foldr addStore is globalsToLoad) globalsToLoad
+    in traceShow (paramsToLoad, globalsToLoad) $ map TACLoad paramsToLoad ++ newis
 
 instance NASMGenerator TACFunction where
     nasmGenerateInstructions xs = do
@@ -127,7 +128,7 @@ instance NASMGenerator TACFunction where
         pre <- nasmGeneratePreFunction funcName offset
         nasmIS <- (mapM nasmGenerateInstructions (modifyInstructions inRegisters params globals (tail is))) >>= return . concat
         post <- nasmGeneratePostFunction funcName
-        return $ pre ++ nasmIS
+        traceShow (modifyInstructions inRegisters params globals (tail is)) $ return $ pre ++ nasmIS
 
 
 retInstructions :: [NASMInstruction]

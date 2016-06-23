@@ -66,6 +66,11 @@ instance TACGenerator Declaration where
             size (Char c) = ord c
             value = if t == IntType then TACInt 0 else TACChar (chr 0)
         in return $ [TACArrayDecl n (replicate (size e) value)]
+    tacGenerateInstructions (VarDeclaration t (NamePointer n) Nothing) = 
+        return [TACCopy n (TACInt 0)]
+    tacGenerateInstructions (VarDeclaration t (NamePointer n) (Just e)) = do
+        (_, t, lines) <- tacExpression e
+        return $ lines ++ [TACCopy n t]
     tacGenerateInstructions _ = return []
 
 
