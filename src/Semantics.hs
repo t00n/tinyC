@@ -77,8 +77,8 @@ instance Checkable Expression where
         st <- get
         case expr of 
             BinOp e1 _ e2 -> check e1
-                        >> check e2 
-                        >> checkExpressionIsValue e1 
+                        >> check e2
+                        >> checkExpressionIsValue e1
                         >> checkExpressionIsValue e2
                         >> return expr
             UnOp _ e -> check e >> checkExpressionIsValue e
@@ -209,9 +209,9 @@ getExpressionKind expr = do
             s1 <- getExpressionKind e1
             s2 <- getExpressionKind e2
             if s1 == Value && s2 /= Value
-                then throwE (SemanticError NotAValueError (show s2))
+                then throwE (SemanticError NotAValueError (show e1))
             else if s1 == Pointer && s2 /= Pointer
-                then throwE (SemanticError NotAPointerError (show s2))
+                then throwE (SemanticError NotAPointerError (show e2))
             else
                 return s1
         (UnOp _ e) -> getExpressionKind e
