@@ -151,7 +151,7 @@ var : name                                        { Name $1 }
 {
 
 parseError :: [TokenWrapper] -> a
-parseError [] = error ""
+parseError [] = error "No token ?"
 parseError ((TokenWrapper token (o, l, c)):_) = error $ printf "Parse error at line %d column %d : \"%s\"" l c (show token)
 
 type Program = [Declaration]

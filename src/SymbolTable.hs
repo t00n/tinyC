@@ -34,7 +34,7 @@ nextDF treePos =
     else right treePos
 
 -- Symbols
-data SymbolKind = Value | Pointer
+data SymbolKind = Value | Pointer | Array
     deriving (Eq, Show)
 
 type SymbolSize = Int
@@ -64,10 +64,6 @@ unsafeSymbolType = infoType ... unsafeGetSymbolInfo
 
 unsafeSymbolKind :: String -> SymbolTable -> SymbolKind
 unsafeSymbolKind = infoKind ... unsafeGetSymbolInfo
-
-nameKind :: Name -> SymbolKind
-nameKind (Name _) = Value
-nameKind (NameSubscription _ _) = Pointer
 
 -- Symbol Table
 type SymbolTable = TreePos Full Symbols
@@ -115,7 +111,8 @@ symbolIsFunction s st =
 -- Declaration data
 nameToKind :: Name -> SymbolKind
 nameToKind (Name _) = Value
-nameToKind _ = Pointer
+nameToKind (NameSubscription _ _) = Array
+nameToKind (NamePointer _) = Pointer
 
 nameToSize :: Name -> Either SemanticError SymbolSize
 nameToSize (Name _) = Right 1

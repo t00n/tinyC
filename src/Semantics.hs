@@ -76,10 +76,9 @@ instance Checkable Expression where
     check expr = do
         st <- get
         case expr of 
-            BinOp e1 _ e2 -> check e1
+            BinOp e1 op e2 -> check e1
                         >> check e2
-                        >> checkExpressionIsValue e1
-                        >> checkExpressionIsValue e2
+                        >> checkBinOp e1 op e2
                         >> return expr
             UnOp _ e -> check e >> checkExpressionIsValue e
                         >> return expr
@@ -88,7 +87,7 @@ instance Checkable Expression where
                         >> check args
                         >> checkArguments args n
                         >> return expr
-            Length n -> checkNameDeclared n >> checkNameIsPointer n
+            Length n -> checkNameDeclared n >> checkNameIsArray n
                         >> return expr
             Var name -> checkNameDeclared name >>
                 case name of
@@ -114,38 +113,65 @@ checkNameDeclared n = do
     if not (nameInScope (nameToString n) st) then throwE (SemanticError NotDeclaredError (show n))
     else return ()
 
+checkBinOp :: Expression -> BinaryOperator -> Expression -> ESSS ()
+checkBinOp e1 op e2 = do
+    k1 <- getExpressionKind e1
+    k2 <- getExpressionKind e2
+    let checkPlus = if k1 == Array   && k2 /= Value then throwE (SemanticError NotAValueError (show e2))
+               else if k1 == Pointer && k2 /= Value then throwE (SemanticError NotAValueError (show e2))
+               else if k2 == Array   && k1 /= Value then throwE (SemanticError NotAValueError (show e2))
+               else if k2 == Pointer && k1 /= Value then throwE (SemanticError NotAValueError (show e2))
+               else return ()
+    let checkMinus = if k1 == Value && k2 /= Value then throwE (SemanticError NotAValueError (show e2))
+                else return ()
+    let checkTimesAndDivide = if k1 /= Value then throwE (SemanticError NotAValueError (show e1))
+                         else if k2 /= Value then throwE (SemanticError NotAValueError (show e2))
+                         else return ()
+    case op of
+        Plus -> checkPlus
+        Minus -> checkMinus
+        Times -> checkTimesAndDivide
+        Divide -> checkTimesAndDivide
+        _ -> return ()
+
 checkNameIsValue :: Name -> ESSS ()
 checkNameIsValue n = do
-    s <- getNameKind n
-    if s /= Value then throwE (SemanticError NotAValueError (show n))
+    k <- getNameKind n
+    if k /= Value then throwE (SemanticError NotAValueError (show n))
+    else return ()
+
+checkNameIsArray :: Name -> ESSS ()
+checkNameIsArray n = do
+    k <- getNameKind n
+    if k /= Array then throwE (SemanticError NotAnArrayError (show n))
     else return ()
 
 checkNameIsPointer :: Name -> ESSS ()
 checkNameIsPointer n = do
-    s <- getNameKind n
-    if s /= Pointer then throwE (SemanticError NotAPointerError (show n))
+    k <- getNameKind n
+    if k /= Pointer then throwE (SemanticError NotAPointerError (show n))
     else return ()
 
 checkNameIsFunction :: Name -> ESSS ()
 checkNameIsFunction n = do
     st <- get
-    let s = nameToString n
-    let info = unsafeGetSymbolInfo s st 
+    let k = nameToString n
+    let info = unsafeGetSymbolInfo k st 
     case info of
         (VarInfo _ _ _) -> throwE (SemanticError NotAFunctionError (show n))
         (FuncInfo _ _) -> return ()
 
 checkExpressionIsValue :: Expression -> ESSS ()
 checkExpressionIsValue expr = do
-    s <- getExpressionKind expr
-    if s /= Value
+    k <- getExpressionKind expr
+    if k /= Value
         then throwE (SemanticError NotAValueError $ show expr)
     else return ()
 
 checkExpressionIsPointer :: Expression -> ESSS ()
 checkExpressionIsPointer expr = do
-    s <- getExpressionKind expr
-    if s /= Pointer
+    k <- getExpressionKind expr
+    if k /= Pointer
         then throwE (SemanticError NotAPointerError (show expr))
     else return ()
 
@@ -162,10 +188,12 @@ checkAssignment name expr = do
 
 checkArgument :: Expression -> SymbolInfo -> ESSS ()
 checkArgument arg param = do
-    s <- getExpressionKind arg
-    if infoKind param == Value && s /= Value
+    k <- getExpressionKind arg
+    if infoKind param == Value && k /= Value
         then throwE (SemanticError NotAValueError $ show arg)
-    else if infoKind param == Pointer && s /= Pointer 
+    else if infoKind param == Array && k /= Array
+        then throwE (SemanticError NotAnArrayError $ show arg)
+    else if infoKind param == Pointer && k /= Pointer 
         then throwE (SemanticError NotAPointerError $ show arg)
     else return ()
 

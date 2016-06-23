@@ -5,6 +5,7 @@ data ErrorType = NotDeclaredError
                | NameExistsWarning
                | NotAFunctionError 
                | NotAPointerError 
+               | NotAnArrayError
                | NotAValueError
                | NotAConstantError
                | NoTinyFunctionError

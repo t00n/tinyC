@@ -181,8 +181,8 @@ main = hspec $ do
             evaluate ast `shouldThrow` errorCall "Parse error at line 1 column 21 : \"}\""
     describe "Symbol table construction" $ do
         it "Constructs a one-level symbol table" $ do
-            let ast = scan_and_parse "char a; int b = 5; int c[5];"
-            fmap root (constructST ast) `shouldBe` Right (zipper (T.Node (M.fromList [("a",VarInfo CharType Value 1),("b",VarInfo IntType Value 1),("c",VarInfo IntType Pointer 5)]) []))
+            let ast = scan_and_parse "char a; int b = 5; int c[5]; int * p;"
+            fmap root (constructST ast) `shouldBe` Right (zipper (T.Node (M.fromList [("a",VarInfo CharType Value 1),("b",VarInfo IntType Value 1),("c",VarInfo IntType Array 5),("p", VarInfo IntType Pointer 1)]) []))
         it "Fails to construct a symbol table when a name exists" $ do
             let ast = scan_and_parse "char a; int a[5];"
             fmap root (constructST ast) `shouldBe` Left (SemanticError {errorType = NameExistsError, errorVariable = "a"})
@@ -190,7 +190,7 @@ main = hspec $ do
             fmap root (constructST ast) `shouldBe` Left (SemanticError {errorType = NameExistsError, errorVariable = "a"})
         it "Constructs a two-level symbol table" $ do
             let ast = scan_and_parse "char a; int b = 5; int c[5]; char f() {} int g(int a) {}"
-            fmap root (constructST ast) `shouldBe` Right (zipper (T.Node (M.fromList [("a",VarInfo CharType Value 1),("b",VarInfo IntType Value 1),("c",VarInfo IntType Pointer 5),("f",FuncInfo CharType M.empty),("g",FuncInfo IntType (M.fromList [("a", VarInfo IntType Value 1)]))]) [T.Node (M.fromList []) [],T.Node (M.fromList [("a",VarInfo IntType Value 1)]) []]))
+            fmap root (constructST ast) `shouldBe` Right (zipper (T.Node (M.fromList [("a",VarInfo CharType Value 1),("b",VarInfo IntType Value 1),("c",VarInfo IntType Array 5),("f",FuncInfo CharType M.empty),("g",FuncInfo IntType (M.fromList [("a", VarInfo IntType Value 1)]))]) [T.Node (M.fromList []) [],T.Node (M.fromList [("a",VarInfo IntType Value 1)]) []]))
     describe "Semantics" $ do
         it "Checks that variables with same name are declared only once on a certain scope level" $ do
             let ast = scan_and_parse "int tiny() { int a; int a; }"
@@ -272,24 +272,98 @@ main = hspec $ do
             let ast = scan_and_parse "int a[5]; int f(int b) {} int tiny() { f(a); }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
             let ast = scan_and_parse "int a; int f(int b[5]) {} int tiny() { f(a); }"
-            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAPointerError, errorVariable = "Var (Name \"a\")"})
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAnArrayError, errorVariable = "Var (Name \"a\")"})
         it "Checks that variables are declared before use in a length expression and that the variable is an array" $ do
             let ast = scan_and_parse "int tiny() { length a; }"
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "Name \"a\"")
             let ast = scan_and_parse "int a; int tiny() { length a; }"
-            checkSemantics ast `shouldBe` Left (SemanticError NotAPointerError "Name \"a\"")
+            checkSemantics ast `shouldBe` Left (SemanticError NotAnArrayError "Name \"a\"")
             let ast = scan_and_parse "int a[5]; int tiny() { length a; }"
             checkSemantics ast `shouldBe` Right ast
         it "Checks that arrays are declared with constant/literals size" $ do
             let ast = scan_and_parse "int a = 5; int b[a]; int tiny() {}"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAConstantError, errorVariable = "NameSubscription \"b\" (Var (Name \"a\"))"})
-        it "Checks that only scalar expressions are used in binary and unary operations" $ do
-            let ast = scan_and_parse "int a[5]; int tiny() { a + 5; }"
-            checkSemantics ast `shouldBe` Left (SemanticError NotAValueError "Var (Name \"a\")")
-            let ast = scan_and_parse "int a[5]; int tiny() { a[2] + 5; }"
+        it "Checks that binary and unary expressions have good kinds" $ do
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a + p; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a + a; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a + a[5]; }"
             checkSemantics ast `shouldBe` Right ast
-            let ast = scan_and_parse "int a = 5; int tiny() { a + 5; }"
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a + x; }"
             checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a + *p; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a - p; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a - a; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a - a[5]; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a - x; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a - *p; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a * p; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a * a; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a * a[5]; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a * x; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a * *p; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a / p; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a / a; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a / a[5]; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a / x; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a / *p; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a + p; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a + a; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p + a[5]; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p + x; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p + *p; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p - p; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p - a; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p - a[5]; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p - x; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p - *p; }"
+            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p * p; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p * a; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p * a[5]; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p * x; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p * *p; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p / p; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p / a; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p / a[5]; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p / x; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
+            let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; p / *p; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
         it "Checks that name subscriptions are used with an array" $ do
             let ast = scan_and_parse "int a = 5; int tiny() { a[5] + 5; }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAPointerError, errorVariable = "NameSubscription \"a\" (Int 5)"})
@@ -489,6 +563,13 @@ main = hspec $ do
             putStrLn $ show $ tacData tac
             putStrLn $ tacPrint $ tacCode tac
             nasm `shouldBe` NASMProgram [] []
+        it "Generates code for quicksort.c" $ do
+            code <- readFile "test/fixtures/quicksort2.c"
+            let ast = scan_parse_check code
+            let st = symbolTable ast
+            let tac = tacGenerate st ast
+            let (vMap, spilled, is) = mapVariablesToRegisters (concat $ tacCode tac) 6 M.empty
+            nasmGenerate tac st `shouldBe` NASMProgram [] []
     describe "Tests live variable analysis" $ do
         it "tests graphs creation" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"
