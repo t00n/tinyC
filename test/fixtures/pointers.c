@@ -17,4 +17,5 @@ int tiny() {
     b = xs;
     write *b;
     write b[1];
+    write *xs;
 }
