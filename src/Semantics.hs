@@ -165,7 +165,14 @@ checkExpressionIsValue :: Expression -> ESSS ()
 checkExpressionIsValue expr = do
     k <- getExpressionKind expr
     if k /= Value
-        then throwE (SemanticError NotAValueError $ show expr)
+        then throwE (SemanticError NotAValueError (show expr))
+    else return ()
+
+checkExpressionIsArray :: Expression -> ESSS ()
+checkExpressionIsArray expr = do
+    k <- getExpressionKind expr
+    if k /= Array
+        then throwE (SemanticError NotAnArrayError (show expr))
     else return ()
 
 checkExpressionIsPointer :: Expression -> ESSS ()
@@ -179,10 +186,8 @@ checkAssignment :: Name -> Expression -> ESSS ()
 checkAssignment name expr = do
     s1 <- getNameKind name
     s2 <- getExpressionKind expr
-    if s1 == Value && s2 /= Value
-        then throwE (SemanticError NotAValueError (show expr))
-    else if s1 == Pointer && s2 /= Pointer
-        then throwE (SemanticError NotAPointerError (show expr))
+    if s1 == Array
+        then throwE (SemanticError CantAssignArrayError (show name))
     else
         return ()
 
@@ -191,10 +196,6 @@ checkArgument arg param = do
     k <- getExpressionKind arg
     if infoKind param == Value && k /= Value
         then throwE (SemanticError NotAValueError $ show arg)
-    else if infoKind param == Array && k /= Array
-        then throwE (SemanticError NotAnArrayError $ show arg)
-    else if infoKind param == Pointer && k /= Pointer 
-        then throwE (SemanticError NotAPointerError $ show arg)
     else return ()
 
 checkArguments :: [Expression] -> Name -> ESSS ()
@@ -211,7 +212,6 @@ entryPointExists ds =
         funcs = filter (isEntryPoint) ds
     in
     do
-        st <- get
         if length funcs == 0 then throwE (SemanticError NoTinyFunctionError "")
         else return ds
 
@@ -223,7 +223,7 @@ getNameKind n = do
     case n of
         (Name _) -> return s
         (NameSubscription _ _) -> 
-            if s == Value then throwE (SemanticError NotAPointerError (show n))
+            if s == Value then throwE (SemanticError NotAnArrayError (show n))
             else return Value
         (NamePointer n) -> 
             if s == Value then throwE (SemanticError NotAPointerError (show n))
@@ -233,18 +233,10 @@ getExpressionKind :: Expression -> ESSS SymbolKind
 getExpressionKind expr = do
     st <- get
     case expr of 
-        (BinOp e1 _ e2) -> do
-            s1 <- getExpressionKind e1
-            s2 <- getExpressionKind e2
-            if s1 == Value && s2 /= Value
-                then throwE (SemanticError NotAValueError (show e1))
-            else if s1 == Pointer && s2 /= Pointer
-                then throwE (SemanticError NotAPointerError (show e2))
-            else
-                return s1
+        (BinOp e1 _ e2) -> return Value
         (UnOp _ e) -> getExpressionKind e
         (Var name) -> getNameKind name
-        (Address name) -> return Pointer
+        (Address _) -> return Pointer
         _ -> return Value
 
 -- API

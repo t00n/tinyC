@@ -230,7 +230,7 @@ main = hspec $ do
             let ast = scan_and_parse "int a[5]; int tiny() { read a; }"
             checkSemantics ast `shouldBe`  Left (SemanticError {errorType = NotAValueError, errorVariable = "Name \"a\""})
             let ast = scan_and_parse "int a; int tiny() { read a[5]; }"
-            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAPointerError, errorVariable = "NameSubscription \"a\" (Int 5)"})
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAnArrayError, errorVariable = "NameSubscription \"a\" (Int 5)"})
             let ast = scan_and_parse "int a[5]; int tiny() { read a[2]; }"
             checkSemantics ast `shouldBe` Right ast
         it "Checks that variables are declared before use in expression" $ do
@@ -271,8 +271,6 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotDeclaredError, errorVariable = "Name \"c\""})
             let ast = scan_and_parse "int a[5]; int f(int b) {} int tiny() { f(a); }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
-            let ast = scan_and_parse "int a; int f(int b[5]) {} int tiny() { f(a); }"
-            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAnArrayError, errorVariable = "Var (Name \"a\")"})
         it "Checks that variables are declared before use in a length expression and that the variable is an array" $ do
             let ast = scan_and_parse "int tiny() { length a; }"
             checkSemantics ast `shouldBe` Left (SemanticError NotDeclaredError "Name \"a\"")
@@ -366,7 +364,7 @@ main = hspec $ do
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
         it "Checks that name subscriptions are used with an array" $ do
             let ast = scan_and_parse "int a = 5; int tiny() { a[5] + 5; }"
-            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAPointerError, errorVariable = "NameSubscription \"a\" (Int 5)"})
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAnArrayError, errorVariable = "NameSubscription \"a\" (Int 5)"})
         it "Checks that names are subscribed with scalar expressions" $ do
             let ast = scan_and_parse "int a[5]; int b[6]; int tiny() { a[b]; }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"b\")"})
@@ -375,16 +373,8 @@ main = hspec $ do
         it "Checks that assignments have the same scalarity" $ do
             let ast = scan_and_parse "int a; int b; int tiny() { a = b; }"
             checkSemantics ast `shouldBe` Right ast
-            let ast = scan_and_parse "int a; int b[5]; int tiny() { a = b; }"
-            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"b\")"})
-            let ast = scan_and_parse "int a[5]; int b; int tiny() { a = b; }"
-            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAPointerError, errorVariable = "Var (Name \"b\")"})
-            let ast = scan_and_parse "int a; int b[5]; int tiny() { a = b[2]; }"
-            checkSemantics ast `shouldBe` Right ast
-            let ast = scan_and_parse "int a; int b[5]; int tiny() { b[2] = a; }"
-            checkSemantics ast `shouldBe` Right ast
-            let ast = scan_and_parse "int a[2]; int b[5]; int tiny() { a = b; }"
-            checkSemantics ast `shouldBe` Right ast
+            let ast = scan_and_parse "int a; int b[5]; int tiny () { b = a; }"
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = CantAssignArrayError, errorVariable = "Name \"b\""})
         it "Checks that return statement have scalar expression" $ do
             let ast = scan_and_parse "int tiny() { return 4; }"
             checkSemantics ast `shouldBe` Right ast
@@ -563,7 +553,7 @@ main = hspec $ do
             putStrLn $ show $ tacData tac
             putStrLn $ tacPrint $ tacCode tac
             nasm `shouldBe` NASMProgram [] []
-        it "Generates code for quicksort.c" $ do
+        it "Generates code for quicksort2.c" $ do
             code <- readFile "test/fixtures/quicksort2.c"
             let ast = scan_parse_check code
             let st = symbolTable ast

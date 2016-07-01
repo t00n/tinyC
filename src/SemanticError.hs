@@ -9,6 +9,7 @@ data ErrorType = NotDeclaredError
                | NotAValueError
                | NotAConstantError
                | NoTinyFunctionError
+               | CantAssignArrayError
     deriving (Eq, Show)
 
 data SemanticError = SemanticError {
