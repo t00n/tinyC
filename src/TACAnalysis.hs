@@ -4,7 +4,7 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Queue as Q
 import qualified Graph as G
-import Data.List (maximumBy, nub)
+import Data.List (maximumBy, nub, intercalate)
 import Data.Ord
 import Debug.Trace (traceShow, trace)
 
@@ -69,7 +69,6 @@ usedAndDefinedVariables inst =
         (TACBinary v e1 _ e2) -> (expressionsToSet [e1, e2], S.fromList [v])
         (TACUnary s _ e) -> (expressionsToSet [e], S.fromList [s])
         (TACCopy s e) -> (expressionsToSet [e], S.fromList [s])
-        (TACArrayDecl var ex) -> (expressionsToSet ex, S.fromList [var])
         (TACArrayAccess var array ex) -> (expressionsToSet [TACVar array, ex], S.fromList [var])
         (TACArrayModif array index ex) -> (expressionsToSet [index, ex], S.empty)
         (TACIf e _) -> (expressionsToSet [e], S.empty)
@@ -84,9 +83,10 @@ usedAndDefinedVariables inst =
         (TACStore s) -> (S.fromList [s], S.empty)
         (TACAddress v e) -> (expressionsToSet [e], S.fromList [v])
         (TACDeRef v e) -> (expressionsToSet [e], S.fromList [v])
-        (TACDeRefA v e) -> (expressionsToSet [e], S.fromList [v])
+        (TACDeRefA v e) -> (expressionsToSet [e], S.empty)
         (TACGoto _) -> (S.empty, S.empty)
         (TACLabel _) -> (S.empty, S.empty)
+        (TACArrayDecl var ex) -> (S.empty, S.empty)
 
 dataFlowGraph :: ControlFlowGraph -> DataFlowGraph
 dataFlowGraph cfg = 
@@ -105,6 +105,10 @@ dataFlowGraph cfg =
                     newvs = M.insert i (newin, out) vs
                 in dataFlowGraphRec newnewq newvs
     in dataFlowGraphRec (Q.enqueueAll (G.keys cfg) Q.empty) variables
+
+dfgShow :: ControlFlowGraph -> DataFlowGraph -> String
+dfgShow cfg = (intercalate "\n") . M.elems . (M.mapWithKey f)
+    where f k (din, dout) = show (G.unsafeLookup k cfg) ++ " => " ++ show din ++ " | " ++ show dout
 
 registerInterferenceGraph :: DataFlowGraph -> RegisterInterferenceGraph
 registerInterferenceGraph vs = graph

@@ -7,25 +7,25 @@ int quicksort(int * beg, int * end) {
         int * e = end;
         while (b < e) {
             int tmp;
-            while (*b < pivot) { b = b + 1; }
-            while (*e > pivot) { e = e - 1; }
+            while (*b < pivot) { b = b + 4; }
+            while (*e > pivot) { e = e - 4; }
             if (b < e) {
                 tmp = *b;
                 *b = *e;
                 *e = tmp;
-                b = b + 1;
-                e = e - 1;
+                b = b + 4;
+                e = e - 4;
             }
             else if (b == e) {
                 tmp = *b;
                 *b = *e;
                 *e = tmp;
-                b = b + 1;
-                e = e - 1;
+                b = b + 4;
+                e = e - 4;
             }
         }
         quicksort(beg, middle);
-        quicksort(middle+1, end);
+        quicksort(middle+4, end);
     }
 }
 
