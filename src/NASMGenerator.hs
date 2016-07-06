@@ -298,10 +298,13 @@ instance NASMGenerator TACInstruction where
     nasmGenerateInstructions (TACLoad var) = do
         reg <- varRegister var
         location <- varLocation var
-        let addr = case location of
-                        (InStack offset) -> AddressRegisterOffset (Register BP DWORD) offset 1
-                        (InMemory label) -> AddressLabelOffset label 0 1
-        return [MOV2 (Register reg DWORD) addr]
+        case location of
+             (InStack offset) -> return [MOV2 (Register reg DWORD) (AddressRegisterOffset (Register BP DWORD) offset 1)]
+             (InMemory label) -> do
+                info <- lift (gets (unsafeGetSymbolInfo var))
+                let k = infoKind info
+                if k == Value then return [MOV2 (Register reg DWORD) (AddressLabelOffset label 0 1)]
+                else return [LEA reg (AddressLabelOffset label 0 1)]
     nasmGenerateInstructions (TACStore var) = do
         reg <- varRegister var
         location <- varLocation var
