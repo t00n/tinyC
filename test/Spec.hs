@@ -6,6 +6,7 @@ import System.IO
 import qualified Data.Tree as T
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.Maybe (fromJust)
 
 import Scanner
 import Parser
@@ -37,6 +38,13 @@ testTokensThrow s e = do
     it ("Tokenizes " ++ s) $ do
         s <- readFile ("test/fixtures/" ++ s)
         evaluate (alexScanTokens s) `shouldThrow` e
+
+testRegisterMapping :: RegisterMapping -> RegisterInterferenceGraph -> Bool
+testRegisterMapping mapping rig = and $ M.elems $ M.mapWithKey f mapping
+    where f var reg = reg `notElem` neighboursReg
+                where varKey = find var rig
+                      varNeighbours = neighboursValues varKey rig
+                      neighboursReg = map (fromJust . (flip M.lookup mapping)) varNeighbours
 
 main :: IO ()
 main = hspec $ do
@@ -554,11 +562,12 @@ main = hspec $ do
             let (vMap, spilled, is) = mapVariablesToRegisters (concat $ tacCode tac) 6 M.empty
             nasmGenerate tac st `shouldBe` NASMProgram [] []
     describe "Tests live variable analysis" $ do
-        it "tests graphs creation" $ do
+        it "tests label key construction" $ do
             let ast = scan_and_parse "int tiny() { if(5) { 5; } else { 3; } } int f() {}"
             let st = symbolTable ast
             let tac = tacGenerate st ast
             constructLabelKey ((tacCode tac) !! 0) `shouldBe` M.fromList [("l1",3),("l2",5),("l3",6),("tiny",0)]
+        it "tests graph creation" $ do
             let ast = scan_and_parse "int a; int tiny() { int a = 5; if (a) { int b = 1 + a; } else { int c = 3; } } int f() { int a = 3 + 4; return a; } int b = 3;"
             let st = symbolTable ast
             let tac = tacGenerate st ast
@@ -596,18 +605,23 @@ main = hspec $ do
             let st = symbolTable ast
             let tac = tacGenerate st ast
             let cfg = controlFlowGraph (concat $ tacCode tac)
+            writeFile "cfg1.dot" (toDot cfg)
             let dfg = dataFlowGraph cfg
+            putStrLn $ dfgShow cfg dfg
             let rig = registerInterferenceGraph dfg
-            let (nodes, spilled) = simplifyRIG rig 6
+            let (nodes, spilled) = simplifyRIG rig 4
             writeFile "rig1.dot" (toDot rig)
-            (nodes, spilled) `shouldBe` (["a","b","c","d","t3","t4","t1","t10","t11","t2","t6","t7","t8","t9"],["t5"])
-            let (nodes, spilled) = simplifyRIG rig 5
-            let tac2 = fixInstructions (concat $ tacCode tac) spilled
-            let cfg = controlFlowGraph tac2
+            --(nodes, spilled) `shouldBe` (["t5","t4","t3","d","c","b","t6","t2","t1","t7","t8","t9","t10","t11"],["a"])
+            -- let (nodes, spilled) = simplifyRIG rig 5
+            let newtac = fixInstructions (concat $ tacCode tac) spilled
+            let cfg = controlFlowGraph newtac
+            writeFile "cfg2.dot" (toDot cfg)
             let dfg = dataFlowGraph cfg
+            putStrLn $ dfgShow cfg dfg
             let rig = registerInterferenceGraph dfg
             writeFile "rig2.dot" (toDot rig)
-            findRegisters nodes rig 5 M.empty `shouldBe` M.fromList [("a",0),("b",1),("c",2),("t1",3),("t10",0),("t11",0),("t2",4),("t3",3),("t4",4),("t6",4),("t7",3),("t8",0),("t9",1)]
+            let registerMapping = findRegisters (nodes ++ spilled) rig 4 M.empty
+            testRegisterMapping registerMapping rig `shouldBe` True
     describe "Tests nasm analysis and optimization" $ do
         it "Tests negative constraints on register allocation" $ do
             code <- readFile "test/fixtures/bigprogram.c"

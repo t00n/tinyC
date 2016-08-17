@@ -4,7 +4,7 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Queue as Q
 import qualified Graph as G
-import Data.List (maximumBy, nub, intercalate)
+import Data.List (minimumBy, nub, intercalate)
 import Data.Ord
 import Debug.Trace (traceShow, trace)
 
@@ -83,7 +83,7 @@ usedAndDefinedVariables inst =
         (TACStore s) -> (S.fromList [s], S.empty)
         (TACAddress v e) -> (expressionsToSet [e], S.fromList [v])
         (TACDeRef v e) -> (expressionsToSet [e], S.fromList [v])
-        (TACDeRefA v e) -> (expressionsToSet [e], S.empty)
+        (TACDeRefA v e) -> (expressionsToSet [e], S.fromList [v])
         (TACGoto _) -> (S.empty, S.empty)
         (TACLabel _) -> (S.empty, S.empty)
         (TACArrayDecl var ex) -> (S.empty, S.empty)
@@ -108,7 +108,7 @@ dataFlowGraph cfg =
 
 dfgShow :: ControlFlowGraph -> DataFlowGraph -> String
 dfgShow cfg = (intercalate "\n") . M.elems . (M.mapWithKey f)
-    where f k (din, dout) = show (G.unsafeLookup k cfg) ++ " => " ++ show din ++ " | " ++ show dout
+    where f k (din, dout) = tacPrint (G.unsafeLookup k cfg) ++ " => " ++ show dout
 
 registerInterferenceGraph :: DataFlowGraph -> RegisterInterferenceGraph
 registerInterferenceGraph vs = graph
@@ -118,15 +118,13 @@ registerInterferenceGraph vs = graph
           f x g = foldr (uncurry G.insertEdge) g [(G.find a graph, G.find b graph) | a <- S.toList x, b <- S.toList x, a /= b]
 
 simplifyRIG2 :: Variables -> Spilled -> RegisterInterferenceGraph -> K -> (Variables, Spilled)
-simplifyRIG2 xs spills g k = 
-    let isSimplifiable x Nothing = if length (G.neighbours x g) < k then (Just x) else Nothing
-        isSimplifiable _ (Just x) = (Just x)
-        findSimplify = S.foldr isSimplifiable Nothing (G.keysSet g)
-        findSpill = fst $ maximumBy (comparing snd) (S.map (\x -> (x, length (G.neighbours x g))) (G.keysSet g))
-    in  if null (G.nodes g) then (xs, spills)
-        else case findSimplify of
-            Nothing -> simplifyRIG2 xs (G.unsafeLookup findSpill g:spills) (G.delete findSpill g) k
-            (Just x) -> simplifyRIG2 (G.unsafeLookup x g:xs) spills (G.delete x g) k
+simplifyRIG2 xs spills g k
+    | null (G.nodes g) = (xs, spills)
+    | otherwise =
+        let node = fst $ minimumBy (comparing snd) (S.map (\x -> (x, length (G.neighbours x g))) (G.keysSet g))
+        in  if length (G.neighbours node g) < k
+                then simplifyRIG2 (G.unsafeLookup node g:xs) spills (G.delete node g) k
+            else simplifyRIG2 xs (G.unsafeLookup node g:spills) (G.delete node g) k
 
 simplifyRIG :: RegisterInterferenceGraph -> K -> (Variables, Spilled)
 simplifyRIG = simplifyRIG2 [] []
@@ -134,8 +132,8 @@ simplifyRIG = simplifyRIG2 [] []
 findRegister :: Variable -> Variables -> K -> RegisterMapping -> RegisterConstraintsInt -> Int
 findRegister node neigh k mapping negConstraints = 
     let registersUsed = M.elems $ M.filterWithKey (\k v -> k `elem` neigh) mapping
-    in head $ [x | x <- [0..(k-1)], not (x `elem` registersUsed), node `M.notMember` negConstraints || x `S.notMember` (negConstraints M.! node)]
-
+        registersAvailable = [x | x <- [0..(k-1)], not (x `elem` registersUsed), node `M.notMember` negConstraints || x `S.notMember` (negConstraints M.! node)]
+    in if length registersAvailable > 0 then head registersAvailable else error $ "findRegister : head : empty list " ++ show (node, neigh, k, mapping, negConstraints)
 findRegisters2 :: Variables -> RegisterInterferenceGraph -> K -> RegisterMapping -> RegisterConstraintsInt -> RegisterMapping
 findRegisters2 [] _ _ mapping _ = mapping
 findRegisters2 (n:ns) g k mapping negConstraints = 
