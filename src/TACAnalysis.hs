@@ -71,7 +71,7 @@ usedAndDefinedVariables inst =
         (TACUnary s _ e) -> (expressionsToSet [e], S.fromList [s])
         (TACCopy s e) -> (expressionsToSet [e], S.fromList [s])
         (TACArrayAccess var array ex) -> (expressionsToSet [TACVar array, ex], S.fromList [var])
-        (TACArrayModif array index ex) -> (expressionsToSet [index, ex], S.empty)
+        (TACArrayModif array index ex) -> (expressionsToSet [index, ex] `S.union` S.fromList [array], S.empty)
         (TACIf e _) -> (expressionsToSet [e], S.empty)
         (TACCall _ es ret) -> case ret of
                                    Nothing -> (expressionsToSet es, S.empty)
@@ -138,7 +138,7 @@ spillMoreVariables is spilled dfg k
     | and (M.map (\(vin, _) -> S.size vin <= k) dfg) = spilled
     | otherwise = spillMoreVariables newfunction newspilled newdfg k
                 where usedPlusDefOf = (\(a, b) -> S.toList $ a `S.union` b) . usedAndDefinedVariables . ((!!) is)
-                      varFrequency = (frequency . concat . M.elems) $ M.mapWithKey (\k a -> (filter (`notElem` usedPlusDefOf k) . S.toList . fst) a) $ M.filter (((<) k) . S.size . fst) dfg
+                      varFrequency = (frequency . concat . M.elems) $ M.mapWithKey (\k a -> (filter (`notElem` usedPlusDefOf k) . filter (`notElem` spilled) . S.toList . fst) a) $ M.filter (((<) k) . S.size . fst) dfg
                       varToSpill = fst $ minimumBy (comparing snd) varFrequency
                       newspilled = varToSpill:spilled
                       newfunction = fixInstructions is [varToSpill]

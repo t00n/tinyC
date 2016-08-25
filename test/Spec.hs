@@ -619,7 +619,7 @@ main = hspec $ do
             putStrLn $ dfgShow cfg (M.filter (((<) k) . S.size . snd) dfg)
             let registerMapping = findRegisters nodes rig k M.empty
             testRegisterMapping registerMapping rig `shouldBe` True
-            registerMapping `shouldBe` M.fromList [("a",1),("b",3),("c",0),("d",0),("t1",1),("t10",1),("t11",0),("t2",0),("t3",2),("t4",1),("t5",0),("t6",0),("t7",0),("t8",1),("t9",0)]
+            registerMapping `shouldBe` M.fromList [("a",0),("b",5),("c",4),("d",3),("t1",1),("t10",0),("t11",0),("t2",0),("t3",2),("t4",1),("t5",0),("t6",0),("t7",1),("t8",0),("t9",2)]
     describe "Tests nasm analysis and optimization" $ do
         it "Tests negative constraints on register allocation" $ do
             code <- readFile "test/fixtures/bigprogram.c"
