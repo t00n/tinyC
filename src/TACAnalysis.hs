@@ -168,16 +168,14 @@ findAddressedVariables = (nub . (concatMap f))
           f _ = []
 
 mapVariablesToRegisters :: TACFunction -> K -> RegisterConstraintsInt -> (RegisterMapping, Spilled, TACFunction)
-mapVariablesToRegisters function k negConstraints = 
-    let addressedVariables = findAddressedVariables function
-        mkRIG is = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) is
-        rig = foldr G.deleteNode (mkRIG function) addressedVariables
-        (nodes, spilled) = simplifyRIG rig k
-    in
-    if spilled == []
-        then let newfunction = fixInstructions function addressedVariables
-             in (findRegisters nodes rig k negConstraints, addressedVariables, newfunction)
-    else let (newnodes, newspilled) = simplifyRIG rig (k-1)
-             newfunction = fixInstructions function (newspilled ++ addressedVariables)
-             newrig = mkRIG newfunction
-         in (findRegisters newnodes newrig (k-1) negConstraints, (newspilled ++ addressedVariables), newfunction)
+mapVariablesToRegisters function k negConstraints = let 
+        addressedVariables = findAddressedVariables function
+        rig = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) function
+        (variables, spilled) = simplifyRIG rig k
+        allspilled = nub $ spilled ++ addressedVariables
+        dfg = (dataFlowGraph . controlFlowGraph) (fixInstructions function allspilled)
+        newspilled = spillMoreVariables allspilled dfg k
+        newfunction = fixInstructions function newspilled
+        newrig = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) newfunction
+    in  if allspilled == [] then (findRegisters variables rig k negConstraints, [], function)
+        else (findRegisters variables newrig k negConstraints, newspilled, newfunction)

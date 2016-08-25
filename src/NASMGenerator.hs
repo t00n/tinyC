@@ -100,7 +100,7 @@ instance NASMGenerator TACFunction where
         let funcName = (labelToName . head) xs
         let negConstraints = (constraintsRegisterNameToInt . negativeConstraints) xs
         let (varIntMap, spilled, is) = mapVariablesToRegisters xs (length registers) negConstraints
-        let varRegMap = M.map (\v -> registers !! v) varIntMap `M.union` M.fromList (map (\x -> (x, last registers)) spilled)
+        let varRegMap = M.map ((!!) registers) varIntMap
         let variables = M.keys varRegMap
         let inRegisters = variables \\ spilled
         st <- lift get
