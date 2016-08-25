@@ -4,9 +4,10 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Queue as Q
 import qualified Graph as G
-import Data.List (minimumBy, nub, intercalate)
+import Data.List (minimumBy, nub, intercalate, group, sort)
 import Data.Ord
 import Debug.Trace (traceShow, trace)
+import Control.Arrow ((&&&))
 
 import TACGenerator
 
@@ -124,10 +125,21 @@ simplifyRIG2 xs spills g k
         let node = fst $ minimumBy (comparing snd) (S.map (\x -> (x, length (G.neighbours x g))) (G.keysSet g))
         in  if length (G.neighbours node g) < k
                 then simplifyRIG2 (G.unsafeLookup node g:xs) spills (G.delete node g) k
-            else simplifyRIG2 xs (G.unsafeLookup node g:spills) (G.delete node g) k
+            else simplifyRIG2 (G.unsafeLookup node g:xs) (G.unsafeLookup node g:spills) (G.delete node g) k
 
 simplifyRIG :: RegisterInterferenceGraph -> K -> (Variables, Spilled)
 simplifyRIG = simplifyRIG2 [] []
+
+frequency :: (Eq a, Ord a) => [a] -> [(a, Int)]
+frequency = map (head &&& length) . group . sort
+
+spillMoreVariables :: Spilled -> DataFlowGraph -> K -> Spilled
+spillMoreVariables spilled dfg k
+    | and (M.map (\(vin, _) -> S.size vin <= k) dfg) = spilled
+    | otherwise = spillMoreVariables newspilled newdfg k
+                where varToSpill = fst $ minimumBy (comparing snd) $ (frequency . concat . map (filter (`notElem` spilled)) . filter (\x -> length x > k) . map (S.toList . fst) . M.elems) dfg
+                      newspilled = varToSpill:spilled
+                      newdfg = M.map (\(vin, vout) -> (S.filter (/= varToSpill) vin, S.filter (/= varToSpill) vout)) dfg
 
 findRegister :: Variable -> Variables -> K -> RegisterMapping -> RegisterConstraintsInt -> Int
 findRegister node neigh k mapping negConstraints = 

@@ -44,7 +44,7 @@ testRegisterMapping mapping rig = and $ M.elems $ M.mapWithKey f mapping
     where f var reg = reg `notElem` neighboursReg
                 where varKey = find var rig
                       varNeighbours = neighboursValues varKey rig
-                      neighboursReg = map (fromJust . (flip M.lookup mapping)) varNeighbours
+                      neighboursReg = map ((M.!) mapping) varNeighbours
 
 main :: IO ()
 main = hspec $ do
@@ -605,23 +605,19 @@ main = hspec $ do
             let st = symbolTable ast
             let tac = tacGenerate st ast
             let cfg = controlFlowGraph (concat $ tacCode tac)
-            writeFile "cfg1.dot" (toDot cfg)
             let dfg = dataFlowGraph cfg
-            putStrLn $ dfgShow cfg dfg
             let rig = registerInterferenceGraph dfg
             let (nodes, spilled) = simplifyRIG rig 4
-            writeFile "rig1.dot" (toDot rig)
-            --(nodes, spilled) `shouldBe` (["t5","t4","t3","d","c","b","t6","t2","t1","t7","t8","t9","t10","t11"],["a"])
-            -- let (nodes, spilled) = simplifyRIG rig 5
             let newtac = fixInstructions (concat $ tacCode tac) spilled
             let cfg = controlFlowGraph newtac
-            writeFile "cfg2.dot" (toDot cfg)
             let dfg = dataFlowGraph cfg
-            putStrLn $ dfgShow cfg dfg
             let rig = registerInterferenceGraph dfg
-            writeFile "rig2.dot" (toDot rig)
-            let registerMapping = findRegisters (nodes ++ spilled) rig 4 M.empty
+            let newspilled = spillMoreVariables spilled dfg 4
+            let newnewtac = fixInstructions (concat $ tacCode tac) newspilled
+            let rig = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) newnewtac
+            let registerMapping = findRegisters nodes rig 4 M.empty
             testRegisterMapping registerMapping rig `shouldBe` True
+            registerMapping `shouldBe` M.fromList [("a",1),("b",3),("c",0),("d",0),("t1",1),("t10",1),("t11",0),("t2",0),("t3",2),("t4",1),("t5",0),("t6",0),("t7",0),("t8",1),("t9",0)]
     describe "Tests nasm analysis and optimization" $ do
         it "Tests negative constraints on register allocation" $ do
             code <- readFile "test/fixtures/bigprogram.c"
