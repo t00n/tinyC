@@ -30,3 +30,5 @@ int tiny() {
         i = i + 1;
     }
 }
+
+// result should be : 123234357
