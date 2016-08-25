@@ -598,21 +598,26 @@ main = hspec $ do
             findRegisters nodes rig 3 M.empty `shouldBe` M.fromList [("i",0),("n",0),("t1",0),("t2",1),("t3",1),("t4",0),("t5",0),("t6",0),("t7",1),("t8",0)]
         it "tests register alloction with not enough registers" $ do
             code <- readFile "test/fixtures/bigprogram.c"
+            let k = 6
             let ast = scan_and_parse code
             let st = symbolTable ast
             let tac = tacGenerate st ast
             let cfg = controlFlowGraph (concat $ tacCode tac)
             let dfg = dataFlowGraph cfg
             let rig = registerInterferenceGraph dfg
-            let (nodes, spilled) = simplifyRIG rig 4
+            let (nodes, spilled) = simplifyRIG rig k
             let newtac = fixInstructions (concat $ tacCode tac) spilled
             let cfg = controlFlowGraph newtac
             let dfg = dataFlowGraph cfg
             let rig = registerInterferenceGraph dfg
-            let newspilled = spillMoreVariables spilled dfg 4
+            putStrLn $ dfgShow cfg (M.filter (((<) k) . S.size . snd) dfg)
+            let newspilled = spillMoreVariables newtac spilled dfg k
             let newnewtac = fixInstructions (concat $ tacCode tac) newspilled
-            let rig = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) newnewtac
-            let registerMapping = findRegisters nodes rig 4 M.empty
+            let cfg = controlFlowGraph newnewtac
+            let dfg = dataFlowGraph cfg
+            let rig = registerInterferenceGraph dfg
+            putStrLn $ dfgShow cfg (M.filter (((<) k) . S.size . snd) dfg)
+            let registerMapping = findRegisters nodes rig k M.empty
             testRegisterMapping registerMapping rig `shouldBe` True
             registerMapping `shouldBe` M.fromList [("a",1),("b",3),("c",0),("d",0),("t1",1),("t10",1),("t11",0),("t2",0),("t3",2),("t4",1),("t5",0),("t6",0),("t7",0),("t8",1),("t9",0)]
     describe "Tests nasm analysis and optimization" $ do

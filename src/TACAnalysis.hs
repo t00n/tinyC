@@ -133,19 +133,23 @@ simplifyRIG = simplifyRIG2 [] []
 frequency :: (Eq a, Ord a) => [a] -> [(a, Int)]
 frequency = map (head &&& length) . group . sort
 
-spillMoreVariables :: Spilled -> DataFlowGraph -> K -> Spilled
-spillMoreVariables spilled dfg k
+spillMoreVariables :: TACFunction -> Spilled -> DataFlowGraph -> K -> Spilled
+spillMoreVariables is spilled dfg k
     | and (M.map (\(vin, _) -> S.size vin <= k) dfg) = spilled
-    | otherwise = spillMoreVariables newspilled newdfg k
-                where varToSpill = fst $ minimumBy (comparing snd) $ (frequency . concat . map (filter (`notElem` spilled)) . filter (\x -> length x > k) . map (S.toList . fst) . M.elems) dfg
+    | otherwise = spillMoreVariables newfunction newspilled newdfg k
+                where usedPlusDefOf = (\(a, b) -> S.toList $ a `S.union` b) . usedAndDefinedVariables . ((!!) is)
+                      varFrequency = (frequency . concat . M.elems) $ M.mapWithKey (\k a -> (filter (`notElem` usedPlusDefOf k) . S.toList . fst) a) $ M.filter (((<) k) . S.size . fst) dfg
+                      varToSpill = fst $ minimumBy (comparing snd) varFrequency
                       newspilled = varToSpill:spilled
-                      newdfg = M.map (\(vin, vout) -> (S.filter (/= varToSpill) vin, S.filter (/= varToSpill) vout)) dfg
+                      newfunction = fixInstructions is [varToSpill]
+                      newdfg = (dataFlowGraph . controlFlowGraph) newfunction
 
 findRegister :: Variable -> Variables -> K -> RegisterMapping -> RegisterConstraintsInt -> Int
 findRegister node neigh k mapping negConstraints = 
     let registersUsed = M.elems $ M.filterWithKey (\k v -> k `elem` neigh) mapping
         registersAvailable = [x | x <- [0..(k-1)], not (x `elem` registersUsed), node `M.notMember` negConstraints || x `S.notMember` (negConstraints M.! node)]
     in if length registersAvailable > 0 then head registersAvailable else error $ "findRegister : head : empty list " ++ show (node, neigh, k, mapping, negConstraints)
+
 findRegisters2 :: Variables -> RegisterInterferenceGraph -> K -> RegisterMapping -> RegisterConstraintsInt -> RegisterMapping
 findRegisters2 [] _ _ mapping _ = mapping
 findRegisters2 (n:ns) g k mapping negConstraints = 
@@ -173,8 +177,9 @@ mapVariablesToRegisters function k negConstraints = let
         rig = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) function
         (variables, spilled) = simplifyRIG rig k
         allspilled = nub $ spilled ++ addressedVariables
-        dfg = (dataFlowGraph . controlFlowGraph) (fixInstructions function allspilled)
-        newspilled = spillMoreVariables allspilled dfg k
+        intermediateIS = fixInstructions function allspilled
+        dfg = (dataFlowGraph . controlFlowGraph) intermediateIS
+        newspilled = spillMoreVariables intermediateIS allspilled dfg k
         newfunction = fixInstructions function newspilled
         newrig = (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) newfunction
     in  if allspilled == [] then (findRegisters variables rig k negConstraints, [], function)
