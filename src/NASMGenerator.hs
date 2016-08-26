@@ -214,10 +214,11 @@ nasmGenerateMinus var e1 e2 = do
 nasmGenerateTimes :: Variable -> TACExpression -> TACExpression -> SRSS [NASMInstruction]
 nasmGenerateTimes var e1 e2 = do
     dest <- varRegister var
+    mov <- nasmGenerateMove var e1
     case e1 of
          (TACInt i1) -> case e2 of
-                             (TACInt i2) -> return [MOV4 (Register dest DWORD) i1, IMUL3 dest i2]
-                             (TACChar c2) -> return [MOV4 (Register dest DWORD) i1, IMUL3 dest (ord c2)]
+                             (TACInt i2) -> return $ mov ++ [IMUL3 dest i2]
+                             (TACChar c2) -> return $ mov ++ [IMUL3 dest (ord c2)]
                              (TACVar v2) -> if v2 == var then return [IMUL3 dest i1]
                                             else varRegister v2 >>= \src -> return [IMUL6 dest src i1]
          (TACChar c1) -> case e2 of
@@ -232,7 +233,7 @@ nasmGenerateTimes var e1 e2 = do
                                              else varRegister v1 >>= \src -> return [IMUL6 dest src (ord c2)]
                              (TACVar v2) -> if v1 == var then varRegister v2 >>= \src -> return [IMUL4 dest src]
                                             else if v2 == var then varRegister v1 >>= \src -> return [IMUL4 dest src]
-                                            else varRegister v1 >>= \src1 -> varRegister v2 >>= \src2 -> return [MOV1 DWORD dest src1, IMUL4 dest src2]
+                                            else varRegister v1 >>= \src1 -> varRegister v2 >>= \src2 -> return $ mov ++ [IMUL4 dest src2]
 
 
 nasmGenerateDivide :: Variable -> TACExpression -> TACExpression -> SRSS [NASMInstruction]
@@ -537,6 +538,10 @@ instance NASMShow NASMProgram where
         "mov eax, [ebp+8] ; arg 1 : the int"
         "mov ecx, 0      ; byte counter"
         "mov ebx, 10      ; base 10"
+        "; check if positive or negative"
+        "test eax, eax"
+        "jns _writeint_beg"
+        "neg eax"
         "_writeint_beg:"
         "xor edx, edx"
         "idiv ebx"
@@ -545,6 +550,13 @@ instance NASMShow NASMProgram where
         "add ecx, 2"
         "cmp eax, 0"
         "jne _writeint_beg"
+        "; add - if negative"
+        "mov eax, [ebp+8]"
+        "test eax, eax"
+        "jns _write_not_signed"
+        "push word 45"
+        "add ecx, 2"
+        "_write_not_signed:"
         "mov edx,ecx     ; arg3, length of string to print"
         "mov ecx,esp     ; arg2, pointer to string"
         "mov ebx,1       ; arg1, where to write, screen"
