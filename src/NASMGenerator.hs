@@ -571,6 +571,7 @@ instance NASMShow NASMProgram where
         "mov ebx,1       ; arg1, where to write, screen"
         "mov eax,4       ; write sysout command to int 80 hex"
         "int 0x80        ; interrupt 80 hex, call kernel"
+        "add esp, ecx"
         "pop edi"
         "pop esi"
         "pop ebx"
