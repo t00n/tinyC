@@ -27,6 +27,7 @@ import TestSemantics
 import TestTACGenerator
 import TestTACAnalysis
 import TestNASMGenerator
+import TestRealLife
 
 main :: IO ()
 main = hspec $ do
@@ -47,3 +48,4 @@ main = hspec $ do
             let st = symbolTable ast
             let tac = tacGenerate st ast
             negativeConstraints (concat $ tacCode tac) `shouldBe` M.fromList [("t2",S.fromList [A,D]),("t6",S.fromList [A,D]),("t9",S.fromList [A,D])]
+    testRealLife

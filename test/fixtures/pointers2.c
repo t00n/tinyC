@@ -2,9 +2,9 @@
 int * a;
 int x = 5;
 int xs[5];
+int * b;
 
 int tiny() {
-    int * b;
     xs[0] = 10;
     xs[1] = 15;
     xs[2] = 20;
