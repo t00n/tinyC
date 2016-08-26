@@ -297,8 +297,8 @@ instance NASMGenerator TACInstruction where
              (InMemory label) -> do
                 info <- lift (gets (unsafeGetSymbolInfo var))
                 let k = infoKind info
-                if k == Value then return [MOV2 (Register reg DWORD) (AddressLabelOffset label 0 1)]
-                else return [LEA reg (AddressLabelOffset label 0 1)]
+                if k == Array then return [LEA reg (AddressLabelOffset label 0 1)]
+                else return [MOV2 (Register reg DWORD) (AddressLabelOffset label 0 1)]
     nasmGenerateInstructions (TACStore var) = do
         reg <- varRegister var
         location <- varLocation var

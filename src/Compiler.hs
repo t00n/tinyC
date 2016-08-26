@@ -14,5 +14,6 @@ compile infile outfile = do
                    Right x -> x
     let st = symbolTable ast
     let tac = tacGenerate st ast
+    writeFile (outfile ++ ".tac") $ tacPrint tac
     let nasm = nasmGenerate tac st
     writeFile outfile $ nasmShow nasm
