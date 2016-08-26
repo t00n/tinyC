@@ -1,7 +1,13 @@
 
+int swap_ptr(int * a, int * b) {
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
 int quicksort(int * beg, int * end) {
     if (end - beg > 0) {
-        int * middle = (end + beg) / 2;
+        int * middle = (end - beg) / 2 + beg;
         int pivot = *middle;
         int * b = beg;
         int * e = end;
@@ -10,18 +16,10 @@ int quicksort(int * beg, int * end) {
             while (*b < pivot) { b = b + 4; }
             while (*e > pivot) { e = e - 4; }
             if (b < e) {
-                tmp = *b;
-                *b = *e;
-                *e = tmp;
-                b = b + 4;
-                e = e - 4;
+                swap_ptr(b, e);
             }
             else if (b == e) {
-                tmp = *b;
-                *b = *e;
-                *e = tmp;
-                b = b + 4;
-                e = e - 4;
+                swap_ptr(b, e);
             }
         }
         quicksort(beg, middle);
