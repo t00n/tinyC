@@ -32,6 +32,7 @@ int euclides2(int a, int b) {
 }
 
 int tiny() {
+    write modulo(54, 4);
     write euclides1(54, 24);
     write euclides1(42, 56);
     write euclides1(17, 13);
@@ -39,3 +40,4 @@ int tiny() {
     write euclides2(42, 56);
     write euclides2(17, 13);
 }
+// result shoud be : 2 6 14 1 6 14 1

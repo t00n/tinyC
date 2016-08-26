@@ -226,22 +226,28 @@ nasmGenerateTimes var e1 e2 = do
                              (TACChar c2) -> return [MOV4 (Register dest DWORD) (ord c1), IMUL3 dest (ord c2)]
                              (TACVar v2) -> if v2 == var then return [IMUL3 dest (ord c1)]
                                             else varRegister v2 >>= \src -> return [IMUL6 dest src (ord c1)]
-         (TACVar v1) -> case e2 of
-                             (TACInt i2) -> if v1 == var then return [IMUL3 dest i2]
-                                            else varRegister v1 >>= \src -> return [IMUL6 dest src i2]
-                             (TACChar c2) -> if v1 == var then return [IMUL3 dest (ord c2)]
-                                             else varRegister v1 >>= \src -> return [IMUL6 dest src (ord c2)]
-                             (TACVar v2) -> if v1 == var then varRegister v2 >>= \src -> return [IMUL4 dest src]
-                                            else if v2 == var then varRegister v1 >>= \src -> return [IMUL4 dest src]
-                                            else varRegister v1 >>= \src1 -> varRegister v2 >>= \src2 -> return $ mov ++ [IMUL4 dest src2]
+         (TACVar v1) -> varRegister v1 >>= \src1 -> 
+                            case e2 of
+                                (TACInt i2) -> if src1 == dest then return [IMUL3 dest i2]
+                                               else return [IMUL6 dest src1 i2]
+                                (TACChar c2) -> if src1 == dest then return [IMUL3 dest (ord c2)]
+                                                else return [IMUL6 dest src1 (ord c2)]
+                                (TACVar v2) -> varRegister v2 >>= \src2 -> 
+                                                    if src1 == dest then return [IMUL4 dest src2]
+                                                    else if src2 == dest then return [IMUL4 dest src1]
+                                                    else return $ mov ++ [IMUL4 dest src2]
 
 
 nasmGenerateDivide :: Variable -> TACExpression -> TACExpression -> SRSS [NASMInstruction]
 nasmGenerateDivide var e1 e2 = do
     dest <- varRegister var
-    let predest = if dest == A then [PUSH1 D, XOR1 DWORD D D] else [PUSH1 D, XOR1 DWORD D D, PUSH1 A]
+    let predest = if dest == A then [PUSH1 D, XOR1 DWORD D D] 
+                  else if dest == D then [PUSH1 A, XOR1 DWORD D D] 
+                  else [PUSH1 D, XOR1 DWORD D D, PUSH1 A]
     let pre src = if src == A then [] else [MOV1 DWORD A src]
-    let postdest = if dest == A then [POP1 D] else [MOV1 DWORD dest A, POP1 A, POP1 D]
+    let postdest = if dest == A then [POP1 D]
+                   else if dest == D then [MOV1 DWORD dest A, POP1 A]
+                   else [MOV1 DWORD dest A, POP1 A, POP1 D]
     case e1 of
          (TACInt i1) -> case e2 of
                              (TACInt i2) -> return $ predest ++ [PUSH1 B, MOV4 (Register A DWORD) i1, MOV4 (Register B DWORD) i2, IDIV1 B, POP1 B] ++ postdest
