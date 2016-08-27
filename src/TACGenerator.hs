@@ -179,7 +179,10 @@ tacExpression (Call n es) = do
     t <- lift popVariable
     typ <- gets (unsafeSymbolType (nameToString n))
     return (typ, TACVar t, lines ++ [TACCall (nameToString n) params (Just $ TACVar t)])
-tacExpression (Length n) = undefined
+tacExpression (Length name) = do
+    let var = nameToString name
+    size <- gets (unsafeSymbolSize var)
+    return (IntType, TACInt size, [])
 tacExpression (Var (Name n)) = do
     typ <- gets (unsafeSymbolType n)
     return (typ, TACVar n, [])

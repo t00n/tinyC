@@ -65,6 +65,9 @@ unsafeSymbolType = infoType ... unsafeGetSymbolInfo
 unsafeSymbolKind :: String -> SymbolTable -> SymbolKind
 unsafeSymbolKind = infoKind ... unsafeGetSymbolInfo
 
+unsafeSymbolSize :: String -> SymbolTable -> SymbolSize
+unsafeSymbolSize = infoSize ... unsafeGetSymbolInfo
+
 -- Symbol Table
 type SymbolTable = TreePos Full Symbols
 

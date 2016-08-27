@@ -35,13 +35,13 @@ int tiny() {
     a[2] = 3;
     a[3] = 1;
     a[4] = 4;
-    while (i < 5) {
+    while (i < length a) {
         write a[i];
         i = i + 1;
     }
     i = 0;
     quicksort(a, &a[4]);
-    while (i < 5) {
+    while (i < length a) {
         write a[i];
         i = i + 1;
     }
