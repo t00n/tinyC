@@ -6,12 +6,15 @@ import System.IO
 
 import Compiler
 
-testCompile infile result = do
+testCompile infile result = testCompileWithInput infile [] result
+
+testCompileWithInput infile args result = do
     compile ("test/fixtures/" ++ infile) "test.s"
     readProcess "nasm" ["-felf32", "-g", "test.s"] []
     readProcess "ld" ["-melf_i386", "-e", "tiny", "-g", "test.o", "-o", "test.app"] []
-    content <- readProcess "./test.app" [] []
+    content <- readProcess "./test.app" [] args
     content `shouldBe` result
+
 
 testRealLife = 
     describe "Tests the all chain from C to binary on real life examples" $ do
@@ -33,5 +36,7 @@ testRealLife =
             testCompile "quicksort.c" "5231412345"
         it "Tests quicksort with pointers arithmetics" $ do
             testCompile "quicksort2.c" "5231412345"
+        it "Tests read and write chars and ints" $ do
+            testCompileWithInput "read_and_write.c" "-4587\n" "-4587c"
         it "Tests writing chars" $ do
             testCompile "testchar.c" "109e"

@@ -358,7 +358,10 @@ instance NASMGenerator TACInstruction where
                           else nasmCall "_writeint" [ex] Nothing
             (TACChar c) -> nasmCall "_writechar" [ex] Nothing
             (TACInt i) -> nasmCall "_writeint" [ex] Nothing
-    --nasmGenerateInstructions (TACRead TACExpression) = 
+    nasmGenerateInstructions (TACRead typ ex) = 
+        case ex of
+            (TACVar x) -> if typ == CharType then nasmCall "_read_char" [] (Just x)
+                          else nasmCall "_read_int" [] (Just x)
     nasmGenerateInstructions (TACArrayDecl var es) = do
         reg <- varRegister var
         info <- lift (gets (unsafeGetSymbolInfo var))
@@ -398,8 +401,6 @@ instance NASMGenerator TACInstruction where
                                 (TACInt i2) -> return [MOV5 DWORDADDRESS addr i2]
                                 (TACChar c2) -> return [MOV5 BYTEADDRESS addr (ord c2)]
                                 (TACVar v2) -> varRegister v2 >>= \reg -> return [MOV3 addr (Register reg DWORD)]
-    nasmGenerateInstructions _ = return []
-
 type SRSS = StateT RegisterState (StateT SymbolTable (State Flags))
 
 data Flags = Flags {
@@ -579,6 +580,67 @@ instance NASMShow NASMProgram where
         "mov esp, ebp"
         "pop ebp"
         "ret"
+        "_read_char:"
+        "push ebp"
+        "mov ebp, esp"
+        "push ebx"
+        "push esi"
+        "push edi"
+        "sub esp, 1"
+        "mov edx,1     ; arg3, length of string to read"
+        "lea ecx,[esp]     ; arg2, pointer to string"
+        "mov ebx,0       ; arg1, where to read, keyboard"
+        "mov eax,3      ; write sysin command to int 80 hex"
+        "int 0x80        ; interrupt 80 hex, call kernel"
+        "movzx eax, byte [esp]"
+        "add esp, 1"
+        "pop edi"
+        "pop esi"
+        "pop ebx"
+        "mov esp, ebp"
+        "pop ebp"
+        "ret"
+        "_read_int:"
+        "push ebp"
+        "mov ebp, esp"
+        "push ebx"
+        "push esi"
+        "push edi"
+        "sub esp, 100"
+        "mov edx,100     ; arg3, length of string to read"
+        "mov ecx,esp     ; arg2, pointer to string"
+        "mov ebx,0       ; arg1, where to read, keyboard"
+        "mov eax,3      ; write sysin command to int 80 hex"
+        "int 0x80        ; interrupt 80 hex, call kernel"
+        "sub eax, 1"
+        "mov ecx, 0" -- counter
+        "mov ebx, 0" -- result
+        "cmp byte [esp], 45" -- if first char is - ignore it for the moment
+        "jne _read_int_beg"
+        "add ecx, 1"
+        "_read_int_beg:" -- start of loop
+        "cmp ecx, eax" -- end if counter is higher than total number of chars
+        "jge _read_int_end"
+        "imul ebx, 10"
+        "movzx esi, byte [esp+ecx]"
+        "sub esi, 48"
+        "add ebx, esi"
+        "add ecx, 1"
+        "jmp _read_int_beg"
+        "_read_int_end:"
+        "cmp byte [esp], 45"
+        "jne _read_int_not_signed"
+        "neg ebx"
+        "_read_int_not_signed:"
+        "mov eax, ebx"
+        "add esp, 100"
+        "pop edi"
+        "pop esi"
+        "pop ebx"
+        "mov esp, ebp"
+        "pop ebp"
+        "ret"
+
  
 instance NASMShow NASMData where
     nasmShow (NASMData l size vs) = printf "\t%s: %s\t" l (nasmShow size) ++ intercalate "," [printf "%d" v | v <- vs]
