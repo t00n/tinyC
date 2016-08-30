@@ -90,5 +90,4 @@ testTACAnalysis =
             let st = symbolTable ast
             let tac = tacGenerate st ast
             let (registerMapping, spilled, newfunc) = mapVariablesToRegisters (tacCode tac !! 0) 6 M.empty
-            putStrLn $ tacPrint newfunc
-            putStrLn $ show $ registerMapping
+            registerMapping `shouldBe` M.fromList [("a",0),("b",1),("t1",0),("t2",0),("t3",0),("t4",0),("t5",0),("t6",0),("t7",0),("x",0),("xs",0)]

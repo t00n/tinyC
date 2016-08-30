@@ -26,6 +26,7 @@ import TestSymbolTable
 import TestSemantics
 import TestTACGenerator
 import TestTACAnalysis
+import TestTACOptimization
 import TestNASMGenerator
 import TestRealLife
 
@@ -40,6 +41,7 @@ main = hspec $ do
         it "Tests everything" $ do
             evalNames (do { s1 <- popVariable; s2 <- nextVariable; l1 <- nextLabel; return [s1, s2, l1] }) ["t" ++ show i | i <- [1..]] ["l" ++ show i | i <- [1..]] `shouldBe` ["t1", "t2", "l1"]
     testTACAnalysis
+    testTACOptimization
     testNASMGenerator
     describe "Tests nasm analysis and optimization" $ do
         it "Tests negative constraints on register allocation" $ do

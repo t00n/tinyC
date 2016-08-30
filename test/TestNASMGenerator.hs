@@ -38,7 +38,7 @@ testNASMGenerator =
             let ast = scan_and_parse "int a; int tiny() { int b = 2; int c = 3; int d = (a+b)/(b-c); return d; }"
             let st = symbolTable ast
             let tac = tacGenerate st ast
-            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [0]] [LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,MOV4 (Register C DWORD) 2,MOV4 (Register D DWORD) 3,MOV2 (Register A DWORD) (AddressLabelOffset "a" 0 1),ADD1 DWORD A C,SUB1 DWORD C D,PUSH1 D,XOR1 DWORD D D,IDIV1 C,POP1 D,CALL "_exit"]
+            nasmGenerate tac st `shouldBe` NASMProgram [NASMData "a" DD [0]] [LABEL "tiny",PUSH1 BP,MOV1 DWORD BP SP,MOV4 (Register D DWORD) 2,MOV4 (Register C DWORD) 3,MOV2 (Register A DWORD) (AddressLabelOffset "a" 0 1),ADD1 DWORD A D,SUB1 DWORD C D,NEG1 (Register C DWORD),PUSH1 D,XOR1 DWORD D D,IDIV1 C,POP1 D,CALL "_exit"]
         it "Generates functions with arguments and calling convention" $ do
             let ast = scan_parse_check "int g() {} int tiny() { int a = 2; f(5, a); } int f(int x, int y) { return x + y; }"
             let st = symbolTable ast
