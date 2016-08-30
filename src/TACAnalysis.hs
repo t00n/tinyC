@@ -58,6 +58,7 @@ expressionsNames :: [TACExpression] -> [Variable]
 expressionsNames es = 
     let
         expName (TACVar n) = [n]
+        expName (TACArray v e) = v:expressionsNames [e]
         expName (TACExpr e1 _ e2) = concatMap expName [e1, e2]
         expName _ = []
     in concatMap expName es
