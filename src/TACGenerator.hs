@@ -79,8 +79,10 @@ tacArraySize es var = do
     size <- gets (unsafeSymbolSize var)
     case size of
         VarSize s -> return $ es !! 0
-        ArraySize ss -> return $ foldr1 (\x acc -> BinOp x Plus acc) $ map (\(i, s) -> BinOp i Times (Int s)) (zip es (tail ss ++ [1]))
-
+        ArraySize ss -> 
+            let initES = init es in
+            if length initES > 0 then return $ BinOp (foldr1 (\x acc -> BinOp x Plus acc) $ map (\(i, s) -> BinOp i Times (Int s)) (zip (init es) (tail ss))) Plus (last es)
+            else return $ last es
 
 instance TACGenerator Statement where
     tacGenerateInstructions (Assignment (Name n) e) = do
