@@ -115,7 +115,7 @@ instance NASMGenerator TACFunction where
         pre <- nasmGeneratePreFunction funcName offset
         nasmIS <- (mapM nasmGenerateInstructions (modifyInstructions inRegisters params globals (tail is))) >>= return . concat
         post <- nasmGeneratePostFunction funcName
-        return $ pre ++ nasmIS
+        traceShow totalMapping $ return $ pre ++ nasmIS
 
 
 retInstructions :: [NASMInstruction]
@@ -366,8 +366,8 @@ instance NASMGenerator TACInstruction where
         reg <- varRegister var
         info <- lift (gets (unsafeGetSymbolInfo var))
         let mult = if infoType info == IntType then 4 else 1
-        let size = infoSize info
-        return [SUB4 (Register SP DWORD) (mult * size), MOV1 DWORD reg SP]
+        let ArraySize size = infoSize info
+        return [SUB4 (Register SP DWORD) (mult * (product size)), MOV1 DWORD reg SP]
     nasmGenerateInstructions (TACArrayAccess var array index) = do
         reg <- varRegister var
         t <- lift $ gets (infoType . (unsafeGetSymbolInfo array))

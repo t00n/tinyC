@@ -10,6 +10,7 @@ data ErrorType = NotDeclaredError
                | NotAConstantError
                | NoTinyFunctionError
                | CantAssignArrayError
+               | TooMuchSubscriptionError
     deriving (Eq, Show)
 
 data SemanticError = SemanticError {

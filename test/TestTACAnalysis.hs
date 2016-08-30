@@ -84,3 +84,11 @@ testTACAnalysis =
             let registerMapping = findRegisters nodes rig k M.empty
             testRegisterMapping registerMapping rig `shouldBe` True
             registerMapping `shouldBe` M.fromList [("a",0),("b",5),("c",4),("d",3),("t1",1),("t10",0),("t11",0),("t2",0),("t3",2),("t4",1),("t5",0),("t6",0),("t7",1),("t8",0),("t9",2)]
+        it "Tests register allocation on pointers.c" $ do
+            code <- readFile "test/fixtures/pointers.c"
+            let ast = scan_and_parse code
+            let st = symbolTable ast
+            let tac = tacGenerate st ast
+            let (registerMapping, spilled, newfunc) = mapVariablesToRegisters (tacCode tac !! 0) 6 M.empty
+            putStrLn $ tacPrint newfunc
+            putStrLn $ show $ registerMapping

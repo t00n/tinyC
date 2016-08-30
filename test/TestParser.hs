@@ -27,7 +27,7 @@ testParsing =
             ast `shouldBe` [VarDeclaration IntType (Name "a") (Just $ BinOp (Int 2) Plus (Int 3)), VarDeclaration IntType (Name "b") (Just $ BinOp (Int 2) Plus $ BinOp (Int 3) Times (Int 4)), VarDeclaration IntType (Name "c") (Just $ BinOp (BinOp (Int 2) Divide (Int 4)) Plus (BinOp (Int 3) Times (Int 2))), VarDeclaration IntType (Name "d") (Just $ BinOp (BinOp (Int 8) Divide (Int 2)) Plus (Int 1))]
         it "Parses array expression" $ do
             let ast = scan_and_parse "int c = a[5];"
-            ast `shouldBe` [VarDeclaration IntType (Name "c") (Just $ Var $ NameSubscription "a" (Int 5))]
+            ast `shouldBe` [VarDeclaration IntType (Name "c") (Just $ Var $ NameSubscription "a" [Int 5])]
         it "Parses unary operators" $ do
             let ast = scan_and_parse "int a = -5; int b = -7 + -5; int c = !5;"
             ast `shouldBe` [VarDeclaration IntType (Name "a") (Just $ UnOp Neg (Int 5)), VarDeclaration IntType (Name "b") (Just $ BinOp (UnOp Neg (Int 7)) Plus (UnOp Neg (Int 5))), VarDeclaration IntType (Name "c") (Just $ UnOp Not (Int 5))]
@@ -57,7 +57,7 @@ testParsing =
             ast `shouldBe`[VarDeclaration IntType (Name "a") (Just (BinOp (BinOp (Int 1) Plus (Int 5)) Times (Int 3)))]
         it "Parses array declarations" $ do
             let ast = scan_and_parse "int c[10]; char b[5+2];"
-            ast `shouldBe` [VarDeclaration IntType (NameSubscription "c" (Int 10)) Nothing, VarDeclaration CharType (NameSubscription "b" (BinOp (Int 5) Plus (Int 2))) Nothing]
+            ast `shouldBe` [VarDeclaration IntType (NameSubscription "c" [Int 10]) Nothing, VarDeclaration CharType (NameSubscription "b" [BinOp (Int 5) Plus (Int 2)]) Nothing]
         it "Parses function declarations with no args and empty block" $ do
             let ast = scan_and_parse "int tiny() { }"
             ast `shouldBe` [FuncDeclaration IntType (Name "tiny") [] (Block [] [])]
@@ -93,7 +93,7 @@ testParsing =
             evaluate ast `shouldThrow` anyErrorCall
         it "Parses array assignment" $ do
             let ast = scan_and_parse "int tiny() { c[5] = 3; }"
-            ast `shouldBe` [FuncDeclaration IntType (Name "tiny") [] (Block [] [Assignment (NameSubscription "c" (Int 5)) (Int 3)])]
+            ast `shouldBe` [FuncDeclaration IntType (Name "tiny") [] (Block [] [Assignment (NameSubscription "c" [Int 5]) (Int 3)])]
         it "Parses an if with one instruction " $ do
             let ast = scan_and_parse "int tiny() { if (a == 5) a = 3; }"
             ast `shouldBe` [FuncDeclaration IntType (Name "tiny") [] (Block [] [If (BinOp (Var $ Name "a") Equal (Int 5)) (Assignment (Name "a") (Int 3))])]

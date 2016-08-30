@@ -4,6 +4,7 @@ module Semantics (checkSemantics, symbolTable) where
 
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT, throwE)
 import Control.Monad.State (State(..), get, put, modify, runState, gets)
+import Control.Monad (foldM)
 import Data.Maybe (isJust, fromJust)
 import Data.Char (ord)
 import qualified Data.Map as M
@@ -92,7 +93,7 @@ instance Checkable Expression where
             Var name -> checkNameDeclared name >>
                 case name of
                     (NamePointer n) -> checkNameIsValue name >> return expr
-                    (NameSubscription n e) -> checkNameIsValue name >> check e >> checkExpressionIsValue e >> return expr
+                    (NameSubscription n e) -> checkNameIsValue name >> mapM check e >> mapM checkExpressionIsValue e >> return expr
                     _ -> return expr
             Address name -> checkNameDeclared name >> checkNameIsValue name >> return expr
             _ -> return expr
@@ -185,7 +186,6 @@ checkExpressionIsPointer expr = do
 checkAssignment :: Name -> Expression -> ESSS ()
 checkAssignment name expr = do
     s1 <- getNameKind name
-    s2 <- getExpressionKind expr
     if s1 == Array
         then throwE (SemanticError CantAssignArrayError (show name))
     else
@@ -219,15 +219,23 @@ entryPointExists ds =
 getNameKind :: Name -> ESSS SymbolKind
 getNameKind n = do
     st <- get
-    let s = unsafeSymbolKind (nameToString n) st
+    let kind = unsafeSymbolKind (nameToString n) st
+    let ArraySize size = unsafeSymbolSize (nameToString n) st
     case n of
-        (Name _) -> return s
-        (NameSubscription _ _) -> 
-            if s == Value then throwE (SemanticError NotAnArrayError (show n))
-            else return Value
-        (NamePointer n) -> 
-            if s == Value then throwE (SemanticError NotAPointerError (show n))
-            else return Value
+        (Name _) -> return kind
+        (NameSubscription _ es) -> 
+            case kind of 
+                Value -> throwE (SemanticError NotAnArrayError (show n))
+                Pointer -> if length es > 1 then throwE (SemanticError TooMuchSubscriptionError (show n)) else return Value
+                Array -> if length es > length size then throwE (SemanticError TooMuchSubscriptionError (show n))
+                         else if length es == length size then return Value
+                         else return Array
+        (NamePointer _) -> 
+            case kind of
+                Value -> throwE (SemanticError NotAPointerError (show n))
+                Pointer -> return Value
+                Array -> if length size > 1 then return Array
+                         else return Value
             
 getExpressionKind :: Expression -> ESSS SymbolKind
 getExpressionKind expr = do

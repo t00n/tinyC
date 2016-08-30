@@ -88,7 +88,7 @@ usedAndDefinedVariables inst =
         (TACDeRefA v e) -> (expressionsToSet [e] `S.union` S.fromList [v], S.empty)
         (TACGoto _) -> (S.empty, S.empty)
         (TACLabel _) -> (S.empty, S.empty)
-        (TACArrayDecl var ex) -> (S.empty, S.empty)
+        (TACArrayDecl var ex) -> (expressionsToSet ex, S.fromList [var])
 
 dataFlowGraph :: ControlFlowGraph -> DataFlowGraph
 dataFlowGraph cfg = 

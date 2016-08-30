@@ -37,7 +37,9 @@ nextDF treePos =
 data SymbolKind = Value | Pointer | Array
     deriving (Eq, Show)
 
-type SymbolSize = Int
+data SymbolSize = VarSize Int
+                | ArraySize [Int]
+    deriving (Eq, Show)
 
 data SymbolInfo = VarInfo {
     infoType :: Type,
@@ -117,11 +119,14 @@ nameToKind (Name _) = Value
 nameToKind (NameSubscription _ _) = Array
 nameToKind (NamePointer _) = Pointer
 
+expressionSize :: Expression -> Int
+expressionSize (Int i) = i
+expressionSize (Char c) = ord c
+
 nameToSize :: Name -> Either SemanticError SymbolSize
-nameToSize (Name _) = Right 1
-nameToSize (NameSubscription _ (Int i)) = Right i
-nameToSize (NameSubscription _ (Char c)) = Right $ ord c
-nameToSize (NamePointer _) = Right 1
+nameToSize (Name _) = Right $ VarSize 1
+nameToSize (NameSubscription _ sizes) = Right $ ArraySize $ map expressionSize sizes
+nameToSize (NamePointer _) = Right $ VarSize 1
 nameToSize x = Left (SemanticError NotAConstantError (show x))
 
 declName :: Declaration -> String

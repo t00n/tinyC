@@ -4,6 +4,7 @@ import Control.Monad.Trans.State (StateT(..), evalStateT, gets, get, put)
 import Control.Monad.Trans (lift)
 import Control.Monad (liftM2)
 import Data.Char (chr, ord)
+import Data.Sequence (foldrWithIndex)
 import Debug.Trace (traceShow)
 
 import Parser
@@ -61,11 +62,11 @@ instance TACGenerator Declaration where
     tacGenerateInstructions (VarDeclaration _ (Name n) (Just e)) = do
         (_, t, lines) <- tacExpression e
         return $ lines ++ [TACCopy n t]
-    tacGenerateInstructions (VarDeclaration t (NameSubscription n e) _) = 
-        let size (Int i) = i
-            size (Char c) = ord c
-            value = if t == IntType then TACInt 0 else TACChar (chr 0)
-        in return $ [TACArrayDecl n (replicate (size e) value)]
+    tacGenerateInstructions (VarDeclaration t n@(NameSubscription _ _) _) = do
+        let name = nameToString n
+        let value = if t == IntType then TACInt 0 else TACChar (chr 0)
+        ArraySize size <- gets $ unsafeSymbolSize name
+        return $ [TACArrayDecl name (replicate (product size) value)]
     tacGenerateInstructions (VarDeclaration t (NamePointer n) Nothing) = 
         return [TACCopy n (TACInt 0)]
     tacGenerateInstructions (VarDeclaration t (NamePointer n) (Just e)) = do
@@ -73,15 +74,23 @@ instance TACGenerator Declaration where
         return $ lines ++ [TACCopy n t]
     tacGenerateInstructions _ = return []
 
+tacArraySize :: [Expression] -> String -> SSNSS Expression
+tacArraySize es var = do
+    size <- gets (unsafeSymbolSize var)
+    case size of
+        VarSize s -> return $ es !! 0
+        ArraySize ss -> return $ foldr1 (\x acc -> BinOp x Plus acc) $ map (\(i, s) -> BinOp i Times (Int s)) (zip es (tail ss ++ [1]))
+
 
 instance TACGenerator Statement where
     tacGenerateInstructions (Assignment (Name n) e) = do
         (_, t, lines) <- tacExpression e
         return $ lines ++ [TACCopy n t]
-    tacGenerateInstructions (Assignment (NameSubscription n i) e) = do
-        (_, t1, lines1) <- tacExpression i
+    tacGenerateInstructions (Assignment (NameSubscription name indexes) e) = do
+        ex <- tacArraySize indexes name
+        (_, t1, lines1) <- tacExpression ex
         (_, t2, lines2) <- tacExpression e
-        return $ lines1 ++ lines2 ++ [TACArrayModif n t1 t2]
+        return $ lines1 ++ lines2 ++ [TACArrayModif name t1 t2]
     tacGenerateInstructions (Assignment (NamePointer n) e) = do
         (_, t, lines) <- tacExpression e
         return $ lines ++ [TACDeRefA n t]
@@ -179,15 +188,20 @@ tacExpression (Call n es) = do
     t <- lift popVariable
     typ <- gets (unsafeSymbolType (nameToString n))
     return (typ, TACVar t, lines ++ [TACCall (nameToString n) params (Just $ TACVar t)])
-tacExpression (Length name) = do
-    let var = nameToString name
-    size <- gets (unsafeSymbolSize var)
-    return (IntType, TACInt size, [])
+tacExpression (Length n@(NameSubscription _ ex)) = do
+    let var = nameToString n
+    ArraySize size <- gets (unsafeSymbolSize var)
+    return (IntType, TACInt (size !! length ex), [])
+tacExpression (Length n@(Name _)) = do
+    let var = nameToString n
+    ArraySize size <- gets (unsafeSymbolSize var)
+    return (IntType, TACInt (size !! 0), [])
 tacExpression (Var (Name n)) = do
     typ <- gets (unsafeSymbolType n)
     return (typ, TACVar n, [])
-tacExpression (Var (NameSubscription n e)) = do
-    (_, t, lines) <- tacExpression e
+tacExpression (Var (NameSubscription n es)) = do
+    ex <- tacArraySize es n
+    (_, t, lines) <- tacExpression ex
     newvar <- lift popVariable
     typ <- gets (unsafeSymbolType n)
     return (typ, TACVar newvar, lines ++ [TACArrayAccess newvar n t])
@@ -199,7 +213,7 @@ tacExpression (Address name) = do
     newvar <- lift popVariable
     typ <- gets (unsafeSymbolType (nameToString name))
     case name of
-        NameSubscription n e -> tacExpression e >>= \(_, t, lines) -> return (typ, TACVar newvar, lines ++ [TACAddress newvar (TACArray n t)])
+        NameSubscription n es -> tacArraySize es n >>= tacExpression >>= \(_, t, lines) -> return (typ, TACVar newvar, lines ++ [TACAddress newvar (TACArray n t)])
         n -> return (typ, TACVar newvar, [TACAddress newvar (TACVar (nameToString n))])
 
 

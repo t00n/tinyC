@@ -145,8 +145,16 @@ type : int                                        { IntType }
 
 var :: { Name }
 var : name                                        { Name $1 }
-    | name '[' expr ']'                           { NameSubscription $1 $3 }
+    | name subscriptions                          { NameSubscription $1 $2 }
     | '*' name                                    { NamePointer $2 }
+
+subscription :: { Expression }
+subscription : '[' expr ']'                       { $2 }
+
+subscriptions :: { [Expression] }
+subscriptions : subscription                      { [$1] }
+              | subscription subscriptions        { $1:$2 }
+
 
 {
 
@@ -194,7 +202,7 @@ data Expression = Int Int
     deriving (Eq, Show)
 
 data Name = Name String
-          | NameSubscription String Expression
+          | NameSubscription String [Expression]
           | NamePointer String
     deriving (Eq, Show)
 
