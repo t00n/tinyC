@@ -43,11 +43,11 @@ testSemantics =
             let ast = scan_and_parse "int a = 5; int tiny() { write a; }"
             checkSemantics ast `shouldBe` Right ast
             let ast = scan_and_parse "int a[5]; int tiny() { write a; }"
-            checkSemantics ast `shouldBe`  Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"a\")"})
             let ast = scan_and_parse "int a[5]; int tiny() { read a; }"
-            checkSemantics ast `shouldBe`  Left (SemanticError {errorType = NotAValueError, errorVariable = "Name \"a\""})
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Name \"a\""})
             let ast = scan_and_parse "int a; int tiny() { read a[5]; }"
-            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAnArrayError, errorVariable = "NameSubscription \"a\" (Int 5)"})
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAnArrayError, errorVariable = "NameSubscription \"a\" [Int 5]"})
             let ast = scan_and_parse "int a[5]; int tiny() { read a[2]; }"
             checkSemantics ast `shouldBe` Right ast
         it "Checks that variables are declared before use in expression" $ do
@@ -95,9 +95,6 @@ testSemantics =
             checkSemantics ast `shouldBe` Left (SemanticError NotAnArrayError "Name \"a\"")
             let ast = scan_and_parse "int a[5]; int tiny() { length a; }"
             checkSemantics ast `shouldBe` Right ast
-        it "Checks that arrays are declared with constant/literals size" $ do
-            let ast = scan_and_parse "int a = 5; int b[a]; int tiny() {}"
-            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAConstantError, errorVariable = "NameSubscription \"b\" (Var (Name \"a\"))"})
         it "Checks that binary and unary expressions have good kinds" $ do
             let ast = scan_and_parse "int tiny() { int * p; int a[5]; int x; a + p; }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
@@ -181,7 +178,7 @@ testSemantics =
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"p\")"})
         it "Checks that name subscriptions are used with an array" $ do
             let ast = scan_and_parse "int a = 5; int tiny() { a[5] + 5; }"
-            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAnArrayError, errorVariable = "NameSubscription \"a\" (Int 5)"})
+            checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAnArrayError, errorVariable = "NameSubscription \"a\" [Int 5]"})
         it "Checks that names are subscribed with scalar expressions" $ do
             let ast = scan_and_parse "int a[5]; int b[6]; int tiny() { a[b]; }"
             checkSemantics ast `shouldBe` Left (SemanticError {errorType = NotAValueError, errorVariable = "Var (Name \"b\")"})
