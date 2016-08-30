@@ -4,7 +4,10 @@ import Scanner
 import Parser
 import Semantics
 import TACGenerator
+import TACAnalysis
 import NASMGenerator
+
+import qualified Data.Map as M
 
 compile :: String -> String -> IO ()
 compile infile outfile = do
@@ -14,6 +17,7 @@ compile infile outfile = do
                    Right x -> x
     let st = symbolTable ast
     let tac = tacGenerate st ast
-    writeFile (outfile ++ ".tac") $ tacPrint tac
+    let newtac = concatMap (\x -> let (a, b, c) = mapVariablesToRegisters x 6 M.empty in c) (tacCode tac)
+    writeFile (outfile ++ ".tac") $ tacPrint newtac
     let nasm = nasmGenerate tac st
     writeFile outfile $ nasmShow nasm

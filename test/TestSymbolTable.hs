@@ -21,4 +21,4 @@ testSymbolTable = describe "Symbol table construction" $ do
             fmap root (constructST ast) `shouldBe` Left (SemanticError {errorType = NameExistsError, errorVariable = "a"})
         it "Constructs a two-level symbol table" $ do
             let ast = scan_and_parse "char a; int b = 5; int c[5]; char f() {} int g(int a) {}"
-            fmap root (constructST ast) `shouldBe` Right (zipper (T.Node (M.fromList [("a",VarInfo CharType Value (VarSize 1)),("b",VarInfo IntType Value (VarSize 1)),("c",VarInfo IntType Array (ArraySize [5])),("f",FuncInfo CharType M.empty),("g",FuncInfo IntType (M.fromList [("a", VarInfo IntType Value (VarSize 1))]))]) [T.Node (M.fromList []) [],T.Node (M.fromList [("a",VarInfo IntType Value (VarSize 1))]) []]))
+            fmap root (constructST ast) `shouldBe` Right (zipper (T.Node (M.fromList [("a",VarInfo CharType Value (VarSize 1)),("b",VarInfo IntType Value (VarSize 1)),("c",VarInfo IntType Array (ArraySize [5])),("f",FuncInfo CharType []),("g",FuncInfo IntType ([("a", VarInfo IntType Value (VarSize 1))]))]) [T.Node (M.fromList []) [],T.Node (M.fromList [("a",VarInfo IntType Value (VarSize 1))]) []]))

@@ -104,7 +104,7 @@ instance NASMGenerator TACFunction where
         let variables = M.keys varRegMap
         let inRegisters = variables \\ spilled
         st <- lift get
-        params <- lift (gets (M.keys . infoParams . (unsafeGetSymbolInfo funcName)))
+        params <- lift (gets (map fst . infoParams . (unsafeGetSymbolInfo funcName)))
         let globals = filter (flip nameInParent st) variables
         let locals = (variables \\ globals) \\ params
         (localMapping, offset) <- foldrM (foldLocal spilled varRegMap) (M.empty, 0) locals
@@ -115,7 +115,7 @@ instance NASMGenerator TACFunction where
         pre <- nasmGeneratePreFunction funcName offset
         nasmIS <- (mapM nasmGenerateInstructions (modifyInstructions inRegisters params globals (tail is))) >>= return . concat
         post <- nasmGeneratePostFunction funcName
-        traceShow totalMapping $ return $ pre ++ nasmIS
+        return $ pre ++ nasmIS
 
 
 retInstructions :: [NASMInstruction]

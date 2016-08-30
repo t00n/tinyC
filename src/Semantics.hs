@@ -202,7 +202,7 @@ checkArguments :: [Expression] -> Name -> ESSS ()
 checkArguments args func = do
     st <- get
     let funcName = nameToString func
-    let params = M.elems $ (infoParams ... unsafeGetSymbolInfo) funcName st 
+    let params = map snd $ (infoParams ... unsafeGetSymbolInfo) funcName st 
     foldl (>>) (return ()) $ zipWith checkArgument args params
 
 entryPointExists :: Program -> ESSS Program
