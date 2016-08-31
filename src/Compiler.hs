@@ -21,3 +21,5 @@ compile infile outfile = do
     writeFile (outfile ++ ".tac") $ tacPrint newtac
     let nasm = nasmGenerate tac st
     writeFile outfile $ nasmShow nasm
+
+--readFile "test/fixtures/bigprogram.c" >>= return . parse . alexScanTokens >>= \prog -> (return . symbolTable) prog >>= \st -> return (either (error . show) id (checkSemantics prog)) >>= (writeFile "test.s" . nasmShow . flip nasmGenerate st . tacGenerate st)

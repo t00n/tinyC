@@ -249,12 +249,11 @@ getExpressionKind expr = do
 
 -- API
 
-run ::Program -> (Either SemanticError Program, SymbolTable)
+run :: Program -> (Either SemanticError Program, SymbolTable)
 run prog = (runState . runExceptT) (do
-    st <- ExceptT $ return $ constructST prog
-    put st
-    entryPointExists prog >>= check)
-    (zipper emptyST)
+        st <- ExceptT $ return $ constructST prog
+        put st
+        entryPointExists prog >>= check) (zipper emptyST)
 
 checkSemantics :: Program -> (Either SemanticError Program)
 checkSemantics = fst . run

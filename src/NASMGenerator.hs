@@ -50,7 +50,6 @@ class Show a => NASMGenerator a where
 
 nasmGeneratePreFunction :: Label -> Offset -> SRSS [NASMInstruction]
 nasmGeneratePreFunction name offset = do
-    info <- lift $ gets $ unsafeGetSymbolInfo name
     let commonBeg = [LABEL name, PUSH1 BP, MOV1 DWORD BP SP]
     let allocateLocal = if offset == 0 then [] else [SUB4 (Register SP DWORD) (-offset)]
     if name == "tiny" 
