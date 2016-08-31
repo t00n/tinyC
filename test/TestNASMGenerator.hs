@@ -8,6 +8,7 @@ import Compiler
 import SymbolTable
 import TACGenerator
 import NASMGenerator
+import NASMProgram
 
 
 testNASMGenerator = 

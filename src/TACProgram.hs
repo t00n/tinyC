@@ -15,22 +15,22 @@ tacCode (TACProgram _ is) = is
 
 type TACFunction = [TACInstruction]
 
-data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpression
-                    | TACUnary String TACUnaryOperator TACExpression
-                    | TACCopy String TACExpression
-                    | TACArrayDecl String [TACExpression]
-                    | TACArrayAccess String String TACExpression
-                    | TACArrayModif String TACExpression TACExpression
-                    | TACLoad String
-                    | TACStore String
-                    | TACAddress String TACExpression
-                    | TACDeRef String TACExpression
-                    | TACDeRefA String TACExpression
-                    | TACIf TACExpression String
-                    | TACGoto String
-                    | TACCall String [TACExpression] (Maybe TACExpression)
+data TACInstruction = TACBinary Variable TACExpression TACBinaryOperator TACExpression
+                    | TACUnary Variable TACUnaryOperator TACExpression
+                    | TACCopy Variable TACExpression
+                    | TACArrayDecl Variable [TACExpression]
+                    | TACArrayAccess Variable Variable TACExpression
+                    | TACArrayModif Variable TACExpression TACExpression
+                    | TACLoad Variable
+                    | TACStore Variable
+                    | TACAddress Variable TACExpression
+                    | TACDeRef Variable TACExpression
+                    | TACDeRefA Variable TACExpression
+                    | TACIf TACExpression Label
+                    | TACGoto Label
+                    | TACCall Label [TACExpression] (Maybe TACExpression)
                     | TACReturn (Maybe TACExpression)
-                    | TACLabel String
+                    | TACLabel Label
                     | TACWrite TACProgram.Type TACExpression
                     | TACRead TACProgram.Type TACExpression
     deriving (Eq, Show, Ord)
@@ -50,17 +50,20 @@ data TACUnaryOperator = TACNeg | TACNot
 
 data TACExpression = TACInt Int
                    | TACChar Char
-                   | TACVar String
-                   | TACArray String TACExpression
+                   | TACVar Variable
+                   | TACArray Variable TACExpression
                    | TACExpr TACExpression TACBinaryOperator TACExpression
     deriving (Eq, Show, Ord)
 
 type Type = AST.Type
 
+type Label = String
+type Variable = String
+
 class TACPrint a where
     tacPrint :: a -> String
 
-tacShowArray :: String -> TACExpression -> String
+tacShowArray :: Variable -> TACExpression -> String
 tacShowArray array ex = array ++ "[" ++ tacPrint ex ++ "]"
 
 instance TACPrint a => TACPrint [a] where

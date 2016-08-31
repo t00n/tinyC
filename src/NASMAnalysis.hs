@@ -2,38 +2,11 @@ module NASMAnalysis where
 
 import TACAnalysis
 import TACProgram
+import NASMProgram
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (fromJust)
 import Data.List (elemIndex)
-
-
-data RegisterSize = LSB | MSB | WORD | DWORD
-    deriving (Eq, Show)
-
-data RegisterName = A | B | C | D | SI | DI | SP | BP
-    deriving (Eq, Show, Ord)
-
-registers :: [RegisterName]
-registers = [A, C, D, SI, DI, B]
-
-data Register = Register RegisterName RegisterSize
-    deriving (Eq, Show)
-
-data AddressSize = BYTEADDRESS | WORDADDRESS | DWORDADDRESS
-    deriving (Eq, Show)
-
-data Address = AddressRegisterOffset Register Offset Multiplier
-             | AddressRegisterRegister Register Offset Register Multiplier
-             | AddressLabelOffset Label Offset Multiplier
-             | AddressLabelRegister Label Register Multiplier
-    deriving (Eq, Show)
-
-type Constant = Int
-
-type Multiplier = Int
-
-type Offset = Int
 
 type RegisterState = M.Map String (RegisterName, VariableLocation)
 

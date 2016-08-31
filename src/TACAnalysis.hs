@@ -13,8 +13,6 @@ import TACGenerator
 import TACProgram
 
 type InstructionNo = Int
-type Label = String
-type Variable = String
 type Variables = [Variable]
 type Spilled = [Variable]
 type LabelInstructionMapping = M.Map Label InstructionNo

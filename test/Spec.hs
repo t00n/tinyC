@@ -13,6 +13,7 @@ import TACGenerator
 import TACProgram
 import NASMGenerator
 import NASMAnalysis
+import NASMProgram
 import Compiler
 
 import TestScanner

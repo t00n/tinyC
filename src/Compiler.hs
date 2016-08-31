@@ -14,6 +14,7 @@ import TACGenerator
 import TACProgram
 import TACAnalysis
 import NASMGenerator
+import NASMProgram
 import Utility
 
 -- API

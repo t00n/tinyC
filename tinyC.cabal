@@ -19,20 +19,21 @@ library
                      , Tokens
                      , Parser
                      , AST
+                     , SemanticError
+                     , SymbolTable
                      , Semantics
+                     , MonadNames
                      , TACGenerator
                      , TACProgram
-                     , MonadNames
-                     , Utility
-                     , NASMGenerator
-                     , SymbolTable
-                     , SemanticError
+                     , TACOptimization
                      , TACAnalysis
+                     , NASMAnalysis
+                     , NASMGenerator
+                     , NASMProgram
+                     , Compiler
                      , Queue
                      , Graph
-                     , NASMAnalysis
-                     , Compiler
-                     , TACOptimization
+                     , Utility
   build-depends:       base >= 4.7 && < 5
                      , array
                      , containers
