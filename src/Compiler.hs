@@ -1,6 +1,6 @@
 module Compiler (compile, run_parse, run_st, run_semantics, run_tac, run_nasm) where
 
-import Control.Arrow ((&&&), second)
+import Control.Arrow ((&&&))
 import qualified Data.Map as M
 import Control.Monad (liftM2)
 
@@ -13,6 +13,7 @@ import Semantics
 import TACGenerator
 import TACProgram
 import TACAnalysis
+import TACOptimization
 import NASMGenerator
 import NASMProgram
 import Utility
@@ -29,6 +30,9 @@ run_semantics prog = run_st_ast prog >>= uncurry runSemantics
 
 run_tac :: String -> TACProgram
 run_tac = uncurry tacGenerate . st_ast_check . run_parse
+
+run_tac_optimized :: String -> TACProgram
+run_tac_optimized = tacOptimize . run_tac
 
 run_nasm :: String -> NASMProgram
 run_nasm = uncurry nasmGenerate . (eval_st &&& run_tac)

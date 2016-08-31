@@ -19,6 +19,14 @@ type DataFlowOut = S.Set Variable
 type DataFlowGraph = M.Map InstructionNo (DataFlowIn, DataFlowOut)
 type RegisterInterferenceGraph = G.Graph Variable
 
+-- retrieve data variables
+retrieveVariable :: TACInstruction -> Variable
+retrieveVariable (TACCopy a _) = a
+retrieveVariable (TACArrayDecl a _) = a
+
+retrieveVariables :: [TACInstruction] -> Variables
+retrieveVariables = map retrieveVariable
+
 -- map labels to instruction
 constructLabelKey :: TACFunction -> LabelInstructionMapping
 constructLabelKey is = 
