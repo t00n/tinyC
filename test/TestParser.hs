@@ -3,11 +3,8 @@ module TestParser (testParsing, scan_and_parse) where
 import Test.Hspec
 import Control.Exception (evaluate)
 
-import Scanner
-import Parser
+import Compiler (scan_and_parse)
 import AST
-
-scan_and_parse = parse . alexScanTokens
 
 testParsing = 
 	describe "Parser" $ do

@@ -1,5 +1,5 @@
 {
-module Scanner where
+module Scanner (scan) where
 import Tokens
 }
 
@@ -48,5 +48,7 @@ tokens :-
 
 tokenWrapper :: (String -> Token) -> (AlexPosn -> String -> TokenWrapper)
 tokenWrapper f = \(AlexPn p1 p2 p3) s -> TokenWrapper (f s) (p1, p2, p3)
+
+scan = alexScanTokens
 
 }

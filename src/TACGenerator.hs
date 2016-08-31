@@ -168,7 +168,7 @@ tacRelExpression (Var v) = do
     return (TACExpr t TACNotEqual (TACInt 0), lines)
 tacRelExpression e = do (_, b, c) <- tacExpression e; return (b, c)
 
-tacExpression :: Expression -> SSNSS (Type, TACExpression, [TACInstruction])
+tacExpression :: Expression -> SSNSS (TACGenerator.Type, TACExpression, [TACInstruction])
 tacExpression (Int i) = return (IntType, TACInt i, [])
 tacExpression (Char i) = return (CharType, TACChar i, [])
 tacExpression (BinOp e1 op e2) = do
@@ -260,8 +260,8 @@ data TACInstruction = TACBinary String TACExpression TACBinaryOperator TACExpres
                     | TACCall String [TACExpression] (Maybe TACExpression)
                     | TACReturn (Maybe TACExpression)
                     | TACLabel String
-                    | TACWrite Type TACExpression
-                    | TACRead Type TACExpression
+                    | TACWrite TACGenerator.Type TACExpression
+                    | TACRead TACGenerator.Type TACExpression
     deriving (Eq, Show, Ord)
 
 data TACBinaryOperator = TACPlus 
@@ -284,6 +284,7 @@ data TACExpression = TACInt Int
                    | TACExpr TACExpression TACBinaryOperator TACExpression
     deriving (Eq, Show, Ord)
 
+type Type = AST.Type
 
 class TACPrint a where
     tacPrint :: a -> String

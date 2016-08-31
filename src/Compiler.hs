@@ -1,4 +1,4 @@
-module Compiler (compile) where
+module Compiler (compile, scan_and_parse) where
 
 import Scanner
 import Parser
@@ -9,10 +9,12 @@ import NASMGenerator
 
 import qualified Data.Map as M
 
+scan_and_parse = parse . scan
+
 compile :: String -> String -> IO ()
 compile infile outfile = do
     cCode <- readFile infile
-    let ast = case (checkSemantics . parse . alexScanTokens) cCode of
+    let ast = case (checkSemantics . scan_and_parse) cCode of
                    Left x -> error $ show x
                    Right x -> x
     let st = symbolTable ast
