@@ -7,6 +7,7 @@ import Data.Char(ord)
 import Control.Monad (foldM)
 import Data.Maybe (fromJust, fromMaybe)
 import Debug.Trace (traceShow)
+import Control.Monad.Trans.Except (runExceptT)
 
 import Utility
 import SemanticError
@@ -127,7 +128,6 @@ nameToSize :: Name -> Either SemanticError SymbolSize
 nameToSize (Name _) = Right $ VarSize 1
 nameToSize (NameSubscription _ sizes) = Right $ ArraySize $ map expressionSize sizes
 nameToSize (NamePointer _) = Right $ VarSize 1
-nameToSize x = Left (SemanticError NotAConstantError (show x))
 
 declName :: Declaration -> String
 declName (VarDeclaration _ n _) = nameToString n
@@ -202,5 +202,8 @@ constructDeclarations ds st =
 constructFunction :: [Declaration] -> Either SemanticError (Tree Symbols)
 constructFunction ds = constructDeclarations ds emptyST
 
-constructST :: [Declaration] -> Either SemanticError SymbolTable
-constructST ds = constructFunction ds >>= (return . fromTree)
+runST :: Program -> Either SemanticError SymbolTable
+runST ds = constructFunction ds >>= (return . fromTree)
+
+evalST :: Program -> SymbolTable
+evalST = evalEither . runST

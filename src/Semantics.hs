@@ -1,9 +1,9 @@
 {-# LANGUAGE DeriveAnyClass, FlexibleInstances #-}
 
-module Semantics (checkSemantics, symbolTable) where
+module Semantics (runSemantics, evalSemantics) where
 
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT, throwE)
-import Control.Monad.State (State(..), get, put, modify, runState, gets)
+import Control.Monad.State (State(..), get, put, modify, runState, evalState, gets)
 import Control.Monad (foldM)
 import Data.Maybe (isJust, fromJust)
 import Data.Char (ord)
@@ -248,15 +248,8 @@ getExpressionKind expr = do
         _ -> return Value
 
 -- API
+runSemantics :: SymbolTable -> Program -> Either SemanticError Program
+runSemantics st prog = (evalState . runExceptT) (entryPointExists prog >>= check) st
 
-run :: Program -> (Either SemanticError Program, SymbolTable)
-run prog = (runState . runExceptT) (do
-        st <- ExceptT $ return $ constructST prog
-        put st
-        entryPointExists prog >>= check) (zipper emptyST)
-
-checkSemantics :: Program -> (Either SemanticError Program)
-checkSemantics = fst . run
-
-symbolTable :: Program -> SymbolTable
-symbolTable = root . snd . run
+evalSemantics :: SymbolTable -> Program -> Program
+evalSemantics = evalEither ... runSemantics

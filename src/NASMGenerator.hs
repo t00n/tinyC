@@ -23,14 +23,14 @@ import Graph
 import AST
 import NASMAnalysis
 
-nasmGenerate :: TACProgram -> SymbolTable -> NASMProgram
-nasmGenerate p = NASMProgram <$> nasmGenerateData p <*> nasmGenerateText p
+nasmGenerate :: SymbolTable -> TACProgram -> NASMProgram
+nasmGenerate st = NASMProgram <$> nasmGenerateData st <*> nasmGenerateText st
 
-nasmGenerateData :: TACProgram -> SymbolTable -> [NASMData]
-nasmGenerateData p st = evalState (evalStateT (evalStateT (nasmGenerateDataReal (tacData p)) M.empty) st) (Flags False)
+nasmGenerateData :: SymbolTable -> TACProgram -> [NASMData]
+nasmGenerateData st p = evalState (evalStateT (evalStateT (nasmGenerateDataReal (tacData p)) M.empty) st) (Flags False)
 
-nasmGenerateText :: TACProgram -> SymbolTable -> [NASMInstruction]
-nasmGenerateText p st = evalState (evalStateT (evalStateT (nasmGenerateTextReal (tacCode p)) M.empty) st) (Flags False)
+nasmGenerateText :: SymbolTable -> TACProgram -> [NASMInstruction]
+nasmGenerateText st p = evalState (evalStateT (evalStateT (nasmGenerateTextReal (tacCode p)) M.empty) st) (Flags False)
 
 nasmGenerateDataReal :: [TACInstruction] -> SRSS [NASMData]
 nasmGenerateDataReal = return . (map decl)

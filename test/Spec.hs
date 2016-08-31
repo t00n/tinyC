@@ -8,17 +8,11 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (fromJust)
 
-import Scanner
-import Parser
-import Semantics
-import TACGenerator
 import MonadNames
+import TACGenerator
 import NASMGenerator
-import SymbolTable
-import SemanticError
-import TACAnalysis
-import Graph
 import NASMAnalysis
+import Compiler
 
 import TestScanner
 import TestParser
@@ -46,8 +40,6 @@ main = hspec $ do
     describe "Tests nasm analysis and optimization" $ do
         it "Tests negative constraints on register allocation" $ do
             code <- readFile "test/fixtures/bigprogram.c"
-            let ast = scan_parse_check code
-            let st = symbolTable ast
-            let tac = tacGenerate st ast
+            let tac = run_tac code
             negativeConstraints (concat $ tacCode tac) `shouldBe` M.fromList [("t2",S.fromList [A,D]),("t6",S.fromList [A,D]),("t9",S.fromList [A,D])]
     testRealLife

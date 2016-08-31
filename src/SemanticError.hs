@@ -17,3 +17,6 @@ data SemanticError = SemanticError {
     errorType :: ErrorType,
     errorVariable :: String
 } deriving (Eq, Show)
+
+evalEither :: Show a => Either SemanticError a -> a
+evalEither = either (error . show) id
