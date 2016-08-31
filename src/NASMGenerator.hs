@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances, OverlappingInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module NASMGenerator (nasmGenerate, nasmGenerateData, nasmGenerateText) where
 

@@ -5,7 +5,7 @@ import Data.List(intercalate)
 import AST
 
 data TACProgram = TACProgram [TACInstruction] [TACFunction]
-	deriving (Eq, Show)
+    deriving (Eq, Show)
 
 tacData :: TACProgram -> [TACInstruction]
 tacData (TACProgram ds _) = ds

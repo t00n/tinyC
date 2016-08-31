@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances, OverlappingInstances #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
 
 module NASMProgram where
 
@@ -130,7 +130,7 @@ data NASMInstruction = LABEL Label
 class NASMShow a where
     nasmShow :: a -> String
 
-instance NASMShow a => NASMShow [a] where
+instance {-# OVERLAPPABLE #-} NASMShow a => NASMShow [a] where 
     nasmShow = concatMap (\x -> nasmShow x ++ "\n")
 
 instance NASMShow String where
