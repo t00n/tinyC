@@ -10,6 +10,7 @@ import Data.Maybe (fromJust)
 
 import MonadNames
 import TACGenerator
+import TACProgram
 import NASMGenerator
 import NASMAnalysis
 import Compiler

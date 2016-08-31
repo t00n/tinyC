@@ -21,6 +21,7 @@ library
                      , AST
                      , Semantics
                      , TACGenerator
+                     , TACProgram
                      , MonadNames
                      , Utility
                      , NASMGenerator

@@ -11,6 +11,7 @@ import SemanticError
 import SymbolTable
 import Semantics
 import TACGenerator
+import TACProgram
 import TACAnalysis
 import NASMGenerator
 import Utility

@@ -1,7 +1,7 @@
 module NASMAnalysis where
 
 import TACAnalysis
-import TACGenerator
+import TACProgram
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Maybe (fromJust)

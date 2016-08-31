@@ -16,7 +16,7 @@ import Numeric (showHex)
 import Data.Char (toLower)
 
 
-import TACGenerator
+import TACProgram
 import SymbolTable
 import TACAnalysis
 import Graph

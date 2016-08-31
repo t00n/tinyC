@@ -1,6 +1,6 @@
 module TACOptimization (tacOptimize, removeUselessCopy) where
 
-import TACGenerator
+import TACProgram
 import TACAnalysis
 import Debug.Trace (traceShow)
 

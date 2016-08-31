@@ -6,8 +6,8 @@ import qualified Data.Set as S
 
 import Compiler
 import Graph
-import Semantics
 import TACGenerator
+import TACProgram
 import TACAnalysis
 
 

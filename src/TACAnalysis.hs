@@ -10,6 +10,7 @@ import Debug.Trace (traceShow, trace)
 import Control.Arrow ((&&&))
 
 import TACGenerator
+import TACProgram
 
 type InstructionNo = Int
 type Label = String

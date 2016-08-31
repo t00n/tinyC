@@ -4,7 +4,7 @@ import Test.Hspec
 
 import Compiler
 import AST
-import TACGenerator
+import TACProgram
 import TACOptimization
 
 testTACOptimization =

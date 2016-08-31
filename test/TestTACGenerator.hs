@@ -4,6 +4,7 @@ import Test.Hspec
 
 import Compiler
 import AST (Type(..))
+import TACProgram
 import TACGenerator
 
 testTACGenerator = 
