@@ -53,6 +53,7 @@ data TACExpression = TACInt Int
                    | TACVar Variable
                    | TACArray Variable TACExpression
                    | TACExpr TACExpression TACBinaryOperator TACExpression
+                   | TACUnOp TACUnaryOperator TACExpression
     deriving (Eq, Show, Ord)
 
 type Type = AST.Type

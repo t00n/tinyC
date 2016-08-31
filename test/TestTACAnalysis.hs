@@ -26,3 +26,8 @@ testTACAnalysis =
         it "Tests that unused variables do not appear" $ do
             let tac = run_tac "int tiny() { int a = 5; }"
             (registerInterferenceGraph . dataFlowGraph . controlFlowGraph) (concat (tacCode tac)) `shouldBe` empty
+        it "Tests expression flow graph" $ do
+            let tac = run_tac "int tiny() { int a = 5 + 4; int b = 3 + a; a = 5;}"
+            let cfg = controlFlowGraph (concat (tacCode tac))
+            let efg = expressionFlowGraph cfg
+            efg `shouldBe` M.fromList [(0,(M.fromList [],M.fromList [])),(1,(M.fromList [],M.fromList [(TACExpr (TACInt 5) TACPlus (TACInt 4),("t1",S.fromList []))])),(2,(M.fromList [],M.fromList [(TACVar "t1",("a",S.fromList ["t1"])),(TACExpr (TACInt 5) TACPlus (TACInt 4),("t1",S.fromList []))])),(3,(M.fromList [],M.fromList [(TACVar "t1",("a",S.fromList ["t1"])),(TACExpr (TACInt 3) TACPlus (TACVar "a"),("t2",S.fromList ["a"])),(TACExpr (TACInt 5) TACPlus (TACInt 4),("t1",S.fromList []))])),(4,(M.fromList [],M.fromList [(TACVar "t1",("a",S.fromList ["t1"])),(TACVar "t2",("b",S.fromList ["t2"])),(TACExpr (TACInt 3) TACPlus (TACVar "a"),("t2",S.fromList ["a"])),(TACExpr (TACInt 5) TACPlus (TACInt 4),("t1",S.fromList []))])),(5,(M.fromList [],M.fromList [(TACInt 5,("a",S.fromList [])),(TACVar "t2",("b",S.fromList ["t2"])),(TACExpr (TACInt 5) TACPlus (TACInt 4),("t1",S.fromList []))])),(6,(M.fromList [],M.fromList []))]

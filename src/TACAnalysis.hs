@@ -18,6 +18,9 @@ type DataFlowIn = S.Set Variable
 type DataFlowOut = S.Set Variable
 type DataFlowGraph = M.Map InstructionNo (DataFlowIn, DataFlowOut)
 type RegisterInterferenceGraph = G.Graph Variable
+type ExpressionFlowIn = M.Map TACExpression (Variable, S.Set Variable)
+type ExpressionFlowOut = M.Map TACExpression (Variable, S.Set Variable)
+type ExpressionFlowGraph = M.Map InstructionNo (ExpressionFlowIn, ExpressionFlowOut)
 
 -- retrieve data variables
 retrieveVariable :: TACInstruction -> Variable
@@ -108,7 +111,7 @@ dataFlowGraph cfg =
                 in dataFlowGraphRec newnewq newvs
     in dataFlowGraphRec (Q.enqueueAll (G.keys cfg) Q.empty) variables
 
-dfgShow :: ControlFlowGraph -> DataFlowGraph -> String
+dfgShow :: (Show a, Show b) => ControlFlowGraph -> M.Map InstructionNo (a, b) -> String
 dfgShow cfg = (intercalate "\n") . M.elems . (M.mapWithKey f)
     where f k (din, dout) = tacPrint (G.unsafeLookup k cfg) ++ " => " ++ show dout
 
@@ -118,3 +121,41 @@ registerInterferenceGraph vs = graph
           n = S.foldl (flip G.insertNode) G.empty (S.unions allsets)
           graph = foldr f n allsets
           f x g = foldr (uncurry G.insertEdge) g [(G.find a graph, G.find b graph) | a <- S.toList x, b <- S.toList x, a /= b]
+
+genExpressions :: TACInstruction -> (Maybe TACExpression, (Variable, S.Set Variable))
+genExpressions inst = 
+    let expressionsToSet = (S.fromList . expressionsNames)
+    in
+    case inst of 
+        (TACBinary v e1 op e2) -> (Just $ TACExpr e1 op e2, (v, expressionsToSet [e1, e2]))
+        (TACUnary s op e) -> (Just $ TACUnOp op e, (s, expressionsToSet [e]))
+        (TACCopy s e) -> (Just e, (s, expressionsToSet [e]))
+        (TACArrayAccess var array ex) -> (Just $ TACArray array ex, (var, S.fromList [array] `S.union` expressionsToSet [ex]))
+        _ -> (Nothing, ([], S.empty))
+
+killExpressions :: TACInstruction -> ExpressionFlowIn -> ExpressionFlowIn
+killExpressions inst mapping = 
+    let removeVar v = M.filter (\(def, used) ->  v == def || v `elem` used) mapping in
+    case inst of
+        (TACBinary v _ _ _) -> removeVar v
+        (TACUnary v _ _) -> removeVar v
+        (TACCopy v _) -> removeVar v
+        (TACArrayAccess v _ _) -> removeVar v
+        _ -> mapping
+
+expressionFlowGraph :: ControlFlowGraph -> ExpressionFlowGraph
+expressionFlowGraph cfg = G.fold f M.empty cfg
+    where f inst efg = update_succs (M.insert inst (newflowin, newflowout) efg)
+            where (flowin, flowout) = M.findWithDefault (M.empty, M.empty) inst efg
+                  instValue = G.unsafeLookup inst cfg
+                  (expr, (def, used)) = genExpressions instValue
+                  kill = killExpressions instValue flowin
+                  newexpr = case expr of 
+                                 Nothing -> M.empty
+                                 (Just e) -> M.singleton e (def, used)
+                  newflowout = (flowin `M.difference` kill) `M.union` newexpr
+                  newflowin = mapIntersections . S.toList $ S.map (\k -> let (_, out) = M.findWithDefault (M.empty, M.empty) k efg in out) (G.predecessors inst cfg)
+                  update_succs m = foldr (\k acc -> if k `M.member` acc then M.adjust (\(_, y) -> (newflowout, y)) k acc else M.insert k (newflowout, M.empty) acc) m (G.successors inst cfg)
+
+mapIntersections :: Ord k => [M.Map k a] -> M.Map k a
+mapIntersections maps = foldr M.intersection M.empty maps

@@ -2,6 +2,9 @@ module Graph where
 
 import qualified Data.Set as S
 import qualified Data.Map as M
+import qualified Queue as Q
+
+import Debug.Trace (traceShow)
 
 data Graph a = Graph (Nodes a) Edges
     deriving (Eq, Show)
@@ -48,6 +51,9 @@ delete k (Graph nodes edges) =
         newedges = S.filter (\(a, b) -> a /= k && b /= k) edges
     in Graph newnodes newedges
 
+deleteAll :: [Key] -> Graph a -> Graph a
+deleteAll = flip (foldr delete)
+
 deleteNode :: Ord a => a -> Graph a -> Graph a
 deleteNode v g = delete (find v g) g
 
@@ -74,6 +80,17 @@ successorsValues k graph = map (flip unsafeLookup graph) (S.toList (successors k
 
 neighboursValues :: Ord a => Key -> Graph a -> [a]
 neighboursValues k g = predecessorsValues k g ++ successorsValues k g
+
+fold' :: Ord a => (Key -> b -> b) -> b -> Graph a -> Q.Queue Key -> b
+fold' f acc g q = 
+    let (curr, newq) = Q.dequeue q
+    in case curr of
+        Nothing -> acc
+        (Just c) -> let succs = S.toList $ successors c g
+                    in fold' f (f c acc) (delete c g) (Q.enqueueAll succs newq)
+
+fold :: Ord a => (Key -> b -> b) -> b -> Graph a -> b
+fold f acc g = fold' f acc g (Q.enqueue ((head . keys) g) Q.empty)
 
 mapToNumbers :: [a]-> [Integer]
 mapToNumbers = map fst . zip [0..]
