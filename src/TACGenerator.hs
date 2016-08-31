@@ -7,7 +7,7 @@ import Data.Char (chr, ord)
 import Data.Sequence (foldrWithIndex)
 import Debug.Trace (traceShow)
 
-import Parser
+import AST
 import MonadNames
 import Utility
 import SymbolTable

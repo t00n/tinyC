@@ -4,7 +4,7 @@ import Test.Hspec
 
 import TestParser
 
-import Parser
+import AST
 import Semantics
 import TACGenerator
 import TACOptimization

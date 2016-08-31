@@ -11,7 +11,7 @@ import qualified Data.Map as M
 import Debug.Trace (traceShow, trace)
 import Data.Tree (drawTree)
 
-import Parser
+import AST
 import Utility
 import SemanticError
 import SymbolTable

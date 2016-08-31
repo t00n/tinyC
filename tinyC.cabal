@@ -16,7 +16,9 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Scanner
+                     , Tokens
                      , Parser
+                     , AST
                      , Semantics
                      , TACGenerator
                      , MonadNames

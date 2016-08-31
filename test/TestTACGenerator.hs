@@ -3,7 +3,7 @@ module TestTACGenerator (testTACGenerator, scan_parse_check) where
 import Test.Hspec
 
 import TestParser
-import Parser (Type(..))
+import AST
 import Semantics
 import TACGenerator
 

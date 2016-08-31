@@ -6,7 +6,7 @@ import qualified Data.Map as M
 
 import TestParser (scan_and_parse)
 
-import Parser
+import AST
 import SymbolTable
 import SemanticError
 

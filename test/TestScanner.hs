@@ -4,6 +4,7 @@ import Test.Hspec
 import Control.Exception (evaluate)
 
 import Scanner
+import Tokens
 
 testTokensShouldBe s r = do
     it ("Tokenizes " ++ s) $ do

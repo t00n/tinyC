@@ -5,6 +5,7 @@ import Control.Exception (evaluate)
 
 import Scanner
 import Parser
+import AST
 
 scan_and_parse = parse . alexScanTokens
 

@@ -20,7 +20,7 @@ import TACGenerator
 import SymbolTable
 import TACAnalysis
 import Graph
-import Parser (Type(..))
+import AST
 import NASMAnalysis
 
 nasmGenerate :: TACProgram -> SymbolTable -> NASMProgram

@@ -10,7 +10,7 @@ import Debug.Trace (traceShow)
 
 import Utility
 import SemanticError
-import Parser
+import AST
 
 -- Tree
 addChild :: Tree a -> Tree a -> Tree a
