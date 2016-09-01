@@ -2,9 +2,11 @@ module TACOptimization (tacOptimize, removeUselessCopy) where
 
 import TACProgram
 import TACAnalysis
-import Debug.Trace (traceShow)
+import Debug.Trace (traceShow, trace)
 import Data.List ((\\))
 import qualified Graph as G
+import qualified Data.Map as M
+import Data.Sequence (mapWithIndex)
 
 mapData :: (TACInstruction -> TACInstruction) -> TACProgram -> TACProgram
 mapData f (TACProgram staticdata code) = TACProgram (map f staticdata) code
@@ -16,7 +18,7 @@ filterData :: (TACInstruction -> Bool) -> TACProgram -> TACProgram
 filterData f (TACProgram staticdata code) = TACProgram (filter f staticdata) code
 
 tacOptimize :: TACProgram -> TACProgram
-tacOptimize = mapCode (mappair removeUselessCopy) . removeUnusedGlobalVariables
+tacOptimize = replaceCommonExpressions . mapCode (mappair removeUselessCopy) . removeUnusedGlobalVariables
 
 -- remove useless copies
 
@@ -46,3 +48,21 @@ removeUnusedGlobalVariables prog@(TACProgram staticdata funcs) =
         removeVariable (TACArrayDecl a _) = a `notElem` (globalVariables \\ localVariables)
         removeVariable _ = True
     in  filterData removeVariable prog
+
+-- replace common expressions
+
+replaceCommonExpressions' :: TACFunction -> TACFunction
+replaceCommonExpressions' xs = map replace (zip [0..] xs)
+    where efg = (expressionFlowGraph . controlFlowGraph) xs
+          replace (i, inst) = newinst
+                where (expr, (lhs, _)) = genExpressions inst
+                      (flowin, _) = efg M.! i
+                      newinst = case expr of
+                                     Nothing -> inst
+                                     (Just e) -> case M.lookup e flowin of
+                                                      Nothing -> inst
+                                                      (Just (rhs, _)) -> TACCopy lhs (TACVar rhs)
+
+
+replaceCommonExpressions :: TACProgram -> TACProgram
+replaceCommonExpressions (TACProgram staticdata code) = TACProgram staticdata (map replaceCommonExpressions' code) 

@@ -113,7 +113,7 @@ dataFlowGraph cfg =
 
 dfgShow :: (Show a, Show b) => ControlFlowGraph -> M.Map InstructionNo (a, b) -> String
 dfgShow cfg = (intercalate "\n") . M.elems . (M.mapWithKey f)
-    where f k (din, dout) = tacPrint (G.unsafeLookup k cfg) ++ " => " ++ show dout
+    where f k (din, dout) = tacPrint (G.unsafeLookup k cfg) ++ " => " ++ show (din, dout)
 
 registerInterferenceGraph :: DataFlowGraph -> RegisterInterferenceGraph
 registerInterferenceGraph vs = graph
@@ -144,8 +144,8 @@ killExpressions inst mapping =
         _ -> mapping
 
 expressionFlowGraph :: ControlFlowGraph -> ExpressionFlowGraph
-expressionFlowGraph cfg = G.fold f M.empty cfg
-    where f inst efg = update_succs (M.insert inst (newflowin, newflowout) efg)
+expressionFlowGraph cfg = foldr backward (G.fold forward M.empty cfg) (G.keys cfg)
+    where forward inst efg = update_succs (M.insert inst (flowin, newflowout) efg)
             where (flowin, flowout) = M.findWithDefault (M.empty, M.empty) inst efg
                   instValue = G.unsafeLookup inst cfg
                   (expr, (def, used)) = genExpressions instValue
@@ -154,8 +154,10 @@ expressionFlowGraph cfg = G.fold f M.empty cfg
                                  Nothing -> M.empty
                                  (Just e) -> M.singleton e (def, used)
                   newflowout = (flowin `M.difference` kill) `M.union` newexpr
-                  newflowin = mapIntersections . S.toList $ S.map (\k -> let (_, out) = M.findWithDefault (M.empty, M.empty) k efg in out) (G.predecessors inst cfg)
                   update_succs m = foldr (\k acc -> if k `M.member` acc then M.adjust (\(_, y) -> (newflowout, y)) k acc else M.insert k (newflowout, M.empty) acc) m (G.successors inst cfg)
+          backward inst efg = M.adjust (\(flowin, flowout) -> (newflowin, flowout)) inst efg
+             where newflowin = mapIntersections . S.toList $ S.map (\k -> let (_, out) = efg M.! k in out) (G.predecessors inst cfg)
 
 mapIntersections :: Ord k => [M.Map k a] -> M.Map k a
-mapIntersections maps = foldr M.intersection M.empty maps
+mapIntersections [] = M.empty
+mapIntersections maps = foldr1 M.intersection maps
