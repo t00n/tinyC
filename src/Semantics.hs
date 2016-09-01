@@ -93,7 +93,7 @@ instance Checkable Expression where
             Var name -> checkNameDeclared name >>
                 case name of
                     (NamePointer n) -> checkNameIsValue name >> return expr
-                    (NameSubscription n e) -> checkNameIsValue name >> mapM check e >> mapM checkExpressionIsValue e >> return expr
+                    (NameSubscription n e) -> mapM check e >> mapM checkExpressionIsValue e >> return expr
                     _ -> return expr
             Address name -> checkNameDeclared name >> checkNameIsValue name >> return expr
             _ -> return expr

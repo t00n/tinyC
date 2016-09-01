@@ -55,5 +55,6 @@ st_ast_check :: Program -> (SymbolTable, Program)
 st_ast_check = (fst &&& uncurry evalSemantics) . st_ast
 
 compile :: String -> String -> IO ()
-compile infile outfile = 
-    readFile infile >>= writeFile outfile . nasmShow . run_nasm
+compile infile outfile = do
+    readFile infile >>= writeFile outfile . nasmShow . run_nasm_optimized
+    readFile infile >>= writeFile (outfile ++ ".tac") . tacPrint . run_tac_optimized

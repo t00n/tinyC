@@ -203,7 +203,12 @@ tacExpression (Var (NameSubscription n es)) = do
     (_, t, lines) <- tacExpression ex
     newvar <- lift popVariable
     typ <- gets (unsafeSymbolType n)
-    return (typ, TACVar newvar, lines ++ [TACArrayAccess newvar n t])
+    size <- gets (unsafeSymbolSize n)
+    let newline = case size of
+                        VarSize s -> TACArrayAccess newvar n t
+                        ArraySize ss -> if length es < length ss then TACAddress newvar (TACArray n t)
+                                        else TACArrayAccess newvar n t
+    return (typ, TACVar newvar, lines ++ [newline])
 tacExpression (Var (NamePointer n)) = do
     newvar <- lift popVariable
     typ <- gets (unsafeSymbolType n)
