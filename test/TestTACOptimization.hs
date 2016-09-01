@@ -6,6 +6,8 @@ import Compiler
 import AST
 import TACProgram
 import TACOptimization
+import NASMGenerator
+import NASMProgram
 
 testTACOptimization =
     describe "Tests TAC Optimization" $ do
@@ -22,3 +24,8 @@ testTACOptimization =
             let tac = run_tac "int tiny() { int a = 5 + 4; int b = 5 + 4; int c = a + b; int d = a + b; int e; a = 5; e = a + b; }"
             let optimizedTAC = tacOptimize tac
             optimizedTAC `shouldBe` TACProgram [] [[TACLabel "tiny",TACBinary "a" (TACInt 5) TACPlus (TACInt 4),TACCopy "b" (TACVar "a"),TACBinary "c" (TACVar "a") TACPlus (TACVar "b"),TACCopy "d" (TACVar "c"),TACCopy "e" (TACInt 0),TACCopy "a" (TACInt 5),TACBinary "e" (TACVar "a") TACPlus (TACVar "b"),TACReturn Nothing]]
+        it "Tests constants expressions replacement" $ do
+            let code = "int tiny() { int a = 5; int b = 4; int c = a + b; write c;}"
+            let tac = run_tac code
+            let optimizedTAC = tacOptimize tac
+            optimizedTAC `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 5),TACCopy "b" (TACInt 4),TACBinary "c" (TACInt 5) TACPlus (TACInt 4),TACWrite IntType (TACVar "c"),TACReturn Nothing]]

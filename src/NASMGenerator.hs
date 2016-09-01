@@ -121,7 +121,7 @@ exitInstructions :: [NASMInstruction]
 exitInstructions = [CALL "_exit"]
 
 varRegister :: Variable -> SRSS RegisterName
-varRegister var = gets (fst . (M.! var))
+varRegister var = gets (fst . flip (M.!) var)
 
 varLocation :: Variable -> SRSS VariableLocation
 varLocation var = gets (snd . (M.! var))

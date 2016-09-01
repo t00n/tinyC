@@ -6,7 +6,8 @@ import Debug.Trace (traceShow, trace)
 import Data.List ((\\))
 import qualified Graph as G
 import qualified Data.Map as M
-import Data.Sequence (mapWithIndex)
+import qualified Data.Set as S
+import Control.Arrow ((***))
 
 mapData :: (TACInstruction -> TACInstruction) -> TACProgram -> TACProgram
 mapData f (TACProgram staticdata code) = TACProgram (map f staticdata) code
@@ -18,7 +19,7 @@ filterData :: (TACInstruction -> Bool) -> TACProgram -> TACProgram
 filterData f (TACProgram staticdata code) = TACProgram (filter f staticdata) code
 
 tacOptimize :: TACProgram -> TACProgram
-tacOptimize = replaceCommonExpressions . mapCode (mappair removeUselessCopy) . removeUnusedGlobalVariables
+tacOptimize = replaceCommonExpressions . mapCode (mappair removeUselessCopy) . replaceConstants . removeUnusedGlobalVariables
 
 -- remove useless copies
 
@@ -66,3 +67,27 @@ replaceCommonExpressions' xs = map replace (zip [0..] xs)
 
 replaceCommonExpressions :: TACProgram -> TACProgram
 replaceCommonExpressions (TACProgram staticdata code) = TACProgram staticdata (map replaceCommonExpressions' code) 
+
+-- replace constants
+
+replaceConstants' :: TACFunction -> TACFunction
+replaceConstants' xs = map f (zip [0..] xs)
+    where efg = (M.map (M.filterWithKey isConstant *** M.filterWithKey isConstant) . expressionFlowGraph . controlFlowGraph) xs
+          isConstant (TACInt _) _ = True
+          isConstant (TACChar _) _ = True
+          isConstant _ _ = False
+          f (i, inst) = newinst
+                where (expr, (lhs, used)) = genExpressions inst
+                      (flowin, _) = efg M.! i
+                      es = M.filterWithKey (\k (def, _) -> def `S.member` used) flowin
+                      invertedES = (M.fromList . M.elems . M.mapWithKey (\k (def, _) -> (def, k))) es
+                      newinst = case expr of 
+                                     Nothing -> inst
+                                     (Just e) -> if S.size used == M.size es then
+                                                    replaceInst inst
+                                                 else inst
+                      replaceInst (TACBinary v (TACVar v1) op (TACVar v2)) = TACBinary v (invertedES M.! v1) op (invertedES M.! v2)
+                      replaceInst inst = inst
+
+replaceConstants :: TACProgram -> TACProgram
+replaceConstants (TACProgram staticdata code) = TACProgram staticdata (map replaceConstants' code)

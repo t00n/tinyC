@@ -1,4 +1,4 @@
-module Compiler (compile, run_parse, run_st, run_semantics, run_tac, run_nasm) where
+module Compiler (compile, run_parse, run_st, run_semantics, run_tac, run_tac_optimized, run_nasm, run_nasm_optimized) where
 
 import Control.Arrow ((&&&))
 import qualified Data.Map as M
@@ -36,6 +36,9 @@ run_tac_optimized = tacOptimize . run_tac
 
 run_nasm :: String -> NASMProgram
 run_nasm = uncurry nasmGenerate . (eval_st &&& run_tac)
+
+run_nasm_optimized :: String -> NASMProgram
+run_nasm_optimized = uncurry nasmGenerate . (eval_st &&& run_tac_optimized)
 
 -- Helpers
 
