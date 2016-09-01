@@ -83,10 +83,12 @@ replaceConstants' xs = map f (zip [0..] xs)
                       invertedES = (M.fromList . M.elems . M.mapWithKey (\k (def, _) -> (def, k))) es
                       newinst = case expr of 
                                      Nothing -> inst
-                                     (Just e) -> if S.size used == M.size es then
+                                     (Just e) -> if S.size used <= M.size es then
                                                     replaceInst inst
                                                  else inst
                       replaceInst (TACBinary v (TACVar v1) op (TACVar v2)) = TACBinary v (invertedES M.! v1) op (invertedES M.! v2)
+                      replaceInst (TACBinary v (TACVar v1) op e2) = TACBinary v (invertedES M.! v1) op e2
+                      replaceInst (TACBinary v e1 op (TACVar v2)) = TACBinary v e1 op (invertedES M.! v2)
                       replaceInst inst = inst
 
 replaceConstants :: TACProgram -> TACProgram

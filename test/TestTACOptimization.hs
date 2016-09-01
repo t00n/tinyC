@@ -29,3 +29,8 @@ testTACOptimization =
             let tac = run_tac code
             let optimizedTAC = tacOptimize tac
             optimizedTAC `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 5),TACCopy "b" (TACInt 4),TACBinary "c" (TACInt 5) TACPlus (TACInt 4),TACWrite IntType (TACVar "c"),TACReturn Nothing]]
+        it "Tests constants expressions replacement 2" $ do
+            let code = "int tiny() { int a = 5; int b = 4; int c = b; int d = a + c; write d; }"
+            let tac = run_tac code
+            let optimizedTAC = tacOptimize tac
+            optimizedTAC `shouldBe` TACProgram [] [[TACLabel "tiny",TACCopy "a" (TACInt 5),TACCopy "b" (TACInt 4),TACCopy "c" (TACVar "b"),TACBinary "d" (TACVar "a") TACPlus (TACVar "c"),TACWrite IntType (TACVar "d"),TACReturn Nothing]]
